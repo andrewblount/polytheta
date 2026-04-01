@@ -1,4 +1,3 @@
-import { admin } from "@netlify/identity";
 import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
@@ -16,6 +15,7 @@ import {
 import type { UserRole, UserStatus } from "@/lib/types";
 
 import { captureEntrySnapshotsForBasket, runMarketSync } from "./market-sync";
+import { env } from "@/lib/env";
 
 type BasketPayload = {
   id?: string;
@@ -77,6 +77,32 @@ type BasketPayload = {
 
 function uuid(value: unknown) {
   return typeof value === "string" && value.length > 0 ? value : crypto.randomUUID();
+}
+
+async function runIdentityAdminOperation(payload: Record<string, unknown>) {
+  if (!env.syncSecret) {
+    throw new Error("Missing INTERNAL_SYNC_TOKEN.");
+  }
+
+  const response = await fetch(`${env.appUrl}/.netlify/functions/identity-admin`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${env.syncSecret}`,
+    },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+
+  const body = (await response.json().catch(() => null)) as
+    | { error?: string; id?: string; email?: string; role?: UserRole }
+    | null;
+
+  if (!response.ok) {
+    throw new Error(body?.error ?? `Identity admin request failed (${response.status}).`);
+  }
+
+  return body;
 }
 
 export async function saveBasket(
@@ -295,12 +321,16 @@ export async function saveBasket(
 
 export async function updateUserAccess({
   userId,
+  fullName,
   role,
   status,
+  password,
 }: {
   userId: string;
+  fullName: string;
   role: UserRole;
   status: UserStatus;
+  password?: string;
 }) {
   if (!db) {
     return;
@@ -314,9 +344,20 @@ export async function updateUserAccess({
     return;
   }
 
+  const normalizedFullName = fullName.trim();
+
+  if (!normalizedFullName) {
+    throw new Error("Full name is required.");
+  }
+
+  if (password && password.trim().length < 8) {
+    throw new Error("Password must be at least 8 characters.");
+  }
+
   await db
     .update(userProfiles)
     .set({
+      fullName: normalizedFullName,
       role,
       status,
       updatedAt: new Date(),
@@ -324,10 +365,90 @@ export async function updateUserAccess({
     .where(eq(userProfiles.id, userId));
 
   try {
-    await admin.updateUser(profile.identityUserId, { role });
+    await runIdentityAdminOperation({
+      operation: "update-user",
+      identityUserId: profile.identityUserId,
+      fullName: normalizedFullName,
+      role,
+      password,
+    });
   } catch {
     // Runtime may be unavailable outside Netlify; DB remains source of truth.
   }
+}
+
+export async function createUser({
+  fullName,
+  email,
+  password,
+  role,
+  status,
+}: {
+  fullName: string;
+  email: string;
+  password: string;
+  role: UserRole;
+  status: UserStatus;
+}) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedFullName = fullName.trim();
+
+  if (!normalizedFullName) {
+    throw new Error("Full name is required.");
+  }
+
+  if (!normalizedEmail) {
+    throw new Error("Email is required.");
+  }
+
+  if (password.trim().length < 8) {
+    throw new Error("Password must be at least 8 characters.");
+  }
+
+  if (role !== "admin" && role !== "member") {
+    throw new Error("Role must be admin or member.");
+  }
+
+  if (status !== "active" && status !== "inactive") {
+    throw new Error("Status must be active or inactive.");
+  }
+
+  if (!db) {
+    return { id: crypto.randomUUID(), email: normalizedEmail };
+  }
+
+  const existing = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.email, normalizedEmail),
+  });
+
+  if (existing) {
+    throw new Error("A user with that email already exists.");
+  }
+
+  const createdIdentityUser = await runIdentityAdminOperation({
+    operation: "create-user",
+    email: normalizedEmail,
+    password,
+    fullName: normalizedFullName,
+    role,
+  });
+
+  if (!createdIdentityUser?.id) {
+    throw new Error("Identity user creation failed.");
+  }
+
+  const [profile] = await db
+    .insert(userProfiles)
+    .values({
+      identityUserId: createdIdentityUser.id,
+      email: normalizedEmail,
+      fullName: normalizedFullName,
+      role,
+      status,
+    })
+    .returning();
+
+  return { id: profile.id, email: profile.email };
 }
 
 export async function saveManualOverride({

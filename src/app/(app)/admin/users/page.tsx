@@ -1,11 +1,18 @@
 import { updateUserAccessAction } from "@/app/(app)/admin/actions";
+import { CreateUserForm } from "@/components/admin/create-user-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatDateTimeLabel } from "@/lib/format";
 import { listAdminUsers } from "@/server/repos/baskets";
 
-export default async function AdminUsersPage() {
+export default async function AdminUsersPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = searchParams ? await searchParams : undefined;
   const users = await listAdminUsers();
 
   return (
@@ -14,6 +21,19 @@ export default async function AdminUsersPage() {
         <p className="eyebrow text-[10px] text-muted-foreground">Users</p>
         <h1 className="mt-2 text-4xl font-semibold tracking-tight">Manage access and roles</h1>
       </div>
+      {params?.created ? (
+        <p className="rounded-2xl border border-success/20 bg-success/10 px-4 py-3 text-sm text-success">
+          User created successfully.
+        </p>
+      ) : null}
+      <Card>
+        <CardHeader>
+          <CardTitle>Create user</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <CreateUserForm />
+        </CardContent>
+      </Card>
       <div className="grid gap-4">
         {users.map((user) => (
           <Card key={user.id}>
@@ -21,8 +41,36 @@ export default async function AdminUsersPage() {
               <CardTitle>{user.fullName}</CardTitle>
             </CardHeader>
             <CardContent>
-              <form action={updateUserAccessAction} className="grid gap-4 md:grid-cols-[1.2fr_0.8fr_0.8fr_auto]">
+              <div className="mb-4 grid gap-3 rounded-2xl border border-border/70 bg-muted/20 p-4 md:grid-cols-3">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                    Last login
+                  </p>
+                  <p className="mt-2 text-sm">
+                    {user.lastLoginAt ? formatDateTimeLabel(user.lastLoginAt) : "Never"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                    Created
+                  </p>
+                  <p className="mt-2 text-sm">{formatDateTimeLabel(user.createdAt)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                    Identity status
+                  </p>
+                  <p className="mt-2 text-sm">
+                    {user.identityConfirmedAt ? formatDateTimeLabel(user.identityConfirmedAt) : "Confirmed externally"}
+                  </p>
+                </div>
+              </div>
+              <form action={updateUserAccessAction} className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_180px_180px_1fr_auto]">
                 <input type="hidden" name="userId" value={user.id} />
+                <div>
+                  <Label>Full name</Label>
+                  <Input name="fullName" defaultValue={user.fullName} />
+                </div>
                 <div>
                   <Label>Email</Label>
                   <Input value={user.email} readOnly />
@@ -34,6 +82,10 @@ export default async function AdminUsersPage() {
                 <div>
                   <Label>Status</Label>
                   <Input name="status" defaultValue={user.status} />
+                </div>
+                <div>
+                  <Label>New password</Label>
+                  <Input name="password" type="password" placeholder="Leave blank to keep current" />
                 </div>
                 <div className="flex items-end">
                   <Button type="submit">Save</Button>
