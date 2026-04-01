@@ -13,6 +13,10 @@ import {
 } from "@/db/schema";
 import { demoBaskets, demoSyncJobs, demoUsers } from "@/lib/demo-data";
 
+function uuidMap<T extends { id: string }>(items: T[]) {
+  return new Map(items.map((item) => [item.id, crypto.randomUUID()]));
+}
+
 async function resetTables() {
   if (!db) {
     throw new Error("NETLIFY_DATABASE_URL or DATABASE_URL is required to seed.");
@@ -35,9 +39,10 @@ async function seedUsers() {
     return;
   }
 
+  const userIds = uuidMap(demoUsers);
   await db.insert(userProfiles).values(
     demoUsers.map((user) => ({
-      id: user.id,
+      id: userIds.get(user.id)!,
       identityUserId: `demo-${user.role}-${user.id}`,
       email: user.email,
       fullName: user.fullName,
@@ -56,9 +61,35 @@ async function seedBaskets() {
     return;
   }
 
+  const basketIds = uuidMap(demoBaskets);
+  const allPositions = demoBaskets.flatMap((basket) => [
+    ...basket.callPositions,
+    ...basket.putPositions,
+  ]);
+  const positionIds = uuidMap(allPositions);
+  const orderBlockIds = new Map(
+    demoBaskets.flatMap((basket) =>
+      basket.orderBlocks.map((orderBlock) => [orderBlock.id, crypto.randomUUID()]),
+    ),
+  );
+  const alertIds = new Map(
+    demoBaskets.flatMap((basket) =>
+      basket.priceAlerts.map((alert) => [alert.id, crypto.randomUUID()]),
+    ),
+  );
+  const ruleIds = new Map(
+    demoBaskets.flatMap((basket) =>
+      [...basket.hardStops, ...basket.profitTargets].map((rule) => [
+        rule.id,
+        crypto.randomUUID(),
+      ]),
+    ),
+  );
+
   for (const basket of demoBaskets) {
+    const basketId = basketIds.get(basket.id)!;
     await db.insert(baskets).values({
-      id: basket.id,
+      id: basketId,
       title: basket.title,
       slug: basket.slug,
       weekOf: basket.weekOf,
@@ -77,7 +108,7 @@ async function seedBaskets() {
     });
 
     await db.insert(marketConditions).values({
-      basketId: basket.id,
+      basketId,
       gsrsNote: basket.marketConditions.gsrsNote,
       vix: basket.marketConditions.vix.toString(),
       skew: basket.marketConditions.skew.toString(),
@@ -92,7 +123,7 @@ async function seedBaskets() {
     });
 
     await db.insert(basketMetrics).values({
-      basketId: basket.id,
+      basketId,
       totalNames: basket.portfolioSummary.totalNames,
       callCount: basket.portfolioSummary.callCount,
       putCount: basket.portfolioSummary.putCount,
@@ -106,11 +137,12 @@ async function seedBaskets() {
       updatedAt: new Date(basket.lastRefreshAt),
     });
 
-    const allPositions = [...basket.callPositions, ...basket.putPositions];
-    for (const [index, position] of allPositions.entries()) {
+    const basketPositions = [...basket.callPositions, ...basket.putPositions];
+    for (const [index, position] of basketPositions.entries()) {
+      const positionId = positionIds.get(position.id)!;
       await db.insert(positions).values({
-        id: position.id,
-        basketId: basket.id,
+        id: positionId,
+        basketId,
         side: position.side,
         ticker: position.ticker,
         companyName: position.companyName ?? null,
@@ -148,9 +180,9 @@ async function seedBaskets() {
 
       await db.insert(performanceSnapshots).values(
         position.performanceHistory.map((snapshot) => ({
-          id: snapshot.id,
-          basketId: basket.id,
-          positionId: position.id,
+          id: crypto.randomUUID(),
+          basketId,
+          positionId,
           observedAt: new Date(snapshot.observedAt),
           underlyingPrice: snapshot.underlyingPrice.toString(),
           optionMark: snapshot.optionMark?.toString() ?? null,
@@ -175,8 +207,8 @@ async function seedBaskets() {
     if (basket.orderBlocks.length) {
       await db.insert(brokerOrderBlocks).values(
         basket.orderBlocks.map((orderBlock) => ({
-          id: orderBlock.id,
-          basketId: basket.id,
+          id: orderBlockIds.get(orderBlock.id)!,
+          basketId,
           broker: orderBlock.broker,
           side: orderBlock.side,
           title: orderBlock.title,
@@ -190,9 +222,9 @@ async function seedBaskets() {
     if (basket.priceAlerts.length) {
       await db.insert(positionAlerts).values(
         basket.priceAlerts.map((alert, index) => ({
-          id: alert.id,
-          basketId: basket.id,
-          positionId: alert.positionId ?? null,
+          id: alertIds.get(alert.id)!,
+          basketId,
+          positionId: alert.positionId ? positionIds.get(alert.positionId)! : null,
           ticker: alert.ticker,
           side: alert.side,
           label: alert.label,
@@ -207,8 +239,8 @@ async function seedBaskets() {
 
     const rules = [
       ...basket.hardStops.map((rule, index) => ({
-        id: rule.id,
-        basketId: basket.id,
+        id: ruleIds.get(rule.id)!,
+        basketId,
         category: "hard-stop" as const,
         title: rule.title,
         body: rule.body,
@@ -217,8 +249,8 @@ async function seedBaskets() {
         updatedAt: new Date(basket.publicationDate),
       })),
       ...basket.profitTargets.map((rule, index) => ({
-        id: rule.id,
-        basketId: basket.id,
+        id: ruleIds.get(rule.id)!,
+        basketId,
         category: "profit-target" as const,
         title: rule.title,
         body: rule.body,
@@ -241,7 +273,7 @@ async function seedSyncJobs() {
 
   await db.insert(syncJobs).values(
     demoSyncJobs.map((job) => ({
-      id: job.id,
+      id: crypto.randomUUID(),
       jobType: job.jobType,
       status: job.status,
       startedAt: new Date(job.startedAt),
