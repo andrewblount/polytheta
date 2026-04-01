@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { login } from "@netlify/identity";
+import { hydrateSession } from "@netlify/identity";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,44 @@ export function LoginForm({ disabled }: { disabled?: boolean }) {
         const email = String(formData.get("email") ?? "");
         const password = String(formData.get("password") ?? "");
         try {
-          await login(email, password);
+          const body = new URLSearchParams({
+            grant_type: "password",
+            username: email,
+            password,
+          });
+
+          const tokenResponse = await fetch("/.netlify/identity/token", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: body.toString(),
+          });
+
+          if (!tokenResponse.ok) {
+            const errorBody = (await tokenResponse.json().catch(() => null)) as
+              | { msg?: string; error_description?: string }
+              | null;
+
+            throw new Error(
+              errorBody?.msg ??
+                errorBody?.error_description ??
+                `Login failed (${tokenResponse.status})`,
+            );
+          }
+
+          const tokenData = (await tokenResponse.json()) as {
+            access_token: string;
+            refresh_token?: string;
+          };
+
+          document.cookie = `nf_jwt=${encodeURIComponent(tokenData.access_token)}; path=/; secure; samesite=lax`;
+
+          if (tokenData.refresh_token) {
+            document.cookie = `nf_refresh=${encodeURIComponent(tokenData.refresh_token)}; path=/; secure; samesite=lax`;
+          }
+
+          await hydrateSession();
           window.location.href = "/app/dashboard";
         } catch (caught) {
           setError(caught instanceof Error ? caught.message : "Unable to log in.");
