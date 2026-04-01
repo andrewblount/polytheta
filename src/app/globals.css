@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f4f5f7;
+  --foreground: #11151e;
+  --card: rgba(255, 255, 255, 0.78);
+  --card-foreground: #11151e;
+  --muted: #dde2ea;
+  --muted-foreground: #5f6776;
+  --border: rgba(17, 21, 30, 0.12);
+  --accent: #3e6ae1;
+  --accent-foreground: #f8fbff;
+  --ring: rgba(62, 106, 225, 0.44);
+  --success: #27a376;
+  --warning: #c98512;
+  --danger: #d05656;
+  --shadow: 0 24px 64px rgba(15, 23, 42, 0.12);
+  --radius: 1.25rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+.dark {
+  --background: #07111e;
+  --foreground: #f1f4fa;
+  --card: rgba(10, 20, 36, 0.78);
+  --card-foreground: #f1f4fa;
+  --muted: rgba(125, 147, 178, 0.16);
+  --muted-foreground: #93a6c0;
+  --border: rgba(148, 163, 184, 0.16);
+  --accent: #88b4ff;
+  --accent-foreground: #07111e;
+  --ring: rgba(136, 180, 255, 0.44);
+  --success: #4bc48f;
+  --warning: #dbb463;
+  --danger: #f38d8d;
+  --shadow: 0 28px 70px rgba(1, 4, 9, 0.42);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), sans-serif;
+  background-image:
+    radial-gradient(circle at top left, rgba(136, 180, 255, 0.14), transparent 28%),
+    radial-gradient(circle at top right, rgba(79, 97, 174, 0.12), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 32%);
+}
+
+body::selection {
+  background: rgba(136, 180, 255, 0.24);
+}
+
+a,
+button,
+input,
+textarea,
+select {
+  outline: none;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[role="tab"]:focus-visible,
+[role="button"]:focus-visible {
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.glass-panel {
+  background: var(--card);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow);
+}
+
+.eyebrow {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.data-grid {
+  background-image:
+    linear-gradient(to right, rgba(136, 180, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(136, 180, 255, 0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
