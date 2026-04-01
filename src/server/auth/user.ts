@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { getUser } from "@netlify/identity";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { db } from "@/db";
@@ -7,6 +7,16 @@ import { userProfiles } from "@/db/schema";
 import { demoUsers } from "@/lib/demo-data";
 import { env } from "@/lib/env";
 import type { AppUserProfile, UserRole } from "@/lib/types";
+
+type IdentityUser = {
+  id?: string;
+  email?: string;
+  role?: string;
+  user_metadata?: {
+    full_name?: string;
+    name?: string;
+  };
+};
 
 function normalizeFullName(
   input: string | undefined | null,
@@ -53,9 +63,24 @@ async function upsertProfileFromIdentity(): Promise<AppUserProfile | null> {
     return demoUser;
   }
 
-  let identityUser: Awaited<ReturnType<typeof getUser>> | null = null;
+  let identityUser: IdentityUser | null = null;
   try {
-    identityUser = await getUser();
+    const cookieStore = await cookies();
+    const jwt = cookieStore.get("nf_jwt")?.value;
+
+    if (jwt) {
+      const response = await fetch(`${env.appUrl}/.netlify/identity/user`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+        },
+        cache: "no-store",
+      });
+
+      if (response.ok) {
+        identityUser = (await response.json()) as IdentityUser;
+      }
+    }
   } catch {
     identityUser = null;
   }
@@ -64,8 +89,11 @@ async function upsertProfileFromIdentity(): Promise<AppUserProfile | null> {
     return null;
   }
 
-  const identityRole = (identityUser.role ?? identityUser.roles?.[0] ?? "member") as UserRole;
-  const fullName = normalizeFullName(identityUser.name, identityUser.email);
+  const identityRole = (identityUser.role ?? "member") as UserRole;
+  const fullName = normalizeFullName(
+    identityUser.user_metadata?.full_name ?? identityUser.user_metadata?.name,
+    identityUser.email,
+  );
 
   if (!db) {
     return {
