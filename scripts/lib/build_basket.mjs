@@ -167,7 +167,10 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
     const ivAtm = parseFloat(sm.atm_iv);
     const hvR = parseFloat(sm.hv_rank);
     const buf = +((p.side === 'call' ? p.K - px : px - p.K) / atr).toFixed(2);
-    const sideBudget = p.side === 'put' ? putBudget : nameBudget;
+    // Frenzy guard: elevated pre-entry thrust halves the allocation (mirrors
+    // the spec's Fan-Score >= 8 half-sizing rule, applied mechanically).
+    const frenzied = p.frenzy === 'elevated';
+    const sideBudget = (p.side === 'put' ? putBudget : nameBudget) / (frenzied ? 2 : 1);
     const marginPer = nakedMarginPerContract(px, p.K, mid, p.side);
     const contracts = Math.max(1, Math.round(sideBudget / marginPer));
     const margin = Math.round(contracts * marginPer);
@@ -188,7 +191,10 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
       si_pct: sig?.si_pct ?? null,
       contracts, credit, margin, spread,
       doubles_allowed: p.side === 'put' ? putDoublesAllowed : true,
+      frenzy: p.frenzy ?? 'unknown',
+      mom: p.mom ?? null,
       rule_checks: {
+        frenzy_guard: p.frenzy === 'elevated' ? 'half-size' : p.frenzy ?? 'unknown',
         delta_band: absDelta >= DELTA_MIN - 1e-9 && absDelta <= DELTA_MAX + 1e-9 ? 'pass' : 'fail',
         atr_buffer: p.side === 'put'
           ? (buf >= MIN_ATR_BUF_PUT ? 'pass' : 'fail')

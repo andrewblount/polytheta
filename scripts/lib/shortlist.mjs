@@ -57,6 +57,22 @@ export const MIN_ATR_BUF_PUT = 2.0;  // spec: "at least 2x ATR below current pri
 export const DELTA_MIN = 0.15;       // spec: delta 0.15–0.20 far OTM
 export const DELTA_MAX = 0.20;
 export const MAX_SPREAD = 0.15;      // spec: bid-ask no wider than $0.10–0.15
+
+// Frenzy guard (call side): pre-entry thrust thresholds. Validated against
+// all 53 settled call legs through 2026-07-20 — legs entered above these
+// levels averaged -$4,133 vs +$7,070 for calm entries, and all four ITM
+// losses (FCEL, NVTS, RDW, CIFR) trip the guard. HALF trims size 50%
+// (mirrors the spec's Fan>=8 half-sizing rule); EXTREME skips the name.
+export const FRENZY_HALF = { r1: 8, r3: 15, r10: 20 };
+export const FRENZY_SKIP = { r1: 15, r3: 25 };
+
+export function frenzyLevel(r) {
+  const r1 = r.mom1d_pct, r3 = r.mom3d_pct, r10 = r.mom10d_pct;
+  if (r1 == null && r3 == null && r10 == null) return 'unknown';
+  if ((r1 ?? -Infinity) >= FRENZY_SKIP.r1 || (r3 ?? -Infinity) >= FRENZY_SKIP.r3) return 'extreme';
+  if ((r1 ?? -Infinity) >= FRENZY_HALF.r1 || (r3 ?? -Infinity) >= FRENZY_HALF.r3 || (r10 ?? -Infinity) >= FRENZY_HALF.r10) return 'elevated';
+  return 'calm';
+}
 const MIN_ATM_IV = 0.55;
 const MIN_HV_RANK = 55;
 const MIN_AVG_VOL = 1_500_000;
@@ -149,6 +165,9 @@ function enrich(summary, quotes) {
     r.best_put_strike = r.best_put_strike_d18 ? parseFloat(r.best_put_strike_d18) : null;
     r.best_put_credit = r.best_put_credit ? parseFloat(r.best_put_credit) : null;
     r.best_put_iv = r.best_put_iv ? parseFloat(r.best_put_iv) : null;
+    r.mom1d_pct = r.mom1d_pct ? parseFloat(r.mom1d_pct) : null;
+    r.mom3d_pct = r.mom3d_pct ? parseFloat(r.mom3d_pct) : null;
+    r.mom10d_pct = r.mom10d_pct ? parseFloat(r.mom10d_pct) : null;
     const q = qByT[r.ticker];
     r.avg_volume = q ? parseInt(q.avg_volume || '0', 10) : 0;
     r.market_cap = q ? parseFloat(q.market_cap || '0') : 0;
@@ -252,6 +271,13 @@ function pickTop({ pool, side, n = 4, already = new Set(), signalsByT = {} }) {
       skipped.push({ ticker: r.ticker, reason: side === 'call' ? 'disqualified:buyback-or-radar' : 'disqualified:radar' });
       continue;
     }
+    // Frenzy guard applies to the call side only: shorting calls into a
+    // fresh vertical move is the documented failure mode.
+    const frenzy = side === 'call' ? frenzyLevel(r) : 'n/a';
+    if (frenzy === 'extreme') {
+      skipped.push({ ticker: r.ticker, reason: `frenzy-guard:extreme (1d ${r.mom1d_pct}%, 3d ${r.mom3d_pct}%)` });
+      continue;
+    }
     const fam = familyOf(r);
     // Allow at most 2 names per family in the whole basket side.
     const famCount = picks.filter((p) => p.family === fam).length;
@@ -260,6 +286,8 @@ function pickTop({ pool, side, n = 4, already = new Set(), signalsByT = {} }) {
       side, ticker: r.ticker, family: fam,
       K: side === 'call' ? r.best_call_strike : r.best_put_strike,
       signals: sig ?? null,
+      frenzy,
+      mom: { r1: r.mom1d_pct ?? null, r3: r.mom3d_pct ?? null, r10: r.mom10d_pct ?? null },
       thesis: side === 'call'
         ? `Auto: ${(r.best_call_iv * 100).toFixed(0)}% option IV, ${r.call_atr_buf.toFixed(2)}x ATR buf, ${r.call_otm_vol_total.toLocaleString()} OTM call vol, MC $${(r.market_cap / 1e9).toFixed(1)}B (${fam}).`
         : `Auto: ${(r.best_put_iv * 100).toFixed(0)}% option IV, ${r.put_atr_buf.toFixed(2)}x ATR buf, ${r.put_otm_vol_total.toLocaleString()} OTM put vol, MC $${(r.market_cap / 1e9).toFixed(1)}B (${fam}).`,
@@ -285,7 +313,12 @@ export function autoPick({ refined_summary, earningsByT, holdStart, holdEnd, n_p
                    !isEtf(r) && r.avg_volume >= MIN_AVG_VOL && highVol(r) &&
                    r.call_otm_vol_total >= MIN_SIDE_OTM_VOL && (r.call_atr_buf ?? 0) >= MIN_ATR_BUF_CALL)
     .filter(noEarnings)
-    .sort((a, b) => (signalRank('call', b.ticker) - signalRank('call', a.ticker)) || (b.best_call_iv - a.best_call_iv));
+    // Calm names outrank frenzied ones at equal signal rank — the IV sort
+    // otherwise systematically surfaces names that just ripped.
+    .sort((a, b) =>
+      (signalRank('call', b.ticker) - signalRank('call', a.ticker)) ||
+      ((frenzyLevel(a) === 'elevated' ? 1 : 0) - (frenzyLevel(b) === 'elevated' ? 1 : 0)) ||
+      (b.best_call_iv - a.best_call_iv));
   const putPool = !putsAllowed ? [] : refined_summary
     .filter((r) => r.best_put_strike && r.best_put_iv <= MAX_OPT_IV &&
                    !isEtf(r) && r.avg_volume >= MIN_AVG_VOL && highVol(r) &&

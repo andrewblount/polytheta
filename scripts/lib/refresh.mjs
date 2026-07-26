@@ -181,7 +181,7 @@ async function runChains(OUT, EXPIRY_ISO, { chunkLimit = 999999 } = {}) {
   const chainsFile = path.join(OUT, `chains_${EXPIRY_ISO}_v2.csv`);
   const summaryFile = path.join(OUT, 'chain_summary_v2.csv');
   const CHAIN_HEADER = 'ticker,strike,type,bid,ask,last,iv,volume,oi,delta_est,distance_pct';
-  const SUMMARY_HEADER = 'ticker,price,atm_iv,atm_iv_pct,hv20_now,hv20_min,hv20_max,hv_rank,atr14,call_otm_vol_total,put_otm_vol_total,best_call_strike_d18,best_call_credit,best_call_iv,best_put_strike_d18,best_put_credit,best_put_iv';
+  const SUMMARY_HEADER = 'ticker,price,atm_iv,atm_iv_pct,hv20_now,hv20_min,hv20_max,hv_rank,atr14,call_otm_vol_total,put_otm_vol_total,best_call_strike_d18,best_call_credit,best_call_iv,best_put_strike_d18,best_put_credit,best_put_iv,mom1d_pct,mom3d_pct,mom10d_pct';
   if (!fs.existsSync(chainsFile)) fs.writeFileSync(chainsFile, CHAIN_HEADER + '\n');
   if (!fs.existsSync(summaryFile)) fs.writeFileSync(summaryFile, SUMMARY_HEADER + '\n');
 
@@ -204,6 +204,15 @@ async function runChains(OUT, EXPIRY_ISO, { chunkLimit = 999999 } = {}) {
       const hv20Now = realizedVol(closes, 20);
       const rank = hvRank(hv20Series, hv20Now);
       const atr = atr14(ohlc);
+
+      // Pre-entry thrust (frenzy-guard inputs). Every ITM call loss through
+      // 2026-07-20 entered right after a violent up-move; see
+      // docs/trade_autopsy_2026-05-11.md.
+      const momPct = (w) =>
+        closes.length > w && closes.at(-1 - w) > 0
+          ? ((closes.at(-1) / closes.at(-1 - w) - 1) * 100)
+          : null;
+      const mom1d = momPct(1), mom3d = momPct(3), mom10d = momPct(10);
 
       let chain;
       try { chain = await yf.options(ticker, { date: expiryDate }); } catch { chain = null; }
@@ -253,6 +262,7 @@ async function runChains(OUT, EXPIRY_ISO, { chunkLimit = 999999 } = {}) {
         rank?.toFixed(1), atr?.toFixed(3), cVol, pVol,
         bestCall?.strike, bestCall?.mid?.toFixed(3), bestCall?.iv?.toFixed(4),
         bestPut?.strike, bestPut?.mid?.toFixed(3), bestPut?.iv?.toFixed(4),
+        mom1d?.toFixed(1), mom3d?.toFixed(1), mom10d?.toFixed(1),
       ]) + '\n');
       state.done.push(ticker);
       doneSet.add(ticker);

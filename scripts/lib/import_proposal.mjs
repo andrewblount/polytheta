@@ -106,6 +106,10 @@ function cautionFlagsFrom(pick, constraints) {
   if (pick.side === 'put' && constraints?.put_doubles_allowed === false) {
     out.push('DOUBLES PROHIBITED on puts this week (GSRS band)');
   }
+  if (pick.frenzy === 'elevated') {
+    const m = pick.mom ?? {};
+    out.push(`FRENZY GUARD — half size (thrust 1d ${m.r1 ?? '?'}% / 3d ${m.r3 ?? '?'}% / 10d ${m.r10 ?? '?'}%)`);
+  }
   if (pick.spread != null && pick.bid && pick.spread / pick.bid > 0.5) {
     out.push('Wide bid/ask relative to credit');
   }
