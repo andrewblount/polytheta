@@ -103,9 +103,6 @@ function cautionFlagsFrom(pick, constraints) {
   } else if (pick.buf != null && pick.buf < 1.5) {
     out.push(`Thin ATR buffer (${pick.buf}x)`);
   }
-  if (pick.side === 'put' && constraints?.put_doubles_allowed === false) {
-    out.push('DOUBLES PROHIBITED on puts this week (GSRS band)');
-  }
   if (pick.frenzy === 'elevated') {
     const m = pick.mom ?? {};
     out.push(`FRENZY GUARD — half size (thrust 1d ${m.r1 ?? '?'}% / 3d ${m.r3 ?? '?'}% / 10d ${m.r10 ?? '?'}%)`);
@@ -156,17 +153,18 @@ function orderBlocks(picks, expiry) {
 }
 
 const RULES = [
-  ['hard-stop', '25% loss on any single name', 'Close that name.', 0],
+  ['hard-stop', '25% loss on any single name', 'Close that name. Stop-breach emails fire automatically from the hourly sync.', 0],
   ['hard-stop', '30% total portfolio drawdown', 'Close everything.', 1],
   ['hard-stop', 'Acquisition radar signal (call side)', 'Immediate full exit on that name.', 2],
   ['hard-stop', 'Downside-gap radar signal (put side)', 'Immediate full exit on that name.', 3],
-  ['profit-target', 'Close at 50–70% of collected credit', 'Per position.', 4],
-  ['profit-target', 'Daily 1% account gain target', 'Whichever comes first.', 5],
+  ['protocol', 'No doubling down (risk policy v2)', 'Simulated on 96 settled legs, the double protocol turned +$280K into +$125K: ATR breaks fire on half of all legs but only 10 finished ITM. Breaks are attention levels; the P&L stop is the action rule. See docs/risk_policy_v2.md.', 4],
+  ['profit-target', 'Close at 50–70% of collected credit', 'Per position.', 5],
+  ['profit-target', 'Daily 1% account gain target', 'Whichever comes first.', 6],
   [
     'note',
     'Auto-generated basket',
-    'Produced by scripts/run_weekly_basket.mjs. Short interest, fan score, Glassdoor, and buyback signals were not evaluated for these picks — selection is driven by IV, ATR buffer, OTM volume, and earnings clearance. Verify all strikes and credits against live broker chains before trading.',
-    6,
+    'Produced by scripts/run_weekly_basket.mjs. Short interest is fetched live; fan score, Glassdoor, buyback, and radar signals come from thesis_overrides.json when maintained. Verify all strikes and credits against live broker chains before trading.',
+    7,
   ],
 ];
 
@@ -391,16 +389,19 @@ export async function importProposal(proposalPath, { publish = false, sql: injec
     const atr = pick.atr ?? 0;
     if (!atr) continue;
     const dir = pick.side === 'call' ? 1 : -1;
-    const putDoublesBlocked = pick.side === 'put' && proposal.constraints?.put_doubles_allowed === false;
     for (const [n, mult] of [
       [1, 0.5],
       [2, 1.0],
     ]) {
-      const note = putDoublesBlocked
-        ? `EXIT PROTOCOL ONLY — put doubles prohibited at GSRS band ${proposal.constraints?.gsrs_band ?? '3-5'}.`
-        : n === 1
-          ? 'Break #1 — double per protocol (risk cap 15% of account on the name).'
-          : 'Break #2 — final double (cap 25%), then mandatory full exit.';
+      // Risk policy v2 (docs/risk_policy_v2.md): breaks are ATTENTION levels,
+      // not action levels. Simulation across 96 settled legs showed the
+      // double protocol and price-level exits both lose heavily to a simple
+      // P&L stop — these names cross 1x ATR in 50% of weeks (38 whipsaws vs
+      // 10 real breaches). The action rule is the -25%-of-allocation P&L
+      // stop, which alerts automatically.
+      const note = n === 1
+        ? 'ATTENTION — through 0.5x ATR. Do not add. Exit is P&L-based: -25% of allocation (emailed automatically).'
+        : 'Through 1x ATR — check stop distance and radar. Exit on the P&L stop or a radar trigger, not on price level alone.';
       await sql.query(
         `insert into position_alerts
            (basket_id, position_id, ticker, side, label, threshold_value, protocol_note, sort_order)
