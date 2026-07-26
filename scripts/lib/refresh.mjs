@@ -106,7 +106,14 @@ async function runMacro(OUT) {
   return { count: macroQuotes.length };
 }
 
-// Step 2: universe quotes and 8..40 price band filter.
+// Step 2: universe quotes and price-band filter.
+// Band restored to the documented $8–$100 (docs/options_trading_system.md
+// universe filter). It had drifted to $8–$40, which structurally emptied the
+// put side under the 2x ATR + delta 0.15–0.20 rules: the tier-1 names those
+// rules were designed around (F, GM, HOOD, PINS in the manual-era baskets)
+// mostly trade $40–$100. Filename kept for resume-logic compatibility.
+const PRICE_MIN = 8;
+const PRICE_MAX = 100;
 async function runUniverseQuotes(OUT) {
   const unifile = path.join(OUT, 'weeklys_universe.csv');
   if (!fs.existsSync(unifile)) throw new Error(`missing ${unifile}`);
@@ -147,7 +154,7 @@ async function runUniverseQuotes(OUT) {
   for (let i = 1; i < rows.length; i++) {
     const cells = rows[i].split(',');
     const p = parseFloat(cells[priceIdx]);
-    if (Number.isFinite(p) && p >= 8 && p <= 40) filtered.push(rows[i]);
+    if (Number.isFinite(p) && p >= PRICE_MIN && p <= PRICE_MAX) filtered.push(rows[i]);
   }
   fs.writeFileSync(path.join(OUT, 'universe_8to40.csv'), filtered.join('\n'));
   return { done, errors: errs.length, filtered: filtered.length - 1 };

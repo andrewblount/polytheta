@@ -1,0 +1,12 @@
+{
+  "_comment": "Manual thesis signals per ticker — the judgment calls the pipeline cannot fetch. buyback: -1 active program (call-side DISQUALIFIER), 0 none in last 12mo, +1 active (put-side positive). fan: 1-10 QuiverQuant-style fan score. glassdoor: rating out of 5. acq_radar/gap_radar: 'clean' or 'triggered' — triggered forces the name out of its side. Update as_of when you refresh a ticker. Entries here raise thesis coverage toward the 3-of-5 rule; unknown signals never count as passes.",
+  "EXAMPLE": {
+    "buyback": 0,
+    "fan": 6,
+    "glassdoor": 3.1,
+    "acq_radar": "clean",
+    "gap_radar": "clean",
+    "note": "Delete this entry — it is ignored unless EXAMPLE is a real ticker in the pool.",
+    "as_of": "2026-07-26"
+  }
+}

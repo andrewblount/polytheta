@@ -71,18 +71,20 @@ function narrativeFrom(proposal) {
 
 function thesisBulletsFrom(pick) {
   const out = [];
+  if (pick.si_pct != null) out.push(`Short interest ${pick.si_pct}% of float (Yahoo)`);
   if (pick.iv != null) out.push(`Option IV ${(pick.iv * 100).toFixed(0)}%`);
   if (pick.ivAtm != null) out.push(`ATM IV ${(pick.ivAtm * 100).toFixed(0)}%`);
   if (pick.hvR != null) out.push(`HV rank ${pick.hvR}`);
   if (pick.buf != null) out.push(`${pick.buf}x ATR buffer`);
   if (pick.atr != null) out.push(`14d ATR ${pick.atr}`);
+  if (pick.rule_checks?.pot_proxy_pct != null) out.push(`POT ~${pick.rule_checks.pot_proxy_pct}% (2x delta proxy)`);
   if (pick.spread != null) out.push(`Bid/ask spread ${pick.spread}`);
   if (pick.bid != null && pick.ask != null) out.push(`Bid ${pick.bid} / Ask ${pick.ask}`);
   if (pick.family) out.push(`Family: ${pick.family}`);
   return out;
 }
 
-function cautionFlagsFrom(pick) {
+function cautionFlagsFrom(pick, constraints) {
   const out = [];
   if (pick.earnings_date) {
     out.push(
@@ -91,7 +93,19 @@ function cautionFlagsFrom(pick) {
         : `EARNINGS ${pick.earnings_date} INSIDE HOLD WINDOW`,
     );
   }
-  if (pick.buf != null && pick.buf < 1.5) out.push(`Thin ATR buffer (${pick.buf}x)`);
+  const rc = pick.rule_checks;
+  if (rc) {
+    if (rc.delta_band === 'fail') out.push(`Delta ${Math.abs(pick.delta)} outside 0.15–0.20 band`);
+    if (rc.atr_buffer === 'fail') out.push(`ATR buffer ${pick.buf}x below floor`);
+    if (rc.spread === 'fail') out.push(`Spread $${pick.spread} above $0.15 cap`);
+    const cov = parseInt((rc.thesis_coverage ?? '0/5').split('/')[0], 10);
+    if (cov < 3) out.push(`Thesis coverage ${rc.thesis_coverage} — 3-of-5 rule not verifiable (maintain thesis_overrides.json)`);
+  } else if (pick.buf != null && pick.buf < 1.5) {
+    out.push(`Thin ATR buffer (${pick.buf}x)`);
+  }
+  if (pick.side === 'put' && constraints?.put_doubles_allowed === false) {
+    out.push('DOUBLES PROHIBITED on puts this week (GSRS band)');
+  }
   if (pick.spread != null && pick.bid && pick.spread / pick.bid > 0.5) {
     out.push('Wide bid/ask relative to credit');
   }
@@ -337,7 +351,7 @@ export async function importProposal(proposalPath, { publish = false, sql: injec
         p.ticker,
         p.px,
         p.hvR ?? 0, // HV rank stands in for IV rank; the orchestrator reports hvR
-        NOT_EVALUATED.shortInterestPctFloat,
+        p.si_pct ?? NOT_EVALUATED.shortInterestPctFloat,
         NOT_EVALUATED.fanScore,
         NOT_EVALUATED.glassdoorScore,
         NOT_EVALUATED.buybackScore,
@@ -352,11 +366,14 @@ export async function importProposal(proposalPath, { publish = false, sql: injec
         p.buf != null ? `${p.buf}x ATR` : null,
         p.thesis ?? 'Auto-selected.',
         JSON.stringify(thesisBulletsFrom(p)),
-        JSON.stringify(cautionFlagsFrom(p)),
+        JSON.stringify(cautionFlagsFrom(p, proposal.constraints)),
         entryTs,
         JSON.stringify({
           ...p,
-          _not_evaluated: ['shortInterestPctFloat', 'fanScore', 'glassdoorScore', 'buybackScore'],
+          _not_evaluated: [
+            ...(p.si_pct == null ? ['shortInterestPctFloat'] : []),
+            'fanScore', 'glassdoorScore', 'buybackScore',
+          ],
         }),
         sortOrder++,
       ],
@@ -370,10 +387,16 @@ export async function importProposal(proposalPath, { publish = false, sql: injec
     const atr = pick.atr ?? 0;
     if (!atr) continue;
     const dir = pick.side === 'call' ? 1 : -1;
+    const putDoublesBlocked = pick.side === 'put' && proposal.constraints?.put_doubles_allowed === false;
     for (const [n, mult] of [
       [1, 0.5],
       [2, 1.0],
     ]) {
+      const note = putDoublesBlocked
+        ? `EXIT PROTOCOL ONLY — put doubles prohibited at GSRS band ${proposal.constraints?.gsrs_band ?? '3-5'}.`
+        : n === 1
+          ? 'Break #1 — double per protocol (risk cap 15% of account on the name).'
+          : 'Break #2 — final double (cap 25%), then mandatory full exit.';
       await sql.query(
         `insert into position_alerts
            (basket_id, position_id, ticker, side, label, threshold_value, protocol_note, sort_order)
@@ -385,8 +408,37 @@ export async function importProposal(proposalPath, { publish = false, sql: injec
           pick.side,
           `Break #${n}`,
           (pick.px + dir * atr * mult).toFixed(2),
-          n === 1 ? 'Double down (call side only).' : 'Double and prepare exit.',
+          note,
           alertOrder++,
+        ],
+      );
+    }
+  }
+
+  // ---- thesis_signals (structured scorecard per pick) ----
+  for (const { id, pick } of positionIds) {
+    const ts = pick.rule_checks?.thesis_signals;
+    if (!ts) continue;
+    const labels = {
+      short_interest: pick.side === 'call' ? 'Short interest ≥ 20% float' : 'Short interest < 15% float',
+      fan_score: pick.side === 'call' ? 'Fan score ≤ 7' : 'Fan score 7–10',
+      culture: pick.side === 'call' ? 'Distress/culture (Glassdoor ≤ 3.4)' : 'Positive fundamentals (Glassdoor > 3.5)',
+      buyback: pick.side === 'call' ? 'No active buyback (0)' : 'Active buyback (+1)',
+      radar: pick.side === 'call' ? 'Acquisition radar clean' : 'Downside-gap radar clean',
+    };
+    const weights = { short_interest: 30, fan_score: 25, culture: 20, buyback: 15, radar: 10 };
+    for (const [key, verdict] of Object.entries(ts)) {
+      await sql.query(
+        `insert into thesis_signals (basket_id, position_id, ticker, side, title, body, weight, is_passing)
+         values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [
+          basketId, id, pick.ticker, pick.side,
+          labels[key] ?? key,
+          verdict === 'unknown'
+            ? 'Not evaluated — no data source connected. Add to baskets/thesis_overrides.json.'
+            : `Evaluated ${verdict}${key === 'short_interest' && pick.si_pct != null ? ` (SI ${pick.si_pct}% of float, Yahoo)` : ''}.`,
+          weights[key] ?? null,
+          verdict === 'pass',
         ],
       );
     }
