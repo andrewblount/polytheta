@@ -42,3 +42,43 @@ next-env.d.ts
 
 # Local Netlify folder
 .netlify
+
+# Downloader outputs
+/data/*
+!/data/.gitkeep
+/data_history/*
+!/data_history/.gitkeep
+
+# Python downloader virtual environments
+/python/yahoo_equity_downloader/.venv
+/python/tradingview_equity_downloader/.venv
+
+# launchd job logs (the plist itself is tracked; its logs are not)
+/scripts/launchd/*.log
+
+# Python build artifacts
+__pycache__/
+*.egg-info/
+
+# Heavy per-week market-data dumps (proposals + summaries are tracked; raw pulls are not)
+/baskets/*/data/chains_*.csv
+/baskets/*/data/chain_summary*.csv
+/baskets/*/data/universe_quotes.csv
+/baskets/*/data/universe_8to40.csv
+/baskets/*/data/shortlist_*.csv
+/baskets/*/data/*_history.csv
+/baskets/*/data/tv_shots/
+/baskets/*/data/_chains_state.json
+/baskets/*/data/universe_quote_errors.json
+
+# Downloader output trees
+/data_trading_view/
+/data_trading_view_history/
+
+# Sensitive / separate local projects — never commit
+/private/
+/schwab/
+
+# Stray artifacts
+.~lock.*
+deno.lock
