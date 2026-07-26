@@ -11,6 +11,13 @@ export const env = {
     optional(process.env.DATABASE_URL),
   sessionSecret: optional(process.env.SESSION_SECRET),
   syncSecret: optional(process.env.INTERNAL_SYNC_TOKEN),
+  accessRequestNotifyEmail:
+    optional(process.env.ACCESS_REQUEST_NOTIFY_EMAIL) ?? "ablount@bluecielo.com",
+  sendGridApiKey: optional(process.env.SENDGRID_API_KEY),
+  sendGridFromEmail:
+    optional(process.env.SENDGRID_FROM_EMAIL) ??
+    optional(process.env.ACCESS_REQUEST_NOTIFY_EMAIL) ??
+    "ablount@bluecielo.com",
   demoAdminEmail: optional(process.env.DEMO_ADMIN_EMAIL),
   demoMemberEmail: optional(process.env.DEMO_MEMBER_EMAIL),
   useDemoData: process.env.POLYTHETA_DEMO_MODE === "true",
