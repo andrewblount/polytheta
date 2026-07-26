@@ -1,0 +1,2 @@
+# Example cron for weekday morning runs
+15 6 * * 1-5 cd /absolute/path/to/polytheta && /absolute/path/to/python/yahoo_equity_downloader/.venv/bin/polytheta-yahoo-downloader --min-price 8 >> /tmp/polytheta_yahoo_downloader.log 2>&1

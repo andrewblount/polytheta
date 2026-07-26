@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "polytheta-yahoo": {
+      "command": "/absolute/path/to/polytheta/python/yahoo_equity_downloader/.venv/bin/polytheta-yahoo-mcp",
+      "args": [
+        "--project-root",
+        "/absolute/path/to/polytheta"
+      ]
+    }
+  }
+}

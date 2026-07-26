@@ -1,0 +1,1 @@
+"""Polytheta Yahoo Finance downloader."""

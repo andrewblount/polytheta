@@ -1,0 +1,27 @@
+[project]
+name = "polytheta-yahoo-downloader"
+version = "0.1.0"
+description = "Cron-friendly Yahoo Finance equity downloader for Polytheta."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "mcp[cli]>=1.10.0,<2",
+  "pandas>=2.2.0,<3",
+  "yfinance>=0.2.54,<1",
+]
+
+[project.scripts]
+polytheta-yahoo-downloader = "polytheta_yfinance_downloader.cli:main"
+polytheta-yahoo-mcp = "polytheta_yfinance_downloader.mcp_server:main"
+polytheta-yahoo-verify = "polytheta_yfinance_downloader.verify_cli:main"
+polytheta-yahoo-recover = "polytheta_yfinance_downloader.recover_cli:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

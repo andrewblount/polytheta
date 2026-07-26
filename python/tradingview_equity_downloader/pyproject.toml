@@ -1,0 +1,26 @@
+[project]
+name = "polytheta-tradingview-downloader"
+version = "0.1.0"
+description = "Cron-friendly TradingView equity downloader for Polytheta."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "pandas>=2.2.0,<3",
+  "rookiepy>=0.5.0,<1",
+  "tradingview-screener>=3.0.0,<4",
+]
+
+[project.scripts]
+polytheta-tradingview-downloader = "polytheta_tradingview_downloader.cli:main"
+polytheta-tradingview-verify = "polytheta_tradingview_downloader.verify_cli:main"
+polytheta-tradingview-recover = "polytheta_tradingview_downloader.recover_cli:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
