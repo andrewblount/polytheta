@@ -20,6 +20,7 @@ export const memberNavigation = [
   { href: "/app/dashboard", label: "Dashboard" },
   { href: "/app/baskets/current", label: "Current Basket" },
   { href: "/app/baskets", label: "Archive" },
+  { href: "/app/performance", label: "Performance" },
   { href: "/app/analytics", label: "Analytics" },
   { href: "/app/settings", label: "Settings" },
 ] as const;
