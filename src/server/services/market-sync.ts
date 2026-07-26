@@ -7,7 +7,11 @@ import { demoBaskets } from "@/lib/demo-data";
 import { defaultMarketDataProvider } from "@/server/market/yahoo";
 import { normalizePosition } from "@/server/repos/helpers";
 
+import { sendStopBreachAlert } from "./email";
 import { generateLiveSnapshot } from "./performance";
+
+// Hard-stop rule: alert when modeled loss reaches 25% of the name's margin.
+const STOP_LOSS_FRACTION = 0.25;
 
 export async function captureEntrySnapshotsForBasket(basketId: string) {
   if (!db) {
@@ -135,6 +139,30 @@ export async function runMarketSync(triggeredBy = "manual") {
         });
         inserted += 1;
         basketTouched = true;
+
+        // Stop-breach alert: fire once, the first time modeled P&L crosses
+        // -25% of the name's allocated margin.
+        const stopLevel = -STOP_LOSS_FRACTION * row.margin;
+        if (snapshot.pnlAmount <= stopLevel) {
+          const alreadyBreached = existingHistory.some(
+            (s) => Number(s.pnlAmount) <= stopLevel,
+          );
+          if (!alreadyBreached) {
+            try {
+              await sendStopBreachAlert({
+                ticker: row.ticker,
+                side: row.side,
+                strike: Number(row.strike),
+                pnlAmount: snapshot.pnlAmount,
+                margin: row.margin,
+                underlyingPrice: snapshot.underlyingPrice,
+                basketSlug: basketRow.slug,
+              });
+            } catch (err) {
+              console.error("stop-breach alert failed:", err);
+            }
+          }
+        }
 
         if (existingHistory.length === 0) {
           await captureEntrySnapshotsForBasket(row.basketId);

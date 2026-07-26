@@ -32,6 +32,11 @@ function leanPosition(p: PositionData) {
           distanceToStrike: p.latestPerformance.distanceToStrike,
         }
       : null,
+    // 25%-of-allocation hard stop (modeled) — mirrors the emailed alert.
+    stopBreach:
+      p.latestPerformance != null &&
+      p.margin > 0 &&
+      p.latestPerformance.pnlAmount <= -0.25 * p.margin,
   };
 }
 
