@@ -55,7 +55,7 @@ npm run db:seed
 
 ## Database
 
-Schema lives in [src/db/schema.ts](/Users/andrewblount/Local/development/options_trading/src/db/schema.ts).
+Schema lives in [src/db/schema.ts](./src/db/schema.ts).
 
 Useful commands:
 
@@ -65,7 +65,7 @@ npm run db:migrate
 npm run db:seed
 ```
 
-Generated migration output is in [src/db/migrations](/Users/andrewblount/Local/development/options_trading/src/db/migrations).
+Generated migration output is in [src/db/migrations](./src/db/migrations).
 
 ## Netlify Deployment
 
@@ -73,14 +73,16 @@ Generated migration output is in [src/db/migrations](/Users/andrewblount/Local/d
 2. Enable Identity for the site.
 3. Run `npx netlify db init` so Netlify provisions the database and sets `NETLIFY_DATABASE_URL`.
 4. Set `INTERNAL_SYNC_TOKEN` in Netlify environment variables.
-5. Deploy. Netlify auto-detects Next.js App Router.
-6. Run the seed script once against the provisioned database.
+5. Set `ACCESS_REQUEST_NOTIFY_EMAIL=ablount@bluecielo.com`.
+6. If you want access-request emails delivered, also configure `SENDGRID_API_KEY` and `SENDGRID_FROM_EMAIL`.
+7. Deploy. Netlify auto-detects Next.js App Router.
+8. Run the seed script once against the provisioned database.
 
-Scheduled refresh is defined in [netlify/functions/market-sync.mts](/Users/andrewblount/Local/development/options_trading/netlify/functions/market-sync.mts) with an hourly cadence.
+Scheduled refresh is defined in [netlify/functions/market-sync.mts](./netlify/functions/market-sync.mts) with an hourly cadence.
 
 ## Market Data
 
-The server-side provider interface lives in [src/server/market/provider.ts](/Users/andrewblount/Local/development/options_trading/src/server/market/provider.ts).
+The server-side provider interface lives in [src/server/market/provider.ts](./src/server/market/provider.ts).
 
 Current default implementation:
 
@@ -101,7 +103,7 @@ The seed includes:
 - Demo admin/member profiles
 - Sync job history
 
-Seed source lives in [src/lib/demo-data.ts](/Users/andrewblount/Local/development/options_trading/src/lib/demo-data.ts).
+Seed source lives in [src/lib/demo-data.ts](./src/lib/demo-data.ts).
 
 ## Auth Notes
 
