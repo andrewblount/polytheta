@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.polytheta.weekly-basket</string>
+
+  <!-- Fires Sunday at 20:00 local, and Monday at 06:30 local as a safety net
+       in case the Mac was asleep on Sunday night. The orchestrator is
+       idempotent — the Monday run detects Sunday's outputs and exits fast. -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict>
+      <key>Weekday</key><integer>0</integer>
+      <key>Hour</key><integer>20</integer>
+      <key>Minute</key><integer>0</integer>
+    </dict>
+    <dict>
+      <key>Weekday</key><integer>1</integer>
+      <key>Hour</key><integer>6</integer>
+      <key>Minute</key><integer>30</integer>
+    </dict>
+  </array>
+
+  <!-- Full path to node + orchestrator. Update NODE_BIN if `which node`
+       reports a different path on this Mac. -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/node</string>
+    <string>/Users/andrewblount/Local/development/polytheta/scripts/run_weekly_basket.mjs</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/andrewblount/Local/development/polytheta</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+
+  <key>RunAtLoad</key><false/>
+
+  <!-- Logs stream to the basket data dir per run; these are the launchd-level
+       stdout/stderr for the process. -->
+  <key>StandardOutPath</key>
+  <string>/Users/andrewblount/Local/development/polytheta/scripts/launchd/weekly-basket.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/andrewblount/Local/development/polytheta/scripts/launchd/weekly-basket.err.log</string>
+
+  <!-- If launchd is asked to run this while the Mac is asleep, wake so the
+       job actually fires. -->
+  <key>WakeSystem</key><true/>
+</dict>
+</plist>
