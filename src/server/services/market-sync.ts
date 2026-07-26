@@ -80,11 +80,27 @@ export async function runMarketSync(triggeredBy = "manual") {
         .from(positions)
         .where(eq(positions.basketId, basketRow.id));
 
+      const resolvedStates = new Set(["expired-otm", "expired-itm", "manually-closed"]);
+      let basketTouched = false;
+
       for (const row of positionRows) {
         const existingHistory = await db
           .select()
           .from(performanceSnapshots)
           .where(eq(performanceSnapshots.positionId, row.id));
+
+        // Settled positions never change again. Before this check, the hourly
+        // job kept re-pricing expired options indefinitely (the March 2026
+        // basket accumulated ~22,500 junk snapshots over four months).
+        const expiryPassed = new Date(`${row.expiry}T23:59:59Z`).getTime() < Date.now();
+        if (expiryPassed && existingHistory.length > 0) {
+          const latest = [...existingHistory].sort(
+            (a, b) => new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime(),
+          )[0];
+          if (latest && resolvedStates.has(latest.state)) {
+            continue; // already settled — one Expiry-Resolved snapshot is enough
+          }
+        }
 
         const seedPosition = demoBaskets
           .flatMap((basket) => [...basket.callPositions, ...basket.putPositions])
@@ -118,15 +134,18 @@ export async function runMarketSync(triggeredBy = "manual") {
           sourceLabel: snapshot.sourceLabel,
         });
         inserted += 1;
-
-        await db
-          .update(baskets)
-          .set({ lastRefreshAt: new Date(snapshot.observedAt), updatedAt: new Date() })
-          .where(eq(baskets.id, row.basketId));
+        basketTouched = true;
 
         if (existingHistory.length === 0) {
           await captureEntrySnapshotsForBasket(row.basketId);
         }
+      }
+
+      if (basketTouched) {
+        await db
+          .update(baskets)
+          .set({ lastRefreshAt: new Date(), updatedAt: new Date() })
+          .where(eq(baskets.id, basketRow.id));
       }
     }
 
