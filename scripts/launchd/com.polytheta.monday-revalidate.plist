@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.polytheta.monday-revalidate</string>
+
+  <!-- Re-quote the basket shortly after Monday's open and flag stale entries.
+       Times are LOCAL — 07:35 and 08:35 assume Mountain Time (09:35/10:35 ET).
+       Adjust the Hour values if this Mac runs in a different timezone. -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict>
+      <key>Weekday</key><integer>1</integer>
+      <key>Hour</key><integer>7</integer>
+      <key>Minute</key><integer>35</integer>
+    </dict>
+    <dict>
+      <key>Weekday</key><integer>1</integer>
+      <key>Hour</key><integer>8</integer>
+      <key>Minute</key><integer>35</integer>
+    </dict>
+  </array>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/node</string>
+    <string>/Users/andrewblount/Local/development/polytheta/scripts/verify_basket_live.mjs</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/andrewblount/Local/development/polytheta</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key>
+  <string>/Users/andrewblount/Local/development/polytheta/scripts/launchd/monday-revalidate.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/andrewblount/Local/development/polytheta/scripts/launchd/monday-revalidate.err.log</string>
+  <key>WakeSystem</key><true/>
+</dict>
+</plist>
