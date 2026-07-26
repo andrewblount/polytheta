@@ -1,0 +1,22 @@
+{
+  "fetched_ts": "2026-07-20T12:30:07.069Z",
+  "basket_date": "2026-07-20",
+  "tv_desktop_opened": {
+    "opened": true
+  },
+  "notes": [
+    "HY_OAS sourced from FRED series BAMLH0A0HYM2 (identical to TradingView symbol FRED:BAMLH0A0HYM2).",
+    "PC sourced from CBOE daily market statistics (identical to TradingView symbol USI:PCC).",
+    "TradingView desktop app opened as interactive session for chart inspection alongside this run."
+  ],
+  "hy_oas": {
+    "date": "2026-07-16",
+    "value": 2.71
+  },
+  "pc_ratio": {
+    "total": 0.97,
+    "equity": 0.73,
+    "index": 0.98,
+    "as_of": null
+  }
+}

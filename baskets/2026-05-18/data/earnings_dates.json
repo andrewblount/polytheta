@@ -1,0 +1,1032 @@
+{
+  "APA": {
+    "ticker": "APA",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-05",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-05"
+      ]
+    }
+  },
+  "AG": {
+    "ticker": "AG",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-13",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-13"
+      ]
+    }
+  },
+  "ASST": {
+    "ticker": "ASST",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-13",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-13"
+      ]
+    }
+  },
+  "AR": {
+    "ticker": "AR",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-07-29",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-07-29"
+      ]
+    }
+  },
+  "BBWI": {
+    "ticker": "BBWI",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-05-27",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-05-27"
+      ]
+    }
+  },
+  "BILI": {
+    "ticker": "BILI",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-05-19",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-05-19"
+      ]
+    }
+  },
+  "BTDR": {
+    "ticker": "BTDR",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-05-14",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-05-14"
+      ]
+    }
+  },
+  "BMNR": {
+    "ticker": "BMNR",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-07-02",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-07-02"
+      ]
+    }
+  },
+  "BW": {
+    "ticker": "BW",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-10",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-10"
+      ]
+    }
+  },
+  "CCL": {
+    "ticker": "CCL",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-06-24",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-06-24"
+      ]
+    }
+  },
+  "CELH": {
+    "ticker": "CELH",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-05-07",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-05-07"
+      ]
+    }
+  },
+  "CDE": {
+    "ticker": "CDE",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-05",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-05"
+      ]
+    }
+  },
+  "CHWY": {
+    "ticker": "CHWY",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-06-10",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-06-10"
+      ]
+    }
+  },
+  "CIFR": {
+    "ticker": "CIFR",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-06",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-06"
+      ]
+    }
+  },
+  "CLF": {
+    "ticker": "CLF",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-07-20",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-07-20"
+      ]
+    }
+  },
+  "CLSK": {
+    "ticker": "CLSK",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-06",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-06"
+      ]
+    }
+  },
+  "CORZ": {
+    "ticker": "CORZ",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-05-06",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-05-06"
+      ]
+    }
+  },
+  "CMCSA": {
+    "ticker": "CMCSA",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-07-30",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-07-30"
+      ]
+    }
+  },
+  "CRML": {
+    "ticker": "CRML",
+    "source": [
+      "quote.earningsTimestamp"
+    ],
+    "next_date": "2025-03-19",
+    "raw": {
+      "earningsTimestamp": "2025-03-19"
+    }
+  },
+  "CSIQ": {
+    "ticker": "CSIQ",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-05-14",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-05-14"
+      ]
+    }
+  },
+  "DOW": {
+    "ticker": "DOW",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-07-23",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-07-23"
+      ]
+    }
+  },
+  "FIG": {
+    "ticker": "FIG",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-14",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-14"
+      ]
+    }
+  },
+  "GLXY": {
+    "ticker": "GLXY",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-07-28",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-07-28"
+      ]
+    }
+  },
+  "GTLB": {
+    "ticker": "GTLB",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-03-03",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-03-03"
+      ]
+    }
+  },
+  "HIMS": {
+    "ticker": "HIMS",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-10",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-10"
+      ]
+    }
+  },
+  "HPE": {
+    "ticker": "HPE",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-06-01",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-06-01"
+      ]
+    }
+  },
+  "IOT": {
+    "ticker": "IOT",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-06-04",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-06-04"
+      ]
+    }
+  },
+  "HPQ": {
+    "ticker": "HPQ",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-05-27",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-05-27"
+      ]
+    }
+  },
+  "JD": {
+    "ticker": "JD",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-11",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-11"
+      ]
+    }
+  },
+  "JOBY": {
+    "ticker": "JOBY",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-05",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-05"
+      ]
+    }
+  },
+  "KGC": {
+    "ticker": "KGC",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-07-29",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-07-29"
+      ]
+    }
+  },
+  "KLAR": {
+    "ticker": "KLAR",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-13",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-13"
+      ]
+    }
+  },
+  "LUMN": {
+    "ticker": "LUMN",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-07-30",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-07-30"
+      ]
+    }
+  },
+  "LI": {
+    "ticker": "LI",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-05-28",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-05-28"
+      ]
+    }
+  },
+  "LUV": {
+    "ticker": "LUV",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-07-22",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-07-22"
+      ]
+    }
+  },
+  "LYFT": {
+    "ticker": "LYFT",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-05",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-05"
+      ]
+    }
+  },
+  "MARA": {
+    "ticker": "MARA",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-07-28",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-07-28"
+      ]
+    }
+  },
+  "M": {
+    "ticker": "M",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-05-27",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-05-27"
+      ]
+    }
+  },
+  "MOS": {
+    "ticker": "MOS",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-04",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-04"
+      ]
+    }
+  },
+  "MBLY": {
+    "ticker": "MBLY",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-04-23",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-04-23"
+      ]
+    }
+  },
+  "NNE": {
+    "ticker": "NNE",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-13",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-13"
+      ]
+    }
+  },
+  "NCLH": {
+    "ticker": "NCLH",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-07-30",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-07-30"
+      ]
+    }
+  },
+  "NVTS": {
+    "ticker": "NVTS",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-03",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-03"
+      ]
+    }
+  },
+  "NOK": {
+    "ticker": "NOK",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-07-23",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-07-23"
+      ]
+    }
+  },
+  "ONDS": {
+    "ticker": "ONDS",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-12",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-12"
+      ]
+    }
+  },
+  "ONON": {
+    "ticker": "ONON",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-11",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-11"
+      ]
+    }
+  },
+  "OUST": {
+    "ticker": "OUST",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-05-05",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-05-05"
+      ]
+    }
+  },
+  "OSCR": {
+    "ticker": "OSCR",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-05-06",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-05-06"
+      ]
+    }
+  },
+  "PATH": {
+    "ticker": "PATH",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-05-28",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-05-28"
+      ]
+    }
+  },
+  "QBTS": {
+    "ticker": "QBTS",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-06",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-06"
+      ]
+    }
+  },
+  "QS": {
+    "ticker": "QS",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-07-22",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-07-22"
+      ]
+    }
+  },
+  "QUBT": {
+    "ticker": "QUBT",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-10",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-10"
+      ]
+    }
+  },
+  "QXO": {
+    "ticker": "QXO",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-05-12",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-05-12"
+      ]
+    }
+  },
+  "RCAT": {
+    "ticker": "RCAT",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-05-07",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-05-07"
+      ]
+    }
+  },
+  "RGTI": {
+    "ticker": "RGTI",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-05-11",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-05-11"
+      ]
+    }
+  },
+  "RDW": {
+    "ticker": "RDW",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-05",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-05"
+      ]
+    }
+  },
+  "RIOT": {
+    "ticker": "RIOT",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-07-30",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-07-30"
+      ]
+    }
+  },
+  "RIVN": {
+    "ticker": "RIVN",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-04-30",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-04-30"
+      ]
+    }
+  },
+  "RKT": {
+    "ticker": "RKT",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-07-30",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-07-30"
+      ]
+    }
+  },
+  "S": {
+    "ticker": "S",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-05-28",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-05-28"
+      ]
+    }
+  },
+  "SG": {
+    "ticker": "SG",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-06",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-06"
+      ]
+    }
+  },
+  "SGML": {
+    "ticker": "SGML",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-13",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-13"
+      ]
+    }
+  },
+  "SMR": {
+    "ticker": "SMR",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-06",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-06"
+      ]
+    }
+  },
+  "SMCI": {
+    "ticker": "SMCI",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-04",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-04"
+      ]
+    }
+  },
+  "SOC": {
+    "ticker": "SOC",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-05-06",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-05-06"
+      ]
+    }
+  },
+  "SOFI": {
+    "ticker": "SOFI",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-07-28",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-07-28"
+      ]
+    }
+  },
+  "SOUN": {
+    "ticker": "SOUN",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-06",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-06"
+      ]
+    }
+  },
+  "SONY": {
+    "ticker": "SONY",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-07-31",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-07-31"
+      ]
+    }
+  },
+  "STUB": {
+    "ticker": "STUB",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-12",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-12"
+      ]
+    }
+  },
+  "TOST": {
+    "ticker": "TOST",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-04",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-04"
+      ]
+    }
+  },
+  "U": {
+    "ticker": "U",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-05",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-05"
+      ]
+    }
+  },
+  "TTD": {
+    "ticker": "TTD",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-06",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-06"
+      ]
+    }
+  },
+  "UAMY": {
+    "ticker": "UAMY",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-14",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-14"
+      ]
+    }
+  },
+  "UEC": {
+    "ticker": "UEC",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-05-28",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-05-28"
+      ]
+    }
+  },
+  "UMAC": {
+    "ticker": "UMAC",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-10",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-10"
+      ]
+    }
+  },
+  "UPST": {
+    "ticker": "UPST",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-04",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-04"
+      ]
+    }
+  },
+  "UUUU": {
+    "ticker": "UUUU",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-06",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-06"
+      ]
+    }
+  },
+  "USAR": {
+    "ticker": "USAR",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-10",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-10"
+      ]
+    }
+  },
+  "VFC": {
+    "ticker": "VFC",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-05-20",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-05-20"
+      ]
+    }
+  },
+  "VG": {
+    "ticker": "VG",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-12",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-12"
+      ]
+    }
+  },
+  "VKTX": {
+    "ticker": "VKTX",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-07-29",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-07-29"
+      ]
+    }
+  },
+  "WRBY": {
+    "ticker": "WRBY",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-06",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-06"
+      ]
+    }
+  },
+  "WULF": {
+    "ticker": "WULF",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-08-06",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-08-06"
+      ]
+    }
+  },
+  "XPEV": {
+    "ticker": "XPEV",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-05-28",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-05-28"
+      ]
+    }
+  },
+  "ZETA": {
+    "ticker": "ZETA",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-04-30",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-04-30"
+      ]
+    }
+  },
+  "ZIM": {
+    "ticker": "ZIM",
+    "source": [
+      "calendarEvents"
+    ],
+    "next_date": "2026-05-20",
+    "raw": {
+      "calendarEvents_dates": [
+        "2026-05-20"
+      ]
+    }
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "basket_date": "2026-05-04",
+  "expiry": "2026-05-08",
+  "generated_ts": "2026-05-01T21:13:51.678Z",
+  "files": [
+    {
+      "file": "basket_proposal.json",
+      "bytes": 5499,
+      "mtime": "2026-05-01T21:13:40.888Z"
+    },
+    {
+      "file": "chain_summary_v2.csv",
+      "bytes": 18285,
+      "mtime": "2026-05-01T21:10:46.026Z"
+    },
+    {
+      "file": "chains_2026-05-08_v2.csv",
+      "bytes": 596509,
+      "mtime": "2026-05-01T21:10:46.025Z"
+    },
+    {
+      "file": "earnings_dates.json",
+      "bytes": 16894,
+      "mtime": "2026-05-01T21:11:26.376Z"
+    },
+    {
+      "file": "GSPC_history.csv",
+      "bytes": 10537,
+      "mtime": "2026-05-01T21:09:50.993Z"
+    },
+    {
+      "file": "macro_quotes.csv",
+      "bytes": 1295,
+      "mtime": "2026-05-01T21:09:50.595Z"
+    },
+    {
+      "file": "shortlist_calls_no_earnings.csv",
+      "bytes": 7069,
+      "mtime": "2026-05-01T21:11:39.703Z"
+    },
+    {
+      "file": "shortlist_calls_refined.csv",
+      "bytes": 11658,
+      "mtime": "2026-05-01T21:10:51.983Z"
+    },
+    {
+      "file": "shortlist_calls.csv",
+      "bytes": 15682,
+      "mtime": "2026-05-01T21:10:51.980Z"
+    },
+    {
+      "file": "shortlist_puts_no_earnings.csv",
+      "bytes": 6522,
+      "mtime": "2026-05-01T21:11:39.707Z"
+    },
+    {
+      "file": "shortlist_puts_refined.csv",
+      "bytes": 10415,
+      "mtime": "2026-05-01T21:10:51.984Z"
+    },
+    {
+      "file": "shortlist_puts.csv",
+      "bytes": 14826,
+      "mtime": "2026-05-01T21:10:51.981Z"
+    },
+    {
+      "file": "SPY_history.csv",
+      "bytes": 11101,
+      "mtime": "2026-05-01T21:09:50.868Z"
+    },
+    {
+      "file": "universe_8to40.csv",
+      "bytes": 20889,
+      "mtime": "2026-05-01T21:09:58.089Z"
+    },
+    {
+      "file": "universe_quotes.csv",
+      "bytes": 72517,
+      "mtime": "2026-05-01T21:09:58.087Z"
+    },
+    {
+      "file": "VIX_history.csv",
+      "bytes": 10616,
+      "mtime": "2026-05-01T21:09:51.122Z"
+    },
+    {
+      "file": "weeklys_universe.csv",
+      "bytes": 2999,
+      "mtime": "2026-05-01T21:09:46.325Z"
+    }
+  ]
+}

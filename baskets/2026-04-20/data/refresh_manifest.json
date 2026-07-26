@@ -1,0 +1,73 @@
+{
+  "run_ts": "2026-04-19T21:55:00Z",
+  "scheduled_task": "update-stock-data-and-generate-trades",
+  "basket_date": "2026-04-20",
+  "expiry": "2026-04-24",
+  "inputs": {
+    "yahoo_macro_tickers": 18,
+    "yahoo_universe_weeklys": 679,
+    "yahoo_universe_quotes_ok": 678,
+    "yahoo_universe_quote_errors": 0,
+    "yahoo_price_band_8_40": 199,
+    "yahoo_chain_expiry_rows": 11737,
+    "yahoo_chain_summary_rows": 199,
+    "yahoo_chain_errors": 0,
+    "tradingview_screener_rows": 678,
+    "tradingview_snapshot_style": "public_screener_subset",
+    "tradingview_note": "Full polytheta-tradingview-downloader skipped (requires Python >= 3.11 + browser cookies; sandbox has Python 3.10). Used tradingview-screener public API for a 22-column subset."
+  },
+  "macro_snapshot": {
+    "SPY": 710.14,
+    "SPX": 7126.06,
+    "VIX": 17.48,
+    "VIX_prev": 17.94,
+    "SKEW": 141.82,
+    "MOVE": 65.6953
+  },
+  "gsrs": 2.6,
+  "sizing_regime": "full 5% both sides, doubles enabled",
+  "basket_legs": [
+    { "ticker": "GTLB", "side": "call", "strike": 27,   "basket_credit": 0.57, "live_mid": 0.575, "drift": 0.005 },
+    { "ticker": "DOW",  "side": "call", "strike": 44.5, "basket_credit": 1.07, "live_mid": 1.075, "drift": 0.005 },
+    { "ticker": "DBX",  "side": "call", "strike": 28,   "basket_credit": 0.47, "live_mid": 0.475, "drift": 0.005 },
+    { "ticker": "HIMS", "side": "call", "strike": 33,   "basket_credit": 0.52, "live_mid": 0.515, "drift": -0.005 },
+    { "ticker": "PL",   "side": "put",  "strike": 35,   "basket_credit": 0.75, "live_mid": 0.750, "drift": 0.0 },
+    { "ticker": "SMR",  "side": "put",  "strike": 11.5, "basket_credit": 0.25, "live_mid": 0.250, "drift": 0.0 },
+    { "ticker": "LUNR", "side": "put",  "strike": 25,   "basket_credit": 0.58, "live_mid": 0.580, "drift": 0.0 },
+    { "ticker": "RIOT", "side": "put",  "strike": 16.5, "basket_credit": 0.29, "live_mid": 0.290, "drift": 0.0 }
+  ],
+  "totals": {
+    "total_credit_usd": 68070,
+    "total_margin_usd": 437894,
+    "margin_pct_of_1M": 43.8,
+    "max_profit_weekly_pct_on_1M": 6.81
+  },
+  "outputs_written": [
+    "baskets/2026-04-20-basket.md (updated with refresh confirmation section)",
+    "baskets/2026-04-20-basket.pdf (regenerated via pandoc xelatex)",
+    "baskets/2026-04-20/data/macro_quotes.csv",
+    "baskets/2026-04-20/data/SPY_history.csv",
+    "baskets/2026-04-20/data/GSPC_history.csv",
+    "baskets/2026-04-20/data/VIX_history.csv",
+    "baskets/2026-04-20/data/universe_quotes.csv",
+    "baskets/2026-04-20/data/universe_8to40.csv",
+    "baskets/2026-04-20/data/chains_2026-04-24_v2.csv",
+    "baskets/2026-04-20/data/chain_summary_v2.csv",
+    "baskets/2026-04-20/data/shortlist_calls_refined.csv",
+    "baskets/2026-04-20/data/shortlist_puts_refined.csv",
+    "baskets/2026-04-20/data/verify_live_2026-04-19.json",
+    "data_trading_view/2026-04-19 21-50-16_tradingview_weeklys.csv",
+    "data_trading_view/2026-04-19 21-50-16_tradingview_weeklys.json",
+    "data_trading_view/2026-04-19 21-50-16_tradingview_weeklys_manifest.json",
+    "scripts/run_weekly_refresh.mjs (new autodiscovering driver)",
+    "scripts/_refresh_chains.mjs (new chunked chain puller)",
+    "scripts/_run_filter_refine.mjs (new combined filter+refine)",
+    "scripts/_verify_basket_live.mjs (new live basket verifier)"
+  ],
+  "notes": [
+    "Market was closed for the weekend so macro and chain prints match Friday close.",
+    "All 8 basket legs verify live on Yahoo to within 0.005 of mid; strikes/credits unchanged.",
+    "DBX $28C remains the basket choice over the auto-picker's $25.5C — the $28C carries more credit and a larger ATR buffer.",
+    "Full TradingView downloader skipped — see tradingview_note."
+  ]
+}

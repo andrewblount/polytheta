@@ -1,0 +1,66 @@
+{
+  "run_ts": "2026-04-27T16:05:00Z",
+  "scheduled_task": "update-stock-data-and-generate-trades",
+  "basket_date": "2026-04-27",
+  "expiry": "2026-05-01",
+  "scripts_run": [
+    "scripts/_run_weekly_refresh_2026_04_27.mjs (macro + history + universe quotes + universe_8to40, basket_date pinned to today)",
+    "scripts/_chains_parallel.mjs 2026-04-27 (full option chain + IV summary, 199 tickers parallel)",
+    "scripts/_run_filter_refine_2026_04_27.mjs 2026-04-27 (shortlist calls/puts + refined)",
+    "scripts/_fetch_earnings_dates.mjs 2026-04-27 (NEW — Yahoo calendarEvents.earnings.earningsDate for 84 tickers, 14 flagged in-window)",
+    "scripts/_filter_earnings_and_rank.mjs 2026-04-27 2026-04-27 2026-05-01 (NEW — rerank refined shortlists with earnings-out-of-window filter)",
+    "scripts/_build_basket_2026_04_27_monday.mjs (UPDATED — earnings filter is now a hard pre-pick gate; build exits non-zero if any candidate trips)"
+  ],
+  "scripts_skipped": [
+    {
+      "script": "polytheta-tradingview-downloader --cboe-weeklys-only",
+      "reason": "Python venv at python/tradingview_equity_downloader/.venv references a macOS interpreter (/Library/Frameworks/Python.framework/Versions/3.11/...) that does not exist in this Linux session. Same situation as the 2026-04-24 run. The TradingView downloader additionally relies on rookiepy reading local browser cookies, which is unavailable in this sandbox even after a venv rebuild. Most recent TradingView snapshot remains data_trading_view/2026-04-19 21-50-16_tradingview_weeklys.csv. Run on local macOS to refresh."
+    },
+    {
+      "script": "polytheta-yahoo-downloader --min-price 8",
+      "reason": "Same Python venv path issue. Node-based scripts/_run_weekly_refresh_2026_04_27.mjs provides equivalent Yahoo coverage (macro, price history, universe quotes, option chains) for the weeklys-only universe (679 tickers + SPX + VIX) and was used instead."
+    }
+  ],
+  "previous_run_ts": "2026-04-24T21:12:00Z",
+  "macro": {
+    "SPY": 712.88,
+    "SPX": 7152.14,
+    "VIX": 18.74,
+    "VIX_prev": 18.71,
+    "VIX_change_1d": 0.03,
+    "SKEW": 139.08,
+    "MOVE": 66.97,
+    "HY_OAS_carried": 2.86,
+    "PC_estimate": 0.55
+  },
+  "universe_quotes": { "done": 678, "errors": 0 },
+  "chains": { "processed": 199, "errors": 0 },
+  "shortlist": { "calls": 79, "puts": 40 },
+  "earnings_filter": {
+    "applied": true,
+    "window": "2026-04-27 to 2026-05-01 (inclusive)",
+    "tickers_with_earnings_in_window": ["ENPH","GLXY","AR","CMG","KGC","SOFI","TEVA","VKTX","BAX","RIOT","RIVN","SIRI","SMMT","ZETA"],
+    "calls_surviving": 65,
+    "puts_surviving": 30
+  },
+  "basket": { "calls": 4, "puts": 4, "total_margin_est": 440094, "total_credit_est": 64647 },
+  "gsrs": 2.80,
+  "exclusions_summary": {
+    "removed_for_earnings_in_window": [
+      { "ticker": "ENPH", "side": "call", "earnings": "2026-04-28" },
+      { "ticker": "GLXY", "side": "call", "earnings": "2026-04-28", "flagged_by": "user (Andrew)" },
+      { "ticker": "RIVN", "side": "call", "earnings": "2026-04-30" },
+      { "ticker": "SOFI", "side": "put",  "earnings": "2026-04-29" },
+      { "ticker": "ZETA", "side": "put",  "earnings": "2026-04-30" },
+      { "ticker": "RIOT", "side": "put",  "earnings": "2026-04-30" }
+    ],
+    "removed_for_breach": [
+      { "ticker": "POET", "side": "put", "friday_px": 15.10, "monday_px": 8.42, "change_pct": -44, "reason": "Underlying gapped down ~44% over weekend; $12 put is $3.58 ITM at delta -0.85." }
+    ]
+  },
+  "final_basket": {
+    "calls": ["NN $21","NVTS $20","ASST $18","BTDR $13"],
+    "puts":  ["SMR $11","CORZ $19","TTD $22","SOC $12.50"]
+  },
+  "radar_status": "Not independently re-verified in this automated run (no news / SEC / Glassdoor API call). POET breach detected via fresh price feed only. Verify all earnings dates against an authoritative source (Earnings Whispers, company IR page) before entry — Yahoo's calendarEvents can lag for less-covered names."
+}

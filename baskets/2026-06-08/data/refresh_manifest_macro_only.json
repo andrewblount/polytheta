@@ -1,0 +1,21 @@
+{
+  "run_ts": "2026-06-08T02:12:10.689Z",
+  "basket_date": "2026-06-15",
+  "expiry": "2026-06-12",
+  "macro": {
+    "SPY": 737.55,
+    "VIX": 21.51,
+    "VIX_prev": 15.4,
+    "SKEW": 152.25,
+    "MOVE": 75.1985,
+    "SPX": 7383.74
+  },
+  "universe_quotes": {
+    "done": 0,
+    "errors": 0
+  },
+  "chains": {
+    "processed": 0,
+    "errors": 0
+  }
+}
