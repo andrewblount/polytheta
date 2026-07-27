@@ -20,7 +20,18 @@ function leanPosition(p: PositionData) {
     buffer: p.buffer ?? null,
     shortInterestPctFloat: p.shortInterestPctFloat,
     thesisSummary: p.thesisSummary,
+    thesisBullets: p.thesisBullets,
     cautionFlags: p.cautionFlags,
+    // Thesis-confirmation signals per the trading system. Zero generally
+    // means "not evaluated" for auto-generated baskets (except call-side
+    // buyback, where 0 is the desired "no active program" state).
+    signals: {
+      ivRank: p.ivRank,
+      shortInterestPctFloat: p.shortInterestPctFloat,
+      fanScore: p.fanScore,
+      glassdoorScore: p.glassdoorScore,
+      buybackScore: p.buybackScore,
+    },
     latest: p.latestPerformance
       ? {
           observedAt: p.latestPerformance.observedAt,
