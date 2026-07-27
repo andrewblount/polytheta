@@ -19,6 +19,7 @@ import { runEarnings } from './lib/earnings.mjs';
 import { runFilterAndRefine } from './lib/shortlist.mjs';
 import { runBuildBasket } from './lib/build_basket.mjs';
 import { importProposal } from './lib/import_proposal.mjs';
+import { sendBasketEmail } from './lib/basket_email.mjs';
 
 const __filename = url.fileURLToPath(import.meta.url);
 const REPO_ROOT = path.resolve(path.dirname(__filename), '..');
@@ -193,6 +194,15 @@ Credit **$${totalCredit.toLocaleString()}** on margin **$${totalMargin.toLocaleS
 `;
 fs.writeFileSync(summaryPath, summary);
 log(`wrote ${summaryPath}`);
+
+// Email the trading instructions (independent of DB publish — the basket
+// should reach the inbox even if the site is down).
+try {
+  const mail = await sendBasketEmail(proposal);
+  log(mail.sent ? `basket email sent to ${mail.to}` : `basket email skipped/failed: ${mail.reason ?? mail.status}`);
+} catch (err) {
+  log(`WARNING: basket email failed — ${err.message}`);
+}
 
 // Publish to the Neon DB behind polytheta.com. Without this the site keeps
 // serving whatever was last loaded, regardless of what the orchestrator built.

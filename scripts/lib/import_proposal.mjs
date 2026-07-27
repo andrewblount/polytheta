@@ -113,7 +113,7 @@ function cautionFlagsFrom(pick, constraints) {
   return out;
 }
 
-function orderBlocks(picks, expiry) {
+export function orderBlocks(picks, expiry) {
   const fmtDate = new Date(`${expiry}T00:00:00Z`);
   const schwabDate = fmtDate.toLocaleDateString('en-US', {
     month: 'short',
