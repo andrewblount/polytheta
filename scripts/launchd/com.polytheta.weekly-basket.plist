@@ -6,20 +6,27 @@
   <key>Label</key>
   <string>com.polytheta.weekly-basket</string>
 
-  <!-- Fires Sunday at 20:00 local, and Monday at 06:30 local as a safety net
-       in case the Mac was asleep on Sunday night. The orchestrator is
-       idempotent — the Monday run detects Sunday's outputs and exits fast. -->
+  <!-- Fires Monday 04:00 local (06:00 ET) with an 06:15 retry — the
+       orchestrator is idempotent, so the retry fast-forwards if the first
+       run completed. Monday pre-dawn beats Sunday evening: option chains are
+       frozen at Friday's close all weekend anyway, while Monday premarket
+       carries live equity prices (catches weekend gaps before entry — see
+       the FCEL autopsy) and the news radar sees Sunday-night M&A
+       announcements before the basket is picked. Chains for the full
+       universe take ~30-45 min, done well before the open; the 07:35/08:35
+       revalidation job remains the post-open gate. Times are LOCAL
+       (Mountain assumed, ET-2 year-round). -->
   <key>StartCalendarInterval</key>
   <array>
     <dict>
-      <key>Weekday</key><integer>0</integer>
-      <key>Hour</key><integer>20</integer>
+      <key>Weekday</key><integer>1</integer>
+      <key>Hour</key><integer>4</integer>
       <key>Minute</key><integer>0</integer>
     </dict>
     <dict>
       <key>Weekday</key><integer>1</integer>
       <key>Hour</key><integer>6</integer>
-      <key>Minute</key><integer>30</integer>
+      <key>Minute</key><integer>15</integer>
     </dict>
   </array>
 

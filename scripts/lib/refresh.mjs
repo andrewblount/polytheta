@@ -130,8 +130,13 @@ async function runUniverseQuotes(OUT) {
     try {
       const quotes = await yf.quote(batch);
       for (const q of quotes) {
+        // Monday pre-dawn runs: prefer the live premarket price over
+        // Friday's close so strikes/buffers are computed against reality
+        // (FCEL entered 16% below its actual Monday price when this used
+        // stale closes). Thin names without premarket quotes fall back.
+        const price = q.preMarketPrice ?? q.regularMarketPrice;
         rows.push(csvRow([
-          q.symbol, q.regularMarketPrice, q.currency, q.fullExchangeName, q.marketCap,
+          q.symbol, price, q.currency, q.fullExchangeName, q.marketCap,
           q.averageDailyVolume10Day ?? q.averageDailyVolume3Month,
           q.sharesOutstanding, q.regularMarketPreviousClose,
           q.fiftyTwoWeekHigh, q.fiftyTwoWeekLow, q.epsForward, q.forwardPE,
