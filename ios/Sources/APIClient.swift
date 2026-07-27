@@ -57,4 +57,9 @@ final class APIClient: ObservableObject {
     func baskets() async throws -> BasketsResponse {
         try await get("/api/mobile/baskets", as: BasketsResponse.self)
     }
+
+    func alerts(hoursBack: Int = 72) async throws -> AlertsResponse {
+        let since = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-Double(hoursBack) * 3600))
+        return try await get("/api/mobile/alerts?since=\(since)", as: AlertsResponse.self)
+    }
 }

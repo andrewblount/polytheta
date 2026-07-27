@@ -55,6 +55,7 @@ struct MobilePosition: Codable, Identifiable {
     let thesisSummary: String
     let cautionFlags: [String]
     let latest: LatestSnapshot?
+    let stopBreach: Bool? // -25% of allocation crossed (heads-up, policy is hold to expiry)
 }
 
 struct LatestSnapshot: Codable {
@@ -114,6 +115,22 @@ struct Stats: Codable {
 
 struct BasketsResponse: Codable {
     let baskets: [BasketListItem]
+}
+
+struct AlertsResponse: Codable {
+    let alerts: [AlertItem]
+}
+
+struct AlertItem: Codable, Identifiable {
+    let id: String
+    let at: String
+    let message: String
+    let meta: AlertMeta?
+}
+
+struct AlertMeta: Codable {
+    let kind: String?
+    let ticker: String?
 }
 
 struct BasketListItem: Codable, Identifiable {

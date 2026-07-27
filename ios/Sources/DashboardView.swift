@@ -83,6 +83,11 @@ struct DashboardView: View {
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
+                    if p.stopBreach == true {
+                        Label("Past stop level — check news (policy: hold to expiry)", systemImage: "exclamationmark.octagon.fill")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.red)
+                    }
                     if !p.cautionFlags.isEmpty {
                         Text(p.cautionFlags.joined(separator: " · "))
                             .font(.caption2)
