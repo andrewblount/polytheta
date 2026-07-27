@@ -62,4 +62,37 @@ final class APIClient: ObservableObject {
         let since = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-Double(hoursBack) * 3600))
         return try await get("/api/mobile/alerts?since=\(since)", as: AlertsResponse.self)
     }
+
+    func trades() async throws -> TradesResponse {
+        try await get("/api/mobile/trades", as: TradesResponse.self)
+    }
+
+    func createTrade(_ trade: NewTrade) async throws -> Trade {
+        guard isConfigured, let url = URL(string: baseURL + "/api/mobile/trades") else {
+            throw APIError.notConfigured
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(trade)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw APIError.badStatus(0) }
+        if http.statusCode == 401 { throw APIError.unauthorized }
+        guard (200..<300).contains(http.statusCode) else { throw APIError.badStatus(http.statusCode) }
+        return try JSONDecoder().decode(TradeResponse.self, from: data).trade
+    }
+
+    func deleteTrade(id: String) async throws {
+        guard isConfigured, let url = URL(string: baseURL + "/api/mobile/trades/\(id)") else {
+            throw APIError.notConfigured
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw APIError.badStatus((response as? HTTPURLResponse)?.statusCode ?? 0)
+        }
+    }
 }

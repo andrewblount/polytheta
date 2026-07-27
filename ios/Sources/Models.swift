@@ -133,6 +133,51 @@ struct AlertMeta: Codable {
     let ticker: String?
 }
 
+struct TradesResponse: Codable {
+    let trades: [Trade]
+}
+
+struct TradeResponse: Codable {
+    let trade: Trade
+}
+
+struct Trade: Codable, Identifiable {
+    let id: String
+    let positionId: String?
+    let ticker: String
+    let side: String
+    let action: String // sell-to-open | buy-to-close
+    let strike: Double
+    let expiry: String
+    let quantity: Int
+    let price: Double
+    let fees: Double
+    let broker: String?
+    let executedAt: String
+    let notes: String?
+
+    // Signed cash flow: credit received positive, debit paid negative.
+    var cashFlow: Double {
+        let gross = price * 100 * Double(quantity)
+        return (action == "sell-to-open" ? gross : -gross) - fees
+    }
+}
+
+struct NewTrade: Codable {
+    var ticker: String
+    var side: String
+    var action: String
+    var strike: Double
+    var expiry: String
+    var quantity: Int
+    var price: Double
+    var fees: Double
+    var broker: String?
+    var executedAt: String
+    var notes: String?
+    var positionId: String?
+}
+
 struct BasketListItem: Codable, Identifiable {
     var id: String { slug }
     let slug: String

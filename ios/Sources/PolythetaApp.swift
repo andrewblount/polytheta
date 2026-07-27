@@ -21,6 +21,8 @@ struct RootView: View {
         TabView {
             DashboardView()
                 .tabItem { Label("Basket", systemImage: "basket") }
+            TradesView()
+                .tabItem { Label("Trades", systemImage: "list.bullet.rectangle.portrait") }
             AlertsView()
                 .tabItem { Label("Alerts", systemImage: "bell.badge") }
             PerformanceView()

@@ -53,9 +53,11 @@ struct SettingsView: View {
             Form {
                 Section("Connection") {
                     TextField("Base URL", text: $api.baseURL)
+                        #if os(iOS)
                         .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
                         .keyboardType(.URL)
+                        #endif
+                        .autocorrectionDisabled()
                     SecureField("API token", text: $api.token)
                 }
                 Section {
