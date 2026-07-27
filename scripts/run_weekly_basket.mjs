@@ -231,6 +231,23 @@ if (proposal.picks.length === 0) {
   process.exit(1);
 }
 
+// TradingView artifacts: an importable watchlist and the alert levels.
+// (TradingView has no public write API — the watchlist file drag-imports in
+// one step, and the Monday scheduled assistant task sets alerts via the
+// browser from these levels.)
+const tvWatchlist = proposal.picks.map((p) => p.ticker).join(',');
+fs.writeFileSync(path.join(BASKET_DIR, 'tradingview_watchlist.txt'), tvWatchlist + '\n');
+const tvAlerts = [
+  '# TradingView alerts — ' + BASKET_DATE,
+  '',
+  '| ticker | side | alert | level | meaning |',
+  '|--------|------|-------|------:|---------|',
+  ...proposal.picks.map((p) =>
+    `| ${p.ticker} | ${p.side} | crossing ${p.side === 'call' ? 'up' : 'down'} | ${p.K} | short strike — attention only, policy is hold to expiry; exits on radar signals |`),
+].join('\n');
+fs.writeFileSync(path.join(BASKET_DIR, 'tradingview_alerts.md'), tvAlerts + '\n');
+log(`tradingview artifacts: watchlist (${proposal.picks.length} symbols) + alert levels`);
+
 // Email the trading instructions (independent of DB publish — the basket
 // should reach the inbox even if the site is down).
 try {

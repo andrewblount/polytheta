@@ -1,0 +1,721 @@
+{
+  "AA": {
+    "si_pct": 3.41,
+    "shares_short": 8981785,
+    "short_ratio": 1.31,
+    "fetched_at": "2026-07-27T15:59:33.656Z"
+  },
+  "AAP": {
+    "si_pct": 28.95,
+    "shares_short": 10770232,
+    "short_ratio": 6.02,
+    "fetched_at": "2026-07-27T15:59:33.703Z"
+  },
+  "AG": {
+    "si_pct": null,
+    "shares_short": 17466960,
+    "short_ratio": 1.56,
+    "fetched_at": "2026-07-27T15:59:33.655Z"
+  },
+  "APLD": {
+    "si_pct": 26.54,
+    "shares_short": 69869887,
+    "short_ratio": 3.65,
+    "fetched_at": "2026-07-27T15:59:33.656Z"
+  },
+  "ARKG": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:33.752Z"
+  },
+  "ARKK": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:34.173Z"
+  },
+  "ASST": {
+    "si_pct": 30.38,
+    "shares_short": 21948900,
+    "short_ratio": 4.95,
+    "fetched_at": "2026-07-27T15:59:34.156Z"
+  },
+  "ASTS": {
+    "si_pct": 19.93,
+    "shares_short": 59349055,
+    "short_ratio": 3.08,
+    "fetched_at": "2026-07-27T15:59:34.157Z"
+  },
+  "BBWI": {
+    "si_pct": 8.13,
+    "shares_short": 16341589,
+    "short_ratio": 2.84,
+    "fetched_at": "2026-07-27T15:59:34.158Z"
+  },
+  "BILI": {
+    "si_pct": 7.01,
+    "shares_short": 20436615,
+    "short_ratio": 8.93,
+    "fetched_at": "2026-07-27T15:59:34.250Z"
+  },
+  "BITX": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:34.665Z"
+  },
+  "BMNR": {
+    "si_pct": 8.15,
+    "shares_short": 49117115,
+    "short_ratio": 1.24,
+    "fetched_at": "2026-07-27T15:59:34.656Z"
+  },
+  "BMY": {
+    "si_pct": 2.2,
+    "shares_short": 44935362,
+    "short_ratio": 3.33,
+    "fetched_at": "2026-07-27T15:59:34.653Z"
+  },
+  "BOIL": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:34.657Z"
+  },
+  "BP": {
+    "si_pct": 0.49,
+    "shares_short": 11007637,
+    "short_ratio": 1.03,
+    "fetched_at": "2026-07-27T15:59:34.755Z"
+  },
+  "BSX": {
+    "si_pct": 1.9,
+    "shares_short": 28281040,
+    "short_ratio": 1.42,
+    "fetched_at": "2026-07-27T15:59:35.172Z"
+  },
+  "BTDR": {
+    "si_pct": 36.78,
+    "shares_short": 56954361,
+    "short_ratio": 5.9,
+    "fetched_at": "2026-07-27T15:59:35.170Z"
+  },
+  "BTU": {
+    "si_pct": 14.4,
+    "shares_short": 12585367,
+    "short_ratio": 4.49,
+    "fetched_at": "2026-07-27T15:59:35.172Z"
+  },
+  "CC": {
+    "si_pct": 10.89,
+    "shares_short": 11684336,
+    "short_ratio": 4.05,
+    "fetched_at": "2026-07-27T15:59:35.171Z"
+  },
+  "CCL": {
+    "si_pct": 2.65,
+    "shares_short": 33756235,
+    "short_ratio": 1.42,
+    "fetched_at": "2026-07-27T15:59:35.269Z"
+  },
+  "CELH": {
+    "si_pct": 15.89,
+    "shares_short": 39938164,
+    "short_ratio": 4.87,
+    "fetched_at": "2026-07-27T15:59:35.742Z"
+  },
+  "CHWY": {
+    "si_pct": 11.8,
+    "shares_short": 27330297,
+    "short_ratio": 2.64,
+    "fetched_at": "2026-07-27T15:59:35.685Z"
+  },
+  "CIFR": {
+    "si_pct": 16.74,
+    "shares_short": 56099030,
+    "short_ratio": 2.32,
+    "fetched_at": "2026-07-27T15:59:35.693Z"
+  },
+  "CMG": {
+    "si_pct": 4.47,
+    "shares_short": 50630812,
+    "short_ratio": 2.57,
+    "fetched_at": "2026-07-27T15:59:35.693Z"
+  },
+  "CNQ": {
+    "si_pct": null,
+    "shares_short": 95572175,
+    "short_ratio": 4.42,
+    "fetched_at": "2026-07-27T15:59:35.778Z"
+  },
+  "CORZ": {
+    "si_pct": 22.56,
+    "shares_short": 63359713,
+    "short_ratio": 5.33,
+    "fetched_at": "2026-07-27T15:59:36.235Z"
+  },
+  "CPB": {
+    "si_pct": 27.58,
+    "shares_short": 42629203,
+    "short_ratio": 4.01,
+    "fetched_at": "2026-07-27T15:59:36.191Z"
+  },
+  "CRCL": {
+    "si_pct": 12.03,
+    "shares_short": 27099251,
+    "short_ratio": 1.82,
+    "fetched_at": "2026-07-27T15:59:36.192Z"
+  },
+  "CRWV": {
+    "si_pct": 21.44,
+    "shares_short": 64362421,
+    "short_ratio": 2.2,
+    "fetched_at": "2026-07-27T15:59:36.191Z"
+  },
+  "CSIQ": {
+    "si_pct": 30.64,
+    "shares_short": 16430419,
+    "short_ratio": 6.38,
+    "fetched_at": "2026-07-27T15:59:36.286Z"
+  },
+  "DAL": {
+    "si_pct": 3.85,
+    "shares_short": 25220397,
+    "short_ratio": 2.87,
+    "fetched_at": "2026-07-27T15:59:36.690Z"
+  },
+  "DBX": {
+    "si_pct": 29.04,
+    "shares_short": 28644593,
+    "short_ratio": 7.29,
+    "fetched_at": "2026-07-27T15:59:36.702Z"
+  },
+  "DVN": {
+    "si_pct": 2.86,
+    "shares_short": 31503519,
+    "short_ratio": 2.17,
+    "fetched_at": "2026-07-27T15:59:36.753Z"
+  },
+  "EEM": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:36.697Z"
+  },
+  "EL": {
+    "si_pct": 3.63,
+    "shares_short": 7988300,
+    "short_ratio": 2.48,
+    "fetched_at": "2026-07-27T15:59:36.783Z"
+  },
+  "EQT": {
+    "si_pct": 3.78,
+    "shares_short": 20683827,
+    "short_ratio": 2.47,
+    "fetched_at": "2026-07-27T15:59:37.187Z"
+  },
+  "F": {
+    "si_pct": 0,
+    "shares_short": 10455,
+    "short_ratio": 0,
+    "fetched_at": "2026-07-27T15:59:37.186Z"
+  },
+  "FCEL": {
+    "si_pct": 18.91,
+    "shares_short": 15094881,
+    "short_ratio": 1,
+    "fetched_at": "2026-07-27T15:59:37.190Z"
+  },
+  "FCX": {
+    "si_pct": 2,
+    "shares_short": 28591644,
+    "short_ratio": 1.84,
+    "fetched_at": "2026-07-27T15:59:37.191Z"
+  },
+  "FIG": {
+    "si_pct": 34.75,
+    "shares_short": 66087132,
+    "short_ratio": 2.93,
+    "fetched_at": "2026-07-27T15:59:37.283Z"
+  },
+  "FIS": {
+    "si_pct": 4,
+    "shares_short": 17881857,
+    "short_ratio": 2.96,
+    "fetched_at": "2026-07-27T15:59:37.689Z"
+  },
+  "FISV": {
+    "si_pct": null,
+    "error": "No fundamentals data found for symbol: FISV",
+    "fetched_at": "2026-07-27T15:59:37.687Z"
+  },
+  "FLY": {
+    "si_pct": 12.17,
+    "shares_short": 11953174,
+    "short_ratio": 2.08,
+    "fetched_at": "2026-07-27T15:59:37.689Z"
+  },
+  "FSLY": {
+    "si_pct": 19.02,
+    "shares_short": 25531692,
+    "short_ratio": 5.03,
+    "fetched_at": "2026-07-27T15:59:37.691Z"
+  },
+  "GAP": {
+    "si_pct": 15.32,
+    "shares_short": 30196271,
+    "short_ratio": 3.57,
+    "fetched_at": "2026-07-27T15:59:37.786Z"
+  },
+  "GDXJ": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:38.242Z"
+  },
+  "GLXY": {
+    "si_pct": 16.16,
+    "shares_short": 27044940,
+    "short_ratio": 3.79,
+    "fetched_at": "2026-07-27T15:59:38.188Z"
+  },
+  "GSK": {
+    "si_pct": 0.69,
+    "shares_short": 13759806,
+    "short_ratio": 3.97,
+    "fetched_at": "2026-07-27T15:59:38.187Z"
+  },
+  "GTLB": {
+    "si_pct": 11.47,
+    "shares_short": 19138615,
+    "short_ratio": 4.14,
+    "fetched_at": "2026-07-27T15:59:38.200Z"
+  },
+  "HAL": {
+    "si_pct": 5.61,
+    "shares_short": 34569025,
+    "short_ratio": 2.91,
+    "fetched_at": "2026-07-27T15:59:38.286Z"
+  },
+  "HIMS": {
+    "si_pct": 31.94,
+    "shares_short": 61410121,
+    "short_ratio": 3.71,
+    "fetched_at": "2026-07-27T15:59:38.694Z"
+  },
+  "HL": {
+    "si_pct": 0,
+    "shares_short": 1815,
+    "short_ratio": 0,
+    "fetched_at": "2026-07-27T15:59:38.695Z"
+  },
+  "HOOD": {
+    "si_pct": 4.88,
+    "shares_short": 38088351,
+    "short_ratio": 1.28,
+    "fetched_at": "2026-07-27T15:59:38.696Z"
+  },
+  "IAU": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:38.695Z"
+  },
+  "IGV": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:38.787Z"
+  },
+  "INTC": {
+    "si_pct": 2.4,
+    "shares_short": 120963181,
+    "short_ratio": 1.02,
+    "fetched_at": "2026-07-27T15:59:39.227Z"
+  },
+  "IONQ": {
+    "si_pct": 12.67,
+    "shares_short": 47045003,
+    "short_ratio": 2.14,
+    "fetched_at": "2026-07-27T15:59:39.265Z"
+  },
+  "IREN": {
+    "si_pct": 27.09,
+    "shares_short": 93712658,
+    "short_ratio": 2.44,
+    "fetched_at": "2026-07-27T15:59:39.222Z"
+  },
+  "JD": {
+    "si_pct": 2.4,
+    "shares_short": 32163620,
+    "short_ratio": 3.66,
+    "fetched_at": "2026-07-27T15:59:39.220Z"
+  },
+  "JETS": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:39.313Z"
+  },
+  "KHC": {
+    "si_pct": 10.76,
+    "shares_short": 92367931,
+    "short_ratio": 6.9,
+    "fetched_at": "2026-07-27T15:59:39.754Z"
+  },
+  "KRE": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:39.752Z"
+  },
+  "KTOS": {
+    "si_pct": 6.36,
+    "shares_short": 10377180,
+    "short_ratio": 1.83,
+    "fetched_at": "2026-07-27T15:59:39.753Z"
+  },
+  "KWEB": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:39.753Z"
+  },
+  "LEN": {
+    "si_pct": 0.27,
+    "shares_short": 493759,
+    "short_ratio": 0.18,
+    "fetched_at": "2026-07-27T15:59:39.853Z"
+  },
+  "LUNR": {
+    "si_pct": 28.8,
+    "shares_short": 37774781,
+    "short_ratio": 3.22,
+    "fetched_at": "2026-07-27T15:59:40.271Z"
+  },
+  "LVS": {
+    "si_pct": 12.5,
+    "shares_short": 17759508,
+    "short_ratio": 3.77,
+    "fetched_at": "2026-07-27T15:59:40.268Z"
+  },
+  "LYFT": {
+    "si_pct": 23.81,
+    "shares_short": 89615386,
+    "short_ratio": 7,
+    "fetched_at": "2026-07-27T15:59:40.270Z"
+  },
+  "MAGS": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:40.269Z"
+  },
+  "MDLZ": {
+    "si_pct": 2.94,
+    "shares_short": 33740434,
+    "short_ratio": 3.28,
+    "fetched_at": "2026-07-27T15:59:40.367Z"
+  },
+  "METU": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:40.792Z"
+  },
+  "MO": {
+    "si_pct": 3.19,
+    "shares_short": 53134147,
+    "short_ratio": 6.69,
+    "fetched_at": "2026-07-27T15:59:40.844Z"
+  },
+  "MRNA": {
+    "si_pct": 16.15,
+    "shares_short": 52401842,
+    "short_ratio": 5.21,
+    "fetched_at": "2026-07-27T15:59:40.845Z"
+  },
+  "MSTR": {
+    "si_pct": 11.76,
+    "shares_short": 40275607,
+    "short_ratio": 1.51,
+    "fetched_at": "2026-07-27T15:59:40.794Z"
+  },
+  "NCLH": {
+    "si_pct": 20.17,
+    "shares_short": 81737353,
+    "short_ratio": 4.77,
+    "fetched_at": "2026-07-27T15:59:40.885Z"
+  },
+  "NEE": {
+    "si_pct": 0,
+    "shares_short": 68753,
+    "short_ratio": 0.01,
+    "fetched_at": "2026-07-27T15:59:41.320Z"
+  },
+  "NKE": {
+    "si_pct": 6.7,
+    "shares_short": 63943595,
+    "short_ratio": 2.23,
+    "fetched_at": "2026-07-27T15:59:41.320Z"
+  },
+  "NVDL": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:41.366Z"
+  },
+  "NVTS": {
+    "si_pct": 18.35,
+    "shares_short": 39390044,
+    "short_ratio": 1.97,
+    "fetched_at": "2026-07-27T15:59:41.319Z"
+  },
+  "OKLO": {
+    "si_pct": 18.39,
+    "shares_short": 27938002,
+    "short_ratio": 2.89,
+    "fetched_at": "2026-07-27T15:59:41.413Z"
+  },
+  "ONON": {
+    "si_pct": 8.49,
+    "shares_short": 21251241,
+    "short_ratio": 4.41,
+    "fetched_at": "2026-07-27T15:59:41.841Z"
+  },
+  "OSCR": {
+    "si_pct": 7.98,
+    "shares_short": 19577008,
+    "short_ratio": 3.33,
+    "fetched_at": "2026-07-27T15:59:41.884Z"
+  },
+  "OXY": {
+    "si_pct": 0.01,
+    "shares_short": 108149,
+    "short_ratio": 0.01,
+    "fetched_at": "2026-07-27T15:59:41.838Z"
+  },
+  "PAAS": {
+    "si_pct": null,
+    "shares_short": 4061193,
+    "short_ratio": 0.99,
+    "fetched_at": "2026-07-27T15:59:41.837Z"
+  },
+  "PDD": {
+    "si_pct": 3.8,
+    "shares_short": 32783501,
+    "short_ratio": 4.02,
+    "fetched_at": "2026-07-27T15:59:41.930Z"
+  },
+  "PINS": {
+    "si_pct": 15.93,
+    "shares_short": 57443101,
+    "short_ratio": 3.73,
+    "fetched_at": "2026-07-27T15:59:42.405Z"
+  },
+  "PL": {
+    "si_pct": 11,
+    "shares_short": 32423850,
+    "short_ratio": 2.49,
+    "fetched_at": "2026-07-27T15:59:42.367Z"
+  },
+  "PYPL": {
+    "si_pct": 6.92,
+    "shares_short": 54774095,
+    "short_ratio": 2.77,
+    "fetched_at": "2026-07-27T15:59:42.363Z"
+  },
+  "QBTS": {
+    "si_pct": 20.02,
+    "shares_short": 65067516,
+    "short_ratio": 2.65,
+    "fetched_at": "2026-07-27T15:59:42.363Z"
+  },
+  "RIOT": {
+    "si_pct": 15.32,
+    "shares_short": 53394795,
+    "short_ratio": 3.44,
+    "fetched_at": "2026-07-27T15:59:42.455Z"
+  },
+  "RIVN": {
+    "si_pct": 12.39,
+    "shares_short": 140540265,
+    "short_ratio": 3.34,
+    "fetched_at": "2026-07-27T15:59:42.894Z"
+  },
+  "RKLB": {
+    "si_pct": 7.97,
+    "shares_short": 45847931,
+    "short_ratio": 1.71,
+    "fetched_at": "2026-07-27T15:59:42.889Z"
+  },
+  "S": {
+    "si_pct": 6.41,
+    "shares_short": 21251177,
+    "short_ratio": 2.96,
+    "fetched_at": "2026-07-27T15:59:42.896Z"
+  },
+  "SCO": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:42.896Z"
+  },
+  "SEDG": {
+    "si_pct": 20.11,
+    "shares_short": 10741694,
+    "short_ratio": 4.34,
+    "fetched_at": "2026-07-27T15:59:42.994Z"
+  },
+  "SILJ": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:43.422Z"
+  },
+  "SIRI": {
+    "si_pct": 18.26,
+    "shares_short": 36718070,
+    "short_ratio": 8.16,
+    "fetched_at": "2026-07-27T15:59:43.462Z"
+  },
+  "SLS": {
+    "si_pct": 28.23,
+    "shares_short": 55280869,
+    "short_ratio": 4.95,
+    "fetched_at": "2026-07-27T15:59:43.420Z"
+  },
+  "SLV": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:43.460Z"
+  },
+  "SMCI": {
+    "si_pct": 19.61,
+    "shares_short": 97146633,
+    "short_ratio": 1.94,
+    "fetched_at": "2026-07-27T15:59:43.518Z"
+  },
+  "SMMT": {
+    "si_pct": 24.58,
+    "shares_short": 37327940,
+    "short_ratio": 7.58,
+    "fetched_at": "2026-07-27T15:59:43.994Z"
+  },
+  "SMR": {
+    "si_pct": 23.15,
+    "shares_short": 70476605,
+    "short_ratio": 2.28,
+    "fetched_at": "2026-07-27T15:59:43.946Z"
+  },
+  "SONY": {
+    "si_pct": 0.25,
+    "shares_short": 14876415,
+    "short_ratio": 2.86,
+    "fetched_at": "2026-07-27T15:59:43.944Z"
+  },
+  "SOXS": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:43.947Z"
+  },
+  "SSO": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:44.036Z"
+  },
+  "TDOC": {
+    "si_pct": 15.62,
+    "shares_short": 28060519,
+    "short_ratio": 6.25,
+    "fetched_at": "2026-07-27T15:59:44.470Z"
+  },
+  "TLT": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:44.526Z"
+  },
+  "TQQQ": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:44.469Z"
+  },
+  "U": {
+    "si_pct": 7.8,
+    "shares_short": 33891131,
+    "short_ratio": 4.94,
+    "fetched_at": "2026-07-27T15:59:44.470Z"
+  },
+  "UEC": {
+    "si_pct": 14.14,
+    "shares_short": 58090456,
+    "short_ratio": 6.26,
+    "fetched_at": "2026-07-27T15:59:44.567Z"
+  },
+  "UPST": {
+    "si_pct": 31.36,
+    "shares_short": 26176982,
+    "short_ratio": 6.02,
+    "fetched_at": "2026-07-27T15:59:44.986Z"
+  },
+  "URA": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:44.989Z"
+  },
+  "USAR": {
+    "si_pct": 15.11,
+    "shares_short": 28889305,
+    "short_ratio": 2.36,
+    "fetched_at": "2026-07-27T15:59:44.993Z"
+  },
+  "UVXY": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:44.994Z"
+  },
+  "VFC": {
+    "si_pct": 7.97,
+    "shares_short": 31021577,
+    "short_ratio": 5.01,
+    "fetched_at": "2026-07-27T15:59:45.099Z"
+  },
+  "VXX": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:45.513Z"
+  },
+  "WMB": {
+    "si_pct": 1.89,
+    "shares_short": 20455181,
+    "short_ratio": 2.56,
+    "fetched_at": "2026-07-27T15:59:45.513Z"
+  },
+  "XLE": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:45.516Z"
+  },
+  "XLP": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-07-27T15:59:45.568Z"
+  },
+  "ZETA": {
+    "si_pct": 14.26,
+    "shares_short": 31820346,
+    "short_ratio": 3.38,
+    "fetched_at": "2026-07-27T15:59:45.661Z"
+  }
+}

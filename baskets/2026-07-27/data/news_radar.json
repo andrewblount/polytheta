@@ -1,0 +1,661 @@
+{
+  "AA": {
+    "call": [],
+    "put": []
+  },
+  "AAP": {
+    "call": [],
+    "put": []
+  },
+  "AG": {
+    "call": [],
+    "put": []
+  },
+  "APLD": {
+    "call": [],
+    "put": []
+  },
+  "ARKG": {
+    "call": [],
+    "put": []
+  },
+  "ARKK": {
+    "call": [
+      {
+        "title": "TSLA Stock Rebounds Premarket After Q2 Rout — Cathie Wood Bought The Dip, Retail Influencer Sees SpaceX Merger Reveal In 3 Weeks",
+        "link": "https://finance.yahoo.com/m/c58e06dc-e77e-3806-94f7-9803cbeac9d0/tsla-stock-rebounds-premarket.html",
+        "publisher": "Stocktwits",
+        "publishedAt": "2026-07-24T08:17:12.000Z",
+        "matched": "merger"
+      }
+    ],
+    "put": []
+  },
+  "ASST": {
+    "call": [],
+    "put": []
+  },
+  "ASTS": {
+    "call": [],
+    "put": []
+  },
+  "BBWI": {
+    "call": [],
+    "put": []
+  },
+  "BILI": {
+    "call": [],
+    "put": []
+  },
+  "BITX": {
+    "call": [],
+    "put": []
+  },
+  "BMNR": {
+    "call": [],
+    "put": []
+  },
+  "BMY": {
+    "call": [],
+    "put": []
+  },
+  "BOIL": {
+    "call": [],
+    "put": []
+  },
+  "BP": {
+    "call": [],
+    "put": []
+  },
+  "BSX": {
+    "call": [],
+    "put": []
+  },
+  "BTDR": {
+    "call": [],
+    "put": []
+  },
+  "BTU": {
+    "call": [],
+    "put": []
+  },
+  "CC": {
+    "call": [],
+    "put": []
+  },
+  "CCL": {
+    "call": [],
+    "put": []
+  },
+  "CELH": {
+    "call": [],
+    "put": []
+  },
+  "CHWY": {
+    "call": [],
+    "put": []
+  },
+  "CIFR": {
+    "call": [
+      {
+        "title": "CRCL Stock Rallies After Circle Acquires Nearly 1,000 Blockchain Patents From IBM",
+        "link": "https://finance.yahoo.com/m/83e8ad30-2933-361b-98fd-6c98f1b9ae04/crcl-stock-rallies-after.html",
+        "publisher": "Stocktwits",
+        "publishedAt": "2026-07-27T14:05:07.000Z",
+        "matched": "acqui"
+      }
+    ],
+    "put": []
+  },
+  "CMG": {
+    "call": [],
+    "put": []
+  },
+  "CNQ": {
+    "call": [],
+    "put": []
+  },
+  "CORZ": {
+    "call": [
+      {
+        "title": "CRCL Stock Rallies After Circle Acquires Nearly 1,000 Blockchain Patents From IBM",
+        "link": "https://finance.yahoo.com/m/83e8ad30-2933-361b-98fd-6c98f1b9ae04/crcl-stock-rallies-after.html",
+        "publisher": "Stocktwits",
+        "publishedAt": "2026-07-27T14:05:07.000Z",
+        "matched": "acqui"
+      }
+    ],
+    "put": []
+  },
+  "CPB": {
+    "call": [],
+    "put": []
+  },
+  "CRCL": {
+    "call": [
+      {
+        "title": "CRCL Stock Rallies After Circle Acquires Nearly 1,000 Blockchain Patents From IBM",
+        "link": "https://finance.yahoo.com/m/83e8ad30-2933-361b-98fd-6c98f1b9ae04/crcl-stock-rallies-after.html",
+        "publisher": "Stocktwits",
+        "publishedAt": "2026-07-27T14:05:07.000Z",
+        "matched": "acqui"
+      },
+      {
+        "title": "Circle shares rise after acquiring IBM’s blockchain patent portfolio",
+        "link": "https://finance.yahoo.com/m/efb9ba68-a02e-3461-b50d-9cf4687c37fc/circle-shares-rise-after.html",
+        "publisher": "InvestorsHub",
+        "publishedAt": "2026-07-27T13:44:03.000Z",
+        "matched": "acqui"
+      }
+    ],
+    "put": []
+  },
+  "CRWV": {
+    "call": [],
+    "put": []
+  },
+  "CSIQ": {
+    "call": [],
+    "put": []
+  },
+  "DAL": {
+    "call": [
+      {
+        "title": "United reportedly explores Delta mega merger: Why 'now is the time' for big M&A deals",
+        "link": "https://finance.yahoo.com/video/united-reportedly-explores-delta-mega-merger-why-now-is-the-time-for-big-ma-deals-145017331.html",
+        "publisher": "Yahoo Finance Video",
+        "publishedAt": "2026-07-27T14:50:17.000Z",
+        "matched": "merger"
+      },
+      {
+        "title": "UAL, DAL, AAL Stocks In Focus: United Airlines’ Mega Merger Hunt Reportedly Took Aim At Delta Before American",
+        "link": "https://finance.yahoo.com/m/b6bc9807-3869-355b-9561-74ac5b5deb6f/ual%2C-dal%2C-aal-stocks-in.html",
+        "publisher": "Stocktwits",
+        "publishedAt": "2026-07-27T08:27:37.000Z",
+        "matched": "merger"
+      },
+      {
+        "title": "Market Chatter: United Airlines Holdings Pitched Potential Merger to Delta Air Lines Last Year",
+        "link": "https://finance.yahoo.com/markets/stocks/articles/market-chatter-united-airlines-holdings-101957523.html",
+        "publisher": "MT Newswires",
+        "publishedAt": "2026-07-27T10:19:57.000Z",
+        "matched": "merger"
+      },
+      {
+        "title": "PSKY Rises Premarket: Analyst Says Paramount’s Potential $2B Merger Delay Cost May Be ‘Minimal’",
+        "link": "https://finance.yahoo.com/m/d0fa19e0-1b79-3826-8ca0-fa8ebd51ee25/psky-rises-premarket%3A-analyst.html",
+        "publisher": "Stocktwits",
+        "publishedAt": "2026-07-27T09:19:15.000Z",
+        "matched": "merger"
+      }
+    ],
+    "put": []
+  },
+  "DBX": {
+    "call": [],
+    "put": []
+  },
+  "DVN": {
+    "call": [
+      {
+        "title": "Aktsiaselts Infortar own share acquisition transactions",
+        "link": "https://finance.yahoo.com/markets/stocks/articles/aktsiaselts-infortar-own-share-acquisition-050000018.html",
+        "publisher": "GlobeNewswire",
+        "publishedAt": "2026-07-27T05:00:00.000Z",
+        "matched": "acqui"
+      }
+    ],
+    "put": []
+  },
+  "EEM": {
+    "call": [],
+    "put": []
+  },
+  "EL": {
+    "call": [],
+    "put": []
+  },
+  "EQT": {
+    "call": [
+      {
+        "title": "Expand Energy to Acquire Twin Eagle in $1.25 Billion Deal",
+        "link": "https://finance.yahoo.com/energy/articles/expand-energy-acquire-twin-eagle-152850842.html",
+        "publisher": "MT Newswires",
+        "publishedAt": "2026-07-27T15:28:50.000Z",
+        "matched": "acqui"
+      }
+    ],
+    "put": []
+  },
+  "F": {
+    "call": [],
+    "put": [
+      {
+        "title": "Ford’s Recalls Are a Headache for Shareholders. Here’s Who Actually Cashes In.",
+        "link": "https://finance.yahoo.com/m/c86919f5-5829-3309-9f6f-a0b4d9bd56f8/ford%E2%80%99s-recalls-are-a-headache.html",
+        "publisher": "24/7 Wall St.",
+        "publishedAt": "2026-07-27T13:15:35.000Z",
+        "matched": "recall"
+      }
+    ]
+  },
+  "FCEL": {
+    "call": [],
+    "put": []
+  },
+  "FCX": {
+    "call": [],
+    "put": []
+  },
+  "FIG": {
+    "call": [],
+    "put": []
+  },
+  "FIS": {
+    "call": [],
+    "put": []
+  },
+  "FISV": {
+    "call": [],
+    "put": []
+  },
+  "FLY": {
+    "call": [
+      {
+        "title": "Apollo Group to acquire Norway’s Fly Chicken chain to roll out KFC brand",
+        "link": "https://finance.yahoo.com/m/e4e643d4-6278-3393-ba02-f3a857aabea9/apollo-group-to-acquire.html",
+        "publisher": "Verdict Food Service",
+        "publishedAt": "2026-07-27T14:47:14.000Z",
+        "matched": "acqui"
+      }
+    ],
+    "put": []
+  },
+  "FSLY": {
+    "call": [],
+    "put": []
+  },
+  "GAP": {
+    "call": [],
+    "put": []
+  },
+  "GDXJ": {
+    "call": [],
+    "put": []
+  },
+  "GLXY": {
+    "call": [],
+    "put": []
+  },
+  "GSK": {
+    "call": [],
+    "put": []
+  },
+  "GTLB": {
+    "call": [],
+    "put": []
+  },
+  "HAL": {
+    "call": [
+      {
+        "title": "Yorkville America Equities and Truth Social Funds Announce the Completion of the Acquisition of the Point Bridge America First ETF into the Truth Social Funds Family",
+        "link": "https://finance.yahoo.com/markets/stocks/articles/yorkville-america-equities-truth-social-130000298.html",
+        "publisher": "PR Newswire",
+        "publishedAt": "2026-07-27T13:00:00.000Z",
+        "matched": "acqui"
+      }
+    ],
+    "put": []
+  },
+  "HIMS": {
+    "call": [],
+    "put": []
+  },
+  "HL": {
+    "call": [],
+    "put": []
+  },
+  "HOOD": {
+    "call": [],
+    "put": []
+  },
+  "IAU": {
+    "call": [],
+    "put": []
+  },
+  "IGV": {
+    "call": [],
+    "put": []
+  },
+  "INTC": {
+    "call": [],
+    "put": []
+  },
+  "IONQ": {
+    "call": [],
+    "put": []
+  },
+  "IREN": {
+    "call": [],
+    "put": []
+  },
+  "JD": {
+    "call": [
+      {
+        "title": "JD.com (JD) Faces EU Probe Over Its Proposed Ceconomy Takeover",
+        "link": "https://finance.yahoo.com/markets/stocks/articles/jd-com-jd-faces-eu-002036519.html",
+        "publisher": "Simply Wall St.",
+        "publishedAt": "2026-07-24T00:20:36.000Z",
+        "matched": "takeover"
+      }
+    ],
+    "put": []
+  },
+  "JETS": {
+    "call": [],
+    "put": [
+      {
+        "title": "Elon Musk flags that America is ‘1,000% going to go bankrupt’ and ‘fail as a country’ — Here’s what he says can save us",
+        "link": "https://finance.yahoo.com/economy/policy/articles/elon-musk-flags-america-1-113500554.html",
+        "publisher": "Moneywise",
+        "publishedAt": "2026-07-26T11:35:00.000Z",
+        "matched": "bankrupt"
+      }
+    ]
+  },
+  "KHC": {
+    "call": [],
+    "put": []
+  },
+  "KRE": {
+    "call": [],
+    "put": []
+  },
+  "KTOS": {
+    "call": [],
+    "put": []
+  },
+  "KWEB": {
+    "call": [],
+    "put": []
+  },
+  "LEN": {
+    "call": [],
+    "put": []
+  },
+  "LUNR": {
+    "call": [],
+    "put": []
+  },
+  "LVS": {
+    "call": [],
+    "put": []
+  },
+  "LYFT": {
+    "call": [],
+    "put": [
+      {
+        "title": "Lyft Stock Is Down More Than 26% This Year—Now a Short Seller Warns the Uber Rival Could Be in Deep Trouble",
+        "link": "https://finance.yahoo.com/markets/stocks/articles/lyft-stock-down-more-26-105150084.html",
+        "publisher": "Benzinga",
+        "publishedAt": "2026-07-27T10:51:50.000Z",
+        "matched": "short seller"
+      }
+    ]
+  },
+  "MAGS": {
+    "call": [],
+    "put": []
+  },
+  "MDLZ": {
+    "call": [],
+    "put": []
+  },
+  "METU": {
+    "call": [
+      {
+        "title": "Civinity completes acquisition of Metus, which maintains nearly 3,000 lifts in Croatia",
+        "link": "https://finance.yahoo.com/real-estate/articles/civinity-completes-acquisition-metus-maintains-055400410.html",
+        "publisher": "GlobeNewswire",
+        "publishedAt": "2026-07-27T05:54:00.000Z",
+        "matched": "acqui"
+      }
+    ],
+    "put": []
+  },
+  "MO": {
+    "call": [],
+    "put": []
+  },
+  "MRNA": {
+    "call": [],
+    "put": []
+  },
+  "MSTR": {
+    "call": [],
+    "put": []
+  },
+  "NCLH": {
+    "call": [],
+    "put": []
+  },
+  "NEE": {
+    "call": [
+      {
+        "title": "NextEra on track to close Dominion merger by late 2027, executives say",
+        "link": "https://finance.yahoo.com/m/df597e2e-2eca-3a0d-8bcb-f5d9c6a6540e/nextera-on-track-to-close.html",
+        "publisher": "Utility Dive",
+        "publishedAt": "2026-07-27T08:00:00.000Z",
+        "matched": "merger"
+      }
+    ],
+    "put": []
+  },
+  "NKE": {
+    "call": [],
+    "put": []
+  },
+  "NVDL": {
+    "call": [],
+    "put": []
+  },
+  "NVTS": {
+    "call": [],
+    "put": []
+  },
+  "OKLO": {
+    "call": [],
+    "put": []
+  },
+  "ONON": {
+    "call": [],
+    "put": []
+  },
+  "OSCR": {
+    "call": [],
+    "put": []
+  },
+  "OXY": {
+    "call": [],
+    "put": []
+  },
+  "PAAS": {
+    "call": [],
+    "put": []
+  },
+  "PDD": {
+    "call": [
+      {
+        "title": "JD.com (JD) Faces EU Probe Over Its Proposed Ceconomy Takeover",
+        "link": "https://finance.yahoo.com/markets/stocks/articles/jd-com-jd-faces-eu-002036519.html",
+        "publisher": "Simply Wall St.",
+        "publishedAt": "2026-07-24T00:20:36.000Z",
+        "matched": "takeover"
+      }
+    ],
+    "put": []
+  },
+  "PINS": {
+    "call": [],
+    "put": []
+  },
+  "PL": {
+    "call": [],
+    "put": []
+  },
+  "PYPL": {
+    "call": [],
+    "put": []
+  },
+  "QBTS": {
+    "call": [],
+    "put": []
+  },
+  "RIOT": {
+    "call": [],
+    "put": []
+  },
+  "RIVN": {
+    "call": [],
+    "put": []
+  },
+  "RKLB": {
+    "call": [],
+    "put": []
+  },
+  "S": {
+    "call": [],
+    "put": []
+  },
+  "SCO": {
+    "call": [],
+    "put": []
+  },
+  "SEDG": {
+    "call": [],
+    "put": []
+  },
+  "SILJ": {
+    "call": [],
+    "put": []
+  },
+  "SIRI": {
+    "call": [
+      {
+        "title": "Siris to Acquire Equiniti's Retirement Solutions, Customer Resolutions and Lenvi Businesses",
+        "link": "https://finance.yahoo.com/markets/stocks/articles/siris-acquire-equinitis-retirement-solutions-105000025.html",
+        "publisher": "PR Newswire",
+        "publishedAt": "2026-07-24T10:50:00.000Z",
+        "matched": "acqui"
+      }
+    ],
+    "put": []
+  },
+  "SLS": {
+    "call": [],
+    "put": []
+  },
+  "SLV": {
+    "call": [],
+    "put": []
+  },
+  "SMCI": {
+    "call": [],
+    "put": []
+  },
+  "SMMT": {
+    "call": [],
+    "put": []
+  },
+  "SMR": {
+    "call": [],
+    "put": []
+  },
+  "SONY": {
+    "call": [],
+    "put": []
+  },
+  "SOXS": {
+    "call": [],
+    "put": []
+  },
+  "SSO": {
+    "call": [],
+    "put": []
+  },
+  "TDOC": {
+    "call": [],
+    "put": []
+  },
+  "TLT": {
+    "call": [],
+    "put": []
+  },
+  "TQQQ": {
+    "call": [],
+    "put": []
+  },
+  "U": {
+    "call": [],
+    "put": []
+  },
+  "UEC": {
+    "call": [],
+    "put": []
+  },
+  "UPST": {
+    "call": [],
+    "put": []
+  },
+  "URA": {
+    "call": [],
+    "put": []
+  },
+  "USAR": {
+    "call": [
+      {
+        "title": "USA Rare Earth (USAR) Strengthens Its Mine-to-Magnet Strategy With Serra Verde Acquisition",
+        "link": "https://finance.yahoo.com/markets/stocks/articles/usa-rare-earth-usar-strengthens-161209165.html",
+        "publisher": "Insider Monkey",
+        "publishedAt": "2026-07-24T16:12:09.000Z",
+        "matched": "acqui"
+      },
+      {
+        "title": "USA Rare Earth to acquire 13.6% minority stake in France’s Carester",
+        "link": "https://finance.yahoo.com/m/2045e032-b6bf-3bcc-8beb-5c40626a65f2/usa-rare-earth-to-acquire.html",
+        "publisher": "Mining Technology",
+        "publishedAt": "2026-07-24T11:21:49.000Z",
+        "matched": "acqui"
+      }
+    ],
+    "put": []
+  },
+  "UVXY": {
+    "call": [],
+    "put": []
+  },
+  "VFC": {
+    "call": [],
+    "put": []
+  },
+  "VXX": {
+    "call": [],
+    "put": []
+  },
+  "WMB": {
+    "call": [],
+    "put": []
+  },
+  "XLE": {
+    "call": [],
+    "put": []
+  },
+  "XLP": {
+    "call": [],
+    "put": []
+  },
+  "ZETA": {
+    "call": [],
+    "put": []
+  }
+}
