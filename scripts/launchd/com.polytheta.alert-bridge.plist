@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.polytheta.alert-bridge</string>
+
+  <!-- Poll the site for new actionable alerts every 10 minutes and forward
+       them as iMessages. Cheap when idle: one HTTPS GET. -->
+  <key>StartInterval</key>
+  <integer>600</integer>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/node</string>
+    <string>/Users/andrewblount/Local/development/polytheta/scripts/alert_bridge.mjs</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/andrewblount/Local/development/polytheta</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key>
+  <string>/Users/andrewblount/Local/development/polytheta/scripts/launchd/alert-bridge.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/andrewblount/Local/development/polytheta/scripts/launchd/alert-bridge.err.log</string>
+</dict>
+</plist>

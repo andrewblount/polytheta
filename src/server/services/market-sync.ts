@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { baskets, performanceSnapshots, positions, syncJobs } from "@/db/schema";
+import { baskets, performanceSnapshots, positions, syncJobs, syncLogs } from "@/db/schema";
 import { demoBaskets } from "@/lib/demo-data";
 
 import { defaultMarketDataProvider } from "@/server/market/yahoo";
@@ -160,6 +160,20 @@ export async function runMarketSync(triggeredBy = "manual") {
                 underlyingPrice: snapshot.underlyingPrice,
                 basketSlug: basketRow.slug,
               });
+              // Feed the iMessage bridge (scripts/alert_bridge.mjs polls these).
+              await db.insert(syncLogs).values({
+                jobId: job.id,
+                level: "alert",
+                message: `Heads-up: ${row.ticker} ${row.side} down ${Math.round((snapshot.pnlAmount / row.margin) * 100)}% of allocation — check news. Policy: hold to expiry.`,
+                metadata: {
+                  kind: "adverse-move",
+                  ticker: row.ticker,
+                  side: row.side,
+                  strike: Number(row.strike),
+                  pnlAmount: Math.round(snapshot.pnlAmount),
+                  margin: row.margin,
+                },
+              });
             } catch (err) {
               console.error("stop-breach alert failed:", err);
             }
@@ -188,6 +202,18 @@ export async function runMarketSync(triggeredBy = "manual") {
                 strike: Number(row.strike),
                 basketSlug: basketRow.slug,
                 hits: fresh,
+              });
+              await db.insert(syncLogs).values({
+                jobId: job.id,
+                level: "alert",
+                message: `${row.side === "call" ? "ACQUISITION" : "DOWNSIDE-GAP"} RADAR: ${row.ticker} — "${fresh[0].title}" — EXIT SIGNAL, verify now.`,
+                metadata: {
+                  kind: "radar",
+                  ticker: row.ticker,
+                  side: row.side,
+                  strike: Number(row.strike),
+                  hits: fresh.slice(0, 3),
+                },
               });
               await db
                 .update(positions)
