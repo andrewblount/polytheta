@@ -68,6 +68,24 @@ struct StateBadge: View {
     }
 }
 
+#if os(macOS)
+import AppKit
+func copyToClipboard(_ text: String) {
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(text, forType: .string)
+}
+#else
+import UIKit
+func copyToClipboard(_ text: String) {
+    UIPasteboard.general.string = text
+}
+#endif
+
+func orderLine(_ p: MobilePosition, expiry: String) -> String {
+    let type = p.side == "call" ? "Call" : "Put"
+    return "Sell to Open \(p.contracts) \(p.ticker) \(expiry) \(String(format: "%.2f", p.strike).replacingOccurrences(of: ".00", with: "")) \(type) – Limit \(String(format: "%.2f", p.entryCredit)) – GTC"
+}
+
 struct ErrorBanner: View {
     let message: String
 

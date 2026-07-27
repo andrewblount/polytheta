@@ -41,6 +41,44 @@ struct DashboardView: View {
                         Text(b.title)
                     }
 
+                    if b.allPositions.isEmpty {
+                        Section {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Label("No tradable picks in this basket", systemImage: "exclamationmark.octagon.fill")
+                                    .font(.subheadline.weight(.bold))
+                                    .foregroundStyle(.red)
+                                Text("The Monday build published no positions — either the pipeline failed or nothing passed the screens. Check the Alerts tab and your email before trading anything.")
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    } else {
+                        Section("Today's orders — tap to copy") {
+                            ForEach(b.allPositions) { p in
+                                let line = orderLine(p, expiry: p.expiry)
+                                Button {
+                                    copyToClipboard(line)
+                                } label: {
+                                    HStack {
+                                        Text(line)
+                                            .font(.system(.caption, design: .monospaced))
+                                            .foregroundStyle(.primary)
+                                            .multilineTextAlignment(.leading)
+                                        Spacer()
+                                        Image(systemName: "doc.on.doc").font(.caption)
+                                    }
+                                }
+                            }
+                            Button {
+                                copyToClipboard(b.allPositions.map { orderLine($0, expiry: $0.expiry) }.joined(separator: "\n"))
+                            } label: {
+                                Label("Copy all orders", systemImage: "doc.on.doc.fill")
+                                    .font(.caption.weight(.semibold))
+                            }
+                        }
+                    }
+
                     positionSection("Calls", b.calls)
                     positionSection("Puts", b.puts)
 

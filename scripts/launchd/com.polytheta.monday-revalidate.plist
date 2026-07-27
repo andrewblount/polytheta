@@ -6,20 +6,15 @@
   <key>Label</key>
   <string>com.polytheta.monday-revalidate</string>
 
-  <!-- Re-quote the basket shortly after Monday's open and flag stale entries.
-       Times are LOCAL — 07:35 and 08:35 assume Mountain Time (09:35/10:35 ET).
-       Adjust the Hour values if this Mac runs in a different timezone. -->
+  <!-- Drift check a while after the post-open build (build fires 07:45
+       local): re-quote the basket and flag entries whose assumptions moved.
+       Times are LOCAL (Mac runs fixed GMT-6). -->
   <key>StartCalendarInterval</key>
   <array>
     <dict>
       <key>Weekday</key><integer>1</integer>
-      <key>Hour</key><integer>7</integer>
-      <key>Minute</key><integer>35</integer>
-    </dict>
-    <dict>
-      <key>Weekday</key><integer>1</integer>
-      <key>Hour</key><integer>8</integer>
-      <key>Minute</key><integer>35</integer>
+      <key>Hour</key><integer>10</integer>
+      <key>Minute</key><integer>30</integer>
     </dict>
   </array>
 

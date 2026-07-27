@@ -84,10 +84,17 @@ function refreshDone() {
   if (args.force) return false;
   const chainsCsv = path.join(OUT, `chains_${EXPIRY_ISO}_v2.csv`);
   const state = path.join(OUT, '_chains_state.json');
-  if (!fs.existsSync(chainsCsv) || !fs.existsSync(state)) return false;
-  const s = JSON.parse(fs.readFileSync(state, 'utf8'));
-  const universeLines = fs.readFileSync(path.join(OUT, 'universe_8to40.csv'), 'utf8').trim().split(/\r?\n/).length - 1;
-  return (s.done.length + s.errors.length) >= universeLines;
+  const universeFile = path.join(OUT, 'universe_8to40.csv');
+  // Any required artifact missing (including after a partial cleanup) means
+  // the refresh must run — never crash here.
+  if (!fs.existsSync(chainsCsv) || !fs.existsSync(state) || !fs.existsSync(universeFile)) return false;
+  try {
+    const s = JSON.parse(fs.readFileSync(state, 'utf8'));
+    const universeLines = fs.readFileSync(universeFile, 'utf8').trim().split(/\r?\n/).length - 1;
+    return (s.done.length + s.errors.length) >= universeLines;
+  } catch {
+    return false;
+  }
 }
 if (!refreshDone()) {
   const rr = await runRefresh({ OUT, EXPIRY_ISO, chunkLimit: args.chainChunk });
@@ -194,6 +201,35 @@ Credit **$${totalCredit.toLocaleString()}** on margin **$${totalMargin.toLocaleS
 `;
 fs.writeFileSync(summaryPath, summary);
 log(`wrote ${summaryPath}`);
+
+// Zero picks = something is wrong (data outage, over-filtering, or a genuine
+// no-trade week). Never silently publish an empty basket over last week's —
+// alarm loudly on every channel and stop.
+if (proposal.picks.length === 0) {
+  log('ALARM: 0 picks — NOT publishing, NOT emailing instructions.');
+  const msg = `🚨 Polytheta: Monday build produced ZERO picks (pools ${JSON.stringify(proposal.pool_counts)}). No basket published — investigate before trading.`;
+  try {
+    const { execFileSync } = await import('node:child_process');
+    if (process.env.ALERT_IMESSAGE_TO) {
+      execFileSync('osascript', ['-e',
+        `tell application "Messages" to send ${JSON.stringify(msg)} to participant ${JSON.stringify(process.env.ALERT_IMESSAGE_TO)} of (1st account whose service type = iMessage)`,
+      ]);
+    }
+    if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_FROM_EMAIL) {
+      await fetch('https://api.sendgrid.com/v3/mail/send', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          personalizations: [{ to: [{ email: process.env.STOP_ALERT_EMAIL || 'ablount@bluecielo.com' }], subject: `FAILED: weekly basket ${BASKET_DATE} — zero picks` }],
+          from: { email: process.env.SENDGRID_FROM_EMAIL },
+          content: [{ type: 'text/plain', value: msg + `\n\nSee ${summaryPath} and scripts/launchd logs.` }],
+        }),
+      });
+    }
+  } catch (err) { log(`alarm delivery failed: ${err.message}`); }
+  log('done (failed)');
+  process.exit(1);
+}
 
 // Email the trading instructions (independent of DB publish — the basket
 // should reach the inbox even if the site is down).
