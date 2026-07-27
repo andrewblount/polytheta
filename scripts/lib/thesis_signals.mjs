@@ -87,7 +87,9 @@ function tri(pass) {
 // Evaluate the five documented signals for one ticker+side.
 // Returns { checks: {si, fan, culture, buyback, radar}, known, passed,
 //           disqualified, si_pct }
-export function evaluateSignals({ ticker, side, siCache, overrides }) {
+// autoRadar: 'clean' | 'triggered' | null — result of the automated news
+// scan (scripts/lib/news_radar.mjs). Manual overrides take precedence.
+export function evaluateSignals({ ticker, side, siCache, overrides, autoRadar = null }) {
   const si = siCache?.[ticker]?.si_pct ?? null;
   const o = overrides?.[ticker] ?? {};
 
@@ -97,7 +99,7 @@ export function evaluateSignals({ ticker, side, siCache, overrides }) {
     o.glassdoor == null ? null : side === 'call' ? o.glassdoor <= 3.4 : o.glassdoor > 3.5;
   const buybackPass =
     o.buyback == null ? null : side === 'call' ? o.buyback === 0 : o.buyback === 1;
-  const radarVal = side === 'call' ? o.acq_radar : o.gap_radar;
+  const radarVal = (side === 'call' ? o.acq_radar : o.gap_radar) ?? autoRadar;
   const radarPass = radarVal == null ? null : radarVal === 'clean';
 
   // Hard disqualifiers per the spec: active buyback on call side ("automatic

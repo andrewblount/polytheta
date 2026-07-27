@@ -1,4 +1,19 @@
-# Risk Policy v2 — No Doubles, P&L Stops
+# Risk Policy — v2 Analysis, v3 Adopted
+
+> **v3 (adopted July 26, 2026, trader's decision): HOLD TO EXPIRY.** The
+> weekly tenor is the stop — positions are not exited on price or P&L. The
+> only exit triggers are the news radars: any credible acquisition signal on
+> a shorted call, or downside-gap signal on a shorted put, forces immediate
+> exit. Both radars are now automated: the hourly sync scans fresh headlines
+> per position and emails on any match (once per headline), and the Sunday
+> build disqualifies candidates with fresh radar news before entry. The
+> −25%-of-allocation email remains as an informational heads-up (prompting a
+> news check), and no doubling remains in force per the v2 simulation below.
+> Residual risk accepted by policy: a violent move with no headline (FCEL-
+> class squeeze) rides to expiry — that tail is defended at entry (frenzy
+> guard, revalidation), not in-flight.
+
+# v2 Analysis — No Doubles, P&L Stops
 
 **July 26, 2026.** Simulation of exit policies over the 96 fully-documented
 settled legs (identical entries, daily Yahoo OHLC, Black-Scholes at entry IV

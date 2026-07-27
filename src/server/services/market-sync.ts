@@ -7,10 +7,12 @@ import { demoBaskets } from "@/lib/demo-data";
 import { defaultMarketDataProvider } from "@/server/market/yahoo";
 import { normalizePosition } from "@/server/repos/helpers";
 
-import { sendStopBreachAlert } from "./email";
+import { sendRadarAlert, sendStopBreachAlert } from "./email";
+import { scanNewsRadar } from "./news-radar";
 import { generateLiveSnapshot } from "./performance";
 
-// Hard-stop rule: alert when modeled loss reaches 25% of the name's margin.
+// Adverse-move heads-up threshold (informational under policy v3 — the
+// position is held to expiry; only a radar signal forces an exit).
 const STOP_LOSS_FRACTION = 0.25;
 
 export async function captureEntrySnapshotsForBasket(basketId: string) {
@@ -166,6 +168,46 @@ export async function runMarketSync(triggeredBy = "manual") {
 
         if (existingHistory.length === 0) {
           await captureEntrySnapshotsForBasket(row.basketId);
+        }
+
+        // News radar — the exit-signal monitor. Scan fresh headlines for
+        // this position's side; email each new hit once (dedup on link,
+        // persisted in the position's sourceMetadata).
+        try {
+          const hits = await scanNewsRadar(row.ticker, row.side);
+          if (hits.length > 0) {
+            const meta = (row.sourceMetadata ?? {}) as Record<string, unknown>;
+            const alerted = new Set(
+              Array.isArray(meta.radar_alerted_links) ? (meta.radar_alerted_links as string[]) : [],
+            );
+            const fresh = hits.filter((h) => !alerted.has(h.link));
+            if (fresh.length > 0) {
+              await sendRadarAlert({
+                ticker: row.ticker,
+                side: row.side,
+                strike: Number(row.strike),
+                basketSlug: basketRow.slug,
+                hits: fresh,
+              });
+              await db
+                .update(positions)
+                .set({
+                  sourceMetadata: {
+                    ...meta,
+                    radar_alerted_links: [...alerted, ...fresh.map((h) => h.link)],
+                    radar_last_hit: {
+                      title: fresh[0].title,
+                      link: fresh[0].link,
+                      at: new Date().toISOString(),
+                    },
+                  },
+                  updatedAt: new Date(),
+                })
+                .where(eq(positions.id, row.id));
+            }
+          }
+        } catch (err) {
+          console.error(`news radar failed for ${row.ticker}:`, err);
         }
       }
 

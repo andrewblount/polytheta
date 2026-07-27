@@ -153,11 +153,11 @@ function orderBlocks(picks, expiry) {
 }
 
 const RULES = [
-  ['hard-stop', '25% loss on any single name', 'Close that name. Stop-breach emails fire automatically from the hourly sync.', 0],
-  ['hard-stop', '30% total portfolio drawdown', 'Close everything.', 1],
-  ['hard-stop', 'Acquisition radar signal (call side)', 'Immediate full exit on that name.', 2],
-  ['hard-stop', 'Downside-gap radar signal (put side)', 'Immediate full exit on that name.', 3],
-  ['protocol', 'No doubling down (risk policy v2)', 'Simulated on 96 settled legs, the double protocol turned +$280K into +$125K: ATR breaks fire on half of all legs but only 10 finished ITM. Breaks are attention levels; the P&L stop is the action rule. See docs/risk_policy_v2.md.', 4],
+  ['hard-stop', 'Acquisition radar signal (call side)', 'Immediate full exit on that name. Radar emails fire automatically from the hourly news scan.', 0],
+  ['hard-stop', 'Downside-gap radar signal (put side)', 'Immediate full exit on that name. Radar emails fire automatically from the hourly news scan.', 1],
+  ['hard-stop', '30% total portfolio drawdown', 'Close everything.', 2],
+  ['protocol', 'Hold to expiry (risk policy v3)', 'The weekly tenor is the stop. No doubling down (simulated: the double protocol cut +$280K to +$125K across 96 settled legs). ATR breaks and adverse-move emails are attention signals only; exits happen on radar triggers, not price. See docs/risk_policy_v2.md.', 3],
+  ['protocol', 'Adverse-move heads-up at -25% of allocation', 'Informational email from the hourly sync — prompts a news check, not an exit.', 4],
   ['profit-target', 'Close at 50–70% of collected credit', 'Per position.', 5],
   ['profit-target', 'Daily 1% account gain target', 'Whichever comes first.', 6],
   [
@@ -393,15 +393,12 @@ export async function importProposal(proposalPath, { publish = false, sql: injec
       [1, 0.5],
       [2, 1.0],
     ]) {
-      // Risk policy v2 (docs/risk_policy_v2.md): breaks are ATTENTION levels,
-      // not action levels. Simulation across 96 settled legs showed the
-      // double protocol and price-level exits both lose heavily to a simple
-      // P&L stop — these names cross 1x ATR in 50% of weeks (38 whipsaws vs
-      // 10 real breaches). The action rule is the -25%-of-allocation P&L
-      // stop, which alerts automatically.
+      // Risk policy v3 (docs/risk_policy_v2.md): hold to expiry — the weekly
+      // tenor is the stop. Breaks are ATTENTION levels prompting a news
+      // check; the only exit trigger is a radar signal (automated hourly).
       const note = n === 1
-        ? 'ATTENTION — through 0.5x ATR. Do not add. Exit is P&L-based: -25% of allocation (emailed automatically).'
-        : 'Through 1x ATR — check stop distance and radar. Exit on the P&L stop or a radar trigger, not on price level alone.';
+        ? 'ATTENTION — through 0.5x ATR. Policy: hold to expiry. Check news; exit only on a radar signal (radar emails fire automatically).'
+        : 'Through 1x ATR — check the news radar now. Exit on a credible radar signal only, not on price.';
       await sql.query(
         `insert into position_alerts
            (basket_id, position_id, ticker, side, label, threshold_value, protocol_note, sort_order)

@@ -16,6 +16,7 @@ import path from 'node:path';
 import url from 'node:url';
 import { runFilterAndRefine, autoPick, applyCompliantStrikes, MIN_ATR_BUF_PUT, DELTA_MIN, DELTA_MAX, MAX_SPREAD } from './shortlist.mjs';
 import { fetchShortInterest, loadOverrides, evaluateSignals } from './thesis_signals.mjs';
+import { scanRadar } from './news_radar.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), '..', '..');
 
@@ -116,18 +117,34 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
   const siCandidates = enrichedSummary
     .filter((r) => (r.best_call_strike || r.best_put_strike) && r.avg_volume >= 1_500_000)
     .map((r) => r.ticker);
+  const boundedCandidates = [...new Set(siCandidates)].slice(0, 120);
   const siCache = await fetchShortInterest(
-    [...new Set(siCandidates)].slice(0, 120),
+    boundedCandidates,
     path.join(OUT, 'short_interest.json'),
   );
+  // Pre-entry news radar: fresh M&A chatter disqualifies call candidates,
+  // fresh downside-gap news disqualifies put candidates. Clean scans feed
+  // the thesis scorecard (manual overrides still win).
+  const radarCache = await scanRadar(boundedCandidates, path.join(OUT, 'news_radar.json'));
+  const autoRadarFor = (ticker, side) => {
+    const scan = radarCache[ticker];
+    if (!scan || scan.error) return null;
+    return (scan[side] ?? []).length > 0 ? 'triggered' : 'clean';
+  };
   // Signal pass/fail thresholds differ per side, so evaluate separately.
   const signalsBySide = { call: {}, put: {} };
   for (const r of enrichedSummary) {
     if (r.best_call_strike) {
-      signalsBySide.call[r.ticker] = evaluateSignals({ ticker: r.ticker, side: 'call', siCache, overrides });
+      signalsBySide.call[r.ticker] = evaluateSignals({
+        ticker: r.ticker, side: 'call', siCache, overrides,
+        autoRadar: autoRadarFor(r.ticker, 'call'),
+      });
     }
     if (r.best_put_strike) {
-      signalsBySide.put[r.ticker] = evaluateSignals({ ticker: r.ticker, side: 'put', siCache, overrides });
+      signalsBySide.put[r.ticker] = evaluateSignals({
+        ticker: r.ticker, side: 'put', siCache, overrides,
+        autoRadar: autoRadarFor(r.ticker, 'put'),
+      });
     }
   }
 
@@ -248,6 +265,7 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
       strike_reselection: strikeStats,
       signal_sources: {
         short_interest: 'Yahoo defaultKeyStatistics (cached in short_interest.json)',
+        news_radar: 'Yahoo headlines, 96h lookback, keyword match (cached in news_radar.json); hits disqualify',
         overrides_file: 'baskets/thesis_overrides.json',
         overrides_tickers: Object.keys(overrides).length,
       },
