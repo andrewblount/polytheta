@@ -53,9 +53,19 @@ struct MobilePosition: Codable, Identifiable {
     let buffer: String?
     let shortInterestPctFloat: Double
     let thesisSummary: String
+    let thesisBullets: [String]?
     let cautionFlags: [String]
     let latest: LatestSnapshot?
     let stopBreach: Bool? // -25% of allocation crossed (heads-up, policy is hold to expiry)
+    let signals: SignalScores?
+}
+
+struct SignalScores: Codable {
+    let ivRank: Double
+    let shortInterestPctFloat: Double
+    let fanScore: Double
+    let glassdoorScore: Double
+    let buybackScore: Int
 }
 
 struct LatestSnapshot: Codable {

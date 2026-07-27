@@ -33,6 +33,10 @@ struct DashboardView: View {
                         Text(b.metrics.gsrsConstraintNote)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
+                        NavigationLink("Why this basket — decisions & signals") {
+                            BasketDecisionView(basket: b)
+                        }
+                        .font(.footnote.weight(.medium))
                     } header: {
                         Text(b.title)
                     }
@@ -62,7 +66,17 @@ struct DashboardView: View {
     func positionSection(_ title: String, _ positions: [MobilePosition]) -> some View {
         Section(title) {
             ForEach(positions) { p in
-                VStack(alignment: .leading, spacing: 6) {
+                NavigationLink {
+                    PositionDecisionView(position: p)
+                } label: {
+                    positionRow(p)
+                }
+            }
+        }
+    }
+
+    func positionRow(_ p: MobilePosition) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text(p.ticker).font(.headline)
                         Text("\(p.side == "call" ? "C" : "P") $\(p.strike, specifier: "%.2f")")
@@ -94,10 +108,8 @@ struct DashboardView: View {
                             .foregroundStyle(.orange)
                             .lineLimit(2)
                     }
-                }
-                .padding(.vertical, 2)
-            }
         }
+        .padding(.vertical, 2)
     }
 
     func gsrsColor(_ g: Double) -> Color {
