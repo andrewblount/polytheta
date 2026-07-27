@@ -45,6 +45,10 @@ export const syncStatusEnum = pgEnum("sync_status", [
   "success",
   "error",
 ]);
+export const tradeActionEnum = pgEnum("trade_action", [
+  "sell-to-open",
+  "buy-to-close",
+]);
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true })
@@ -360,6 +364,28 @@ export const accessRequests = pgTable("access_requests", {
   ...timestamps,
 });
 
+// Actual executed trades, logged by the trader (Mac/iOS apps). Distinct from
+// `positions` (recommendations): this is the real ledger. positionId links a
+// fill to the recommendation it executed, when there is one.
+export const trades = pgTable("trades", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  positionId: uuid("position_id").references(() => positions.id, {
+    onDelete: "set null",
+  }),
+  ticker: varchar("ticker", { length: 16 }).notNull(),
+  side: positionSideEnum("side").notNull(),
+  action: tradeActionEnum("action").notNull(),
+  strike: numeric("strike", { precision: 10, scale: 2 }).notNull(),
+  expiry: date("expiry").notNull(),
+  quantity: integer("quantity").notNull(),
+  price: numeric("price", { precision: 10, scale: 4 }).notNull(),
+  fees: numeric("fees", { precision: 10, scale: 2 }).default("0").notNull(),
+  broker: varchar("broker", { length: 32 }),
+  executedAt: timestamp("executed_at", { withTimezone: true }).notNull(),
+  notes: text("notes"),
+  ...timestamps,
+});
+
 export const schema = {
   accessRequests,
   auditLogs,
@@ -375,6 +401,7 @@ export const schema = {
   syncJobs,
   syncLogs,
   thesisSignals,
+  trades,
   userProfiles,
 };
 
