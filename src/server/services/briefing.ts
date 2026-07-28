@@ -9,6 +9,7 @@ import { getPerformanceReport } from "@/server/repos/performance";
 
 import { alertEmailShell, kvRowsHtml } from "./email";
 import { getNotificationSettings } from "./settings";
+import { sendTwilioMessage } from "./twilio";
 
 // Daily briefings: a morning read on the basket right after the open, and an
 // evening scorecard after the close. Day P&L is the change in each position's
@@ -138,7 +139,7 @@ export async function composeBriefing(slot: "open" | "close") {
 export async function sendBriefing(slot: "open" | "close") {
   const settings = await getNotificationSettings();
   const prefs = settings[slot === "open" ? "briefing_open" : "briefing_close"] ?? {};
-  if (!prefs.email && !prefs.imessage) {
+  if (!prefs.email && !prefs.imessage && !prefs.sms && !prefs.whatsapp) {
     return { sent: false as const, reason: "disabled-in-settings" };
   }
 
@@ -173,6 +174,9 @@ export async function sendBriefing(slot: "open" | "close") {
     });
     results.imessage = "queued-for-bridge";
   }
+
+  if (prefs.sms) results.sms = await sendTwilioMessage("sms", briefing.compact);
+  if (prefs.whatsapp) results.whatsapp = await sendTwilioMessage("whatsapp", briefing.compact);
 
   return { sent: true as const, slot, results, compact: briefing.compact };
 }

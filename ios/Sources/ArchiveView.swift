@@ -91,14 +91,18 @@ struct SettingsView: View {
                     ForEach(categories, id: \.key) { cat in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(cat.label).font(.subheadline.weight(.medium))
-                            HStack(spacing: 18) {
+                            HStack(spacing: 14) {
                                 channelToggle(cat.key, "email", "Email")
                                 channelToggle(cat.key, "imessage", "iMessage")
+                            }
+                            HStack(spacing: 14) {
+                                channelToggle(cat.key, "sms", "SMS")
+                                channelToggle(cat.key, "whatsapp", "WhatsApp")
                             }
                         }
                         .padding(.vertical, 2)
                     }
-                    Text("WhatsApp delivery needs a Twilio account — see TODO.md. Changes apply to the next scheduled send.")
+                    Text("SMS and WhatsApp go through Twilio to your mobile. WhatsApp also needs the Twilio sandbox activated and joined from WhatsApp. Changes apply to the next scheduled send.")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }

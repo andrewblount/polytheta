@@ -155,6 +155,23 @@ if (flagged && process.env.SENDGRID_API_KEY && process.env.SENDGRID_FROM_EMAIL) 
   console.log(res.ok ? `emailed ${to}` : `email failed: ${res.status} ${await res.text()}`);
 }
 
+// SMS via Twilio (works even when the Mac is asleep/away).
+if (flagged && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_FROM_NUMBER && process.env.ALERT_SMS_TO) {
+  const flaggedNames = rows.filter((r) => r.verdict !== 'OK').map((r) => r.ticker).join(', ');
+  const sms = `Polytheta revalidation: ${flagged} pick(s) need action - ${flaggedNames}. Re-strike or drop before entry.`;
+  try {
+    const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Messages.json`, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Basic ' + Buffer.from(`${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`).toString('base64'),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({ To: process.env.ALERT_SMS_TO, From: process.env.TWILIO_FROM_NUMBER, Body: sms }),
+    });
+    console.log(res.ok ? 'SMS sent' : `SMS failed: ${res.status}`);
+  } catch (err) { console.error('SMS failed:', err.message); }
+}
+
 // iMessage (this script runs on the Mac): short, actionable summary.
 if (flagged && process.env.ALERT_IMESSAGE_TO) {
   const flaggedNames = rows.filter((r) => r.verdict !== 'OK').map((r) => r.ticker).join(', ');

@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { appSettings } from "@/db/schema";
 
-export const NOTIFICATION_CHANNELS = ["email", "imessage", "whatsapp"] as const;
+export const NOTIFICATION_CHANNELS = ["email", "imessage", "sms", "whatsapp"] as const;
 export const NOTIFICATION_CATEGORIES = [
   "briefing_open",
   "briefing_close",
@@ -14,7 +14,17 @@ export const NOTIFICATION_CATEGORIES = [
 export type NotificationSettings = Record<string, Record<string, boolean>>;
 
 export const DEFAULT_NOTIFICATIONS: NotificationSettings = Object.fromEntries(
-  NOTIFICATION_CATEGORIES.map((c) => [c, { email: true, imessage: true, whatsapp: false }]),
+  NOTIFICATION_CATEGORIES.map((c) => [
+    c,
+    // SMS on for the urgent categories only — briefings would burn segments
+    // twice a day for information that isn't time-critical.
+    {
+      email: true,
+      imessage: true,
+      sms: c === "radar_alerts" || c === "adverse_move",
+      whatsapp: false,
+    },
+  ]),
 );
 
 export async function getNotificationSettings(): Promise<NotificationSettings> {

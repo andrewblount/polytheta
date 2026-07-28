@@ -10,6 +10,19 @@ import { normalizePosition } from "@/server/repos/helpers";
 import { sendRadarAlert, sendStopBreachAlert } from "./email";
 import { scanNewsRadar } from "./news-radar";
 import { generateLiveSnapshot } from "./performance";
+import { getNotificationSettings } from "./settings";
+import { sendTwilioMessage } from "./twilio";
+
+// Fan an urgent alert out to the phone channels the settings enable.
+async function pushUrgent(category: "radar_alerts" | "adverse_move", text: string) {
+  try {
+    const prefs = (await getNotificationSettings())[category] ?? {};
+    if (prefs.sms) await sendTwilioMessage("sms", text);
+    if (prefs.whatsapp) await sendTwilioMessage("whatsapp", text);
+  } catch (err) {
+    console.error("urgent push failed:", err);
+  }
+}
 
 // Adverse-move heads-up threshold (informational under policy v3 — the
 // position is held to expiry; only a radar signal forces an exit).
@@ -161,6 +174,8 @@ export async function runMarketSync(triggeredBy = "manual") {
                 basketSlug: basketRow.slug,
               });
               // Feed the iMessage bridge (scripts/alert_bridge.mjs polls these).
+              const adverseText = `⚠️ ${row.ticker} ${row.side} down ${Math.round((snapshot.pnlAmount / row.margin) * 100)}% of allocation — check news. Policy: hold to expiry.`;
+              await pushUrgent("adverse_move", adverseText);
               await db.insert(syncLogs).values({
                 jobId: job.id,
                 level: "alert",
@@ -203,6 +218,8 @@ export async function runMarketSync(triggeredBy = "manual") {
                 basketSlug: basketRow.slug,
                 hits: fresh,
               });
+              const radarText = `🚨 ${row.side === "call" ? "ACQUISITION" : "DOWNSIDE-GAP"} RADAR: ${row.ticker} — "${fresh[0].title}" — EXIT SIGNAL, verify now.`;
+              await pushUrgent("radar_alerts", radarText);
               await db.insert(syncLogs).values({
                 jobId: job.id,
                 level: "alert",
