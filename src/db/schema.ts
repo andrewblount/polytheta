@@ -386,8 +386,28 @@ export const trades = pgTable("trades", {
   ...timestamps,
 });
 
+// Simple KV for user-tunable settings (notification toggles etc.).
+export const appSettings = pgTable("app_settings", {
+  key: varchar("key", { length: 64 }).primaryKey(),
+  value: jsonb("value").$type<Record<string, unknown>>().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Actual account snapshots pushed by the Mac-side Schwab fetcher
+// (scripts/schwab_snapshot.mjs). Credentials never leave the Mac.
+export const schwabSnapshots = pgTable("schwab_snapshots", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  takenAt: timestamp("taken_at", { withTimezone: true }).defaultNow().notNull(),
+  liquidationValue: numeric("liquidation_value", { precision: 14, scale: 2 }),
+  equity: numeric("equity", { precision: 14, scale: 2 }),
+  dayPl: numeric("day_pl", { precision: 14, scale: 2 }),
+  raw: jsonb("raw").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const schema = {
   accessRequests,
+  appSettings,
   auditLogs,
   basketMetrics,
   basketRules,
@@ -400,6 +420,7 @@ export const schema = {
   positions,
   syncJobs,
   syncLogs,
+  schwabSnapshots,
   thesisSignals,
   trades,
   userProfiles,

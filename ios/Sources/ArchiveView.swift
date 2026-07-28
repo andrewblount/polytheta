@@ -47,6 +47,15 @@ struct ArchiveView: View {
 struct SettingsView: View {
     @EnvironmentObject var api: APIClient
     @State private var testResult: String?
+    @State private var notifications: [String: [String: Bool]] = [:]
+    @State private var settingsError: String?
+
+    let categories: [(key: String, label: String)] = [
+        ("briefing_open", "Open briefing (9:45 ET)"),
+        ("briefing_close", "Close briefing (4:10 ET)"),
+        ("radar_alerts", "Radar exit signals"),
+        ("adverse_move", "Adverse-move heads-ups"),
+    ]
 
     var body: some View {
         NavigationStack {
@@ -77,6 +86,22 @@ struct SettingsView: View {
                         Text(testResult).font(.footnote).foregroundStyle(.secondary)
                     }
                 }
+                Section("Notifications") {
+                    if let settingsError { ErrorBanner(message: settingsError) }
+                    ForEach(categories, id: \.key) { cat in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(cat.label).font(.subheadline.weight(.medium))
+                            HStack(spacing: 18) {
+                                channelToggle(cat.key, "email", "Email")
+                                channelToggle(cat.key, "imessage", "iMessage")
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    Text("WhatsApp delivery needs a Twilio account — see TODO.md. Changes apply to the next scheduled send.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
                 Section {
                     Text("Data is modeled from recommended entries. Verify everything against live broker chains before trading.")
                         .font(.caption)
@@ -84,6 +109,35 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .task { await loadSettings() }
         }
+    }
+
+    @ViewBuilder
+    func channelToggle(_ category: String, _ channel: String, _ label: String) -> some View {
+        Toggle(label, isOn: Binding(
+            get: { notifications[category]?[channel] ?? true },
+            set: { newValue in
+                notifications[category, default: [:]][channel] = newValue
+                Task { await saveSettings(category: category, channel: channel, value: newValue) }
+            }
+        ))
+        .font(.caption)
+        .toggleStyle(.switch)
+    }
+
+    func loadSettings() async {
+        guard api.isConfigured else { return }
+        do {
+            notifications = try await api.getSettings()
+            settingsError = nil
+        } catch { settingsError = error.localizedDescription }
+    }
+
+    func saveSettings(category: String, channel: String, value: Bool) async {
+        do {
+            notifications = try await api.updateSetting(category: category, channel: channel, value: value)
+            settingsError = nil
+        } catch { settingsError = error.localizedDescription }
     }
 }

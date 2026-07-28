@@ -83,6 +83,28 @@ final class APIClient: ObservableObject {
         return try JSONDecoder().decode(TradeResponse.self, from: data).trade
     }
 
+    func getSettings() async throws -> [String: [String: Bool]] {
+        struct SettingsResponse: Codable { let notifications: [String: [String: Bool]] }
+        return try await get("/api/mobile/settings", as: SettingsResponse.self).notifications
+    }
+
+    func updateSetting(category: String, channel: String, value: Bool) async throws -> [String: [String: Bool]] {
+        struct SettingsResponse: Codable { let notifications: [String: [String: Bool]] }
+        guard isConfigured, let url = URL(string: baseURL + "/api/mobile/settings") else {
+            throw APIError.notConfigured
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["notifications": [category: [channel: value]]])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw APIError.badStatus((response as? HTTPURLResponse)?.statusCode ?? 0)
+        }
+        return try JSONDecoder().decode(SettingsResponse.self, from: data).notifications
+    }
+
     func deleteTrade(id: String) async throws {
         guard isConfigured, let url = URL(string: baseURL + "/api/mobile/trades/\(id)") else {
             throw APIError.notConfigured

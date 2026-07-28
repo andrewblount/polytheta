@@ -27,6 +27,14 @@ manual steps.** Current state and blockers:
 
 ## Other open items
 
+- [ ] WhatsApp delivery for briefings/alerts — needs a Twilio account (Andrew
+      to create if wanted); the settings toggle exists but is inert until then.
+- [ ] Schwab actuals: drop SCHWAB_APP_KEY / SCHWAB_APP_SECRET /
+      SCHWAB_REFRESH_TOKEN / SCHWAB_ACCOUNT_HASH into .env.local to light up
+      account numbers in the briefings. Schwab refresh tokens expire every
+      7 days — needs the ladder tool's interactive auth weekly, or accept
+      manual refresh.
+
 - [ ] Maintain `baskets/thesis_overrides.json` weekly (fan score, Glassdoor,
       buyback per candidate) — raises thesis coverage past 2/5; the call-side
       buyback disqualifier only works when this is filled in.
