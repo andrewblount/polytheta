@@ -27,8 +27,27 @@ manual steps.** Current state and blockers:
 
 ## Other open items
 
-- [ ] WhatsApp delivery for briefings/alerts — needs a Twilio account (Andrew
-      to create if wanted); the settings toggle exists but is inert until then.
+## Twilio delivery (code done 2026-07-28, blocked on account setup)
+
+Credentials are wired (Netlify env + .env.local) and both channels are coded
+and toggleable per category in the apps. Two carrier/vendor gates remain —
+both require Andrew personally (business attestations / terms acceptance):
+
+- [ ] **SMS blocked by A2P 10DLC registration.** Test send returned Twilio
+      error **30034** — "message from an unregistered number." US carriers
+      require brand + campaign registration for application-to-person SMS on
+      a 10-digit long code. Note: sends to this number also failed 30034 back
+      in Jan 2026, so the account has never completed it. Register at
+      Console → Messaging → Regulatory Compliance → A2P 10DLC (sole-prop
+      brand is fine; ~$4/mo campaign fee; carrier approval takes days).
+      Until then SMS silently fails and the other channels carry the load.
+- [ ] **WhatsApp sandbox not activated.** Console → Messaging → Try it out →
+      Send a WhatsApp message shows an "Activate Your Sandbox" terms dialog
+      that must be accepted, then join the sandbox from WhatsApp by texting
+      the join code to +1 415 523 8886. WhatsApp sandbox bypasses 10DLC
+      entirely, so it's the faster path to phone alerts. Sandbox sessions
+      expire every 72h unless re-joined — a production WhatsApp sender needs
+      Meta business verification.
 - [ ] Schwab actuals: drop SCHWAB_APP_KEY / SCHWAB_APP_SECRET /
       SCHWAB_REFRESH_TOKEN / SCHWAB_ACCOUNT_HASH into .env.local to light up
       account numbers in the briefings. Schwab refresh tokens expire every
