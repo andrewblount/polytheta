@@ -38,15 +38,28 @@ delegated; everything else is buildable.
 
 ## Build queue
 
-- [ ] **Add polyspreads to Polytheta.** `schwab/polyspreads/` is a working
-      Bun + React options-ladder tool with its own engine, CSV import, and
-      Schwab order plumbing — currently a separate project sitting in a
-      gitignored directory. Decide the shape first: (a) fold its ladder/
-      laddering engine in as a Polytheta feature, (b) keep it standalone but
-      share the trades ledger and Schwab credentials, or (c) port only the
-      order-construction logic. Note it can *place* orders, which crosses the
-      line Polytheta currently holds (recommend + track, never execute) — that
-      boundary needs an explicit decision before merging.
+- [ ] **Add polyspreads to Polytheta.** Polyspreads is a smart-execution
+      engine: it enters a sell order inside the bid/ask spread and then
+      chases the best fill — repricing about once a minute, walking from the
+      favorable side toward the market until filled — instead of dumping the
+      order at bid or hoping at ask. Lives in `schwab/polyspreads/` (Bun +
+      React + Schwab order API). Why it matters here: basket credits are
+      small ($0.12–$0.76) at large size, so captured spread is real money —
+      $0.02 better on 344 contracts is ~$688 on one leg.
+
+      Natural integration (closed loop):
+      1. Polyspreads reads the week's basket (proposal file or site API) and
+         prefills its queue with the six orders — Andrew reviews and starts
+         it; Polytheta still never initiates execution itself.
+      2. On each fill, polyspreads POSTs the actual price to
+         `/api/mobile/trades` — the ledger fills itself, no manual entry.
+      3. Slippage vs. the recommended credit becomes a tracked stat per leg,
+         feeding the modeled-vs-actual view — and measures how much the
+         chasing algorithm actually earns vs. naive fills.
+
+      Prereqs: Schwab API credentials in `.env.local` (same blocker as
+      actuals), and a decision on where it runs (it's a local web app —
+      likely stays on the Mac, launched Monday mornings).
 - [ ] **Broker integrations: thinkorswim, Robinhood, Interactive Brokers.**
       Worth knowing before starting: **thinkorswim is Schwab** (post-TD
       Ameritrade acquisition) — the Schwab API already scaffolded in
