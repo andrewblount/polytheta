@@ -30,7 +30,7 @@ delegated; everything else is buildable.
 - [ ] **TradingView login in Chrome** — the Monday scheduled task can set the
       watchlist and strike alerts automatically, but only once tradingview.com
       is logged in *in Chrome* (the desktop app is automation-read-only).
-- [x] **Neon housekeeping** — set an org spending limit; raise the polytheta
+- [ ] **Neon housekeeping** — set an org spending limit; raise the polytheta
       project's restore-history window (currently 6h) now that the trade
       ledger lives there.
 
@@ -38,7 +38,7 @@ delegated; everything else is buildable.
 
 ## Build queue
 
-- [x] **Add polyspreads to Polytheta.** Polyspreads is a smart-execution
+- [ ] **Add polyspreads to Polytheta.** Polyspreads is a smart-execution
       engine: it enters a sell order inside the bid/ask spread and then
       chases the best fill — repricing about once a minute, walking from the
       favorable side toward the market until filled — instead of dumping the
@@ -60,7 +60,7 @@ delegated; everything else is buildable.
       Prereqs: Schwab API credentials in `.env.local` (same blocker as
       actuals), and a decision on where it runs (it's a local web app —
       likely stays on the Mac, launched Monday mornings).
-- [x] **Broker integrations: thinkorswim, Robinhood, Interactive Brokers.**
+- [ ] **Broker integrations: thinkorswim, Robinhood, Interactive Brokers.**
       Worth knowing before starting: **thinkorswim is Schwab** (post-TD
       Ameritrade acquisition) — the Schwab API already scaffolded in
       `scripts/schwab_snapshot.mjs` and the ladder tool *is* the thinkorswim
@@ -84,7 +84,7 @@ delegated; everything else is buildable.
       exist before any IBKR write path, or paper fills contaminate the real
       track record. Nothing about this changes the rule that Polytheta never
       initiates execution on its own.
-- [x] **Paper vs. real account switching.** Add an account-mode concept
+- [ ] **Paper vs. real account switching.** Add an account-mode concept
       (paper | live) on trades and snapshots so paper results never
       contaminate the real track record, with the mode visible in the apps and
       briefings. Verify first whether Schwab's API exposes paperMoney
@@ -140,16 +140,8 @@ delegated; everything else is buildable.
 
 ---
 
-- [x] **Link each losing position's autopsy from its position page.** The
-      autopsies now exist as generated files in `docs/autopsies/`; the site
-      does not surface them yet.
-
-- [x] **Link each losing position's autopsy from its position page.** The
-      autopsies now exist as generated files in `docs/autopsies/`; the site
-      does not surface them yet.
-
 - [ ] **Link each losing position's autopsy from its position page.** The
-      autopsies now exist as generated files in `docs/autopsies/`; the site
+      autopsies exist as generated files in `docs/autopsies/`; the site
       does not surface them yet.
 
 ## Research
@@ -157,31 +149,11 @@ delegated; everything else is buildable.
 - [x] **Study missed opportunities to improve the evaluation system.**
       Done 8 Aug: `scripts/research/replay_rejections.mjs` →
       `docs/rejection_retro.md`. 1,490 rejected legs settled across 14
-      weeks. Headlines: the rejected pool overall was modestly profitable
-      (avg +$228 modeled), frenzied rejects performed the same as calm
-      ones, and the 2x-ATR-floor rejects were the best performers in the
-      pool (avg +$810, 90% win), which reads as capacity left on the
-      table rather than a broken screen. Band could not be tested, the
-      refined shortlists are already band-filtered. All modeled at
-      expiry, no stops, margin-proxy sizing.
-      Done 8 Aug: `scripts/research/replay_rejections.mjs` →
-      `docs/rejection_retro.md`. 1,490 rejected legs settled across 14
-      weeks. Headlines: the rejected pool overall was modestly profitable
-      (avg +$228 modeled), frenzied rejects performed the same as calm
-      ones, and the 2x-ATR-floor rejects were the best performers in the
-      pool (avg +$810, 90% win), which reads as capacity left on the
-      table rather than a broken screen. Band could not be tested, the
-      refined shortlists are already band-filtered. All modeled at
-      expiry, no stops, margin-proxy sizing.
-      Done 8 Aug: `scripts/research/replay_rejections.mjs` →
-      `docs/rejection_retro.md`. 1,490 rejected legs settled across 14
-      weeks. Headlines: the rejected pool overall was modestly profitable
-      (avg +$228 modeled), frenzied rejects performed the same as calm
-      ones, and the 2x-ATR-floor rejects were the best performers in the
-      pool (avg +$810, 90% win), which reads as capacity left on the
-      table rather than a broken screen. Band could not be tested, the
-      refined shortlists are already band-filtered. All modeled at
-      expiry, no stops, margin-proxy sizing. The
+      weeks: the rejected pool was modestly profitable overall, frenzied
+      rejects matched calm ones, and the 2x ATR floor rejected the best
+      performing slice in the pool, which reads as capacity rather than a
+      broken screen. Band untestable, the refined shortlists are already
+      band-filtered. Modeled at expiry, no stops. The
       highest-value analysis left. Every week the pipeline screens hundreds of
       names and takes 6–8; the losers are already studied (see
       `docs/trade_autopsy_2026-05-11.md`), but the *rejected* names never are.
@@ -192,7 +164,7 @@ delegated; everything else is buildable.
       $8–$100 band, and the family cap each pay for themselves or cost more
       than they save. Same method as `scripts/research/sim_exit_policies.mjs`,
       pointed at rejections instead of entries.
-- [x] **IV-rank data source** (ORATS / Market Chameleon / other) so the
+- [ ] **IV-rank data source** (ORATS / Market Chameleon / other) so the
       80th-percentile IV-rank rule can run as written instead of the current
       HV-rank proxy.
 
@@ -200,7 +172,7 @@ delegated; everything else is buildable.
 
 ## Maintenance
 
-- [x] **Maintain `baskets/thesis_overrides.json` weekly** (fan score,
+- [ ] **Maintain `baskets/thesis_overrides.json` weekly** (fan score,
       Glassdoor, buyback per candidate) — raises thesis coverage past 2/5, and
       the call-side buyback disqualifier only works when it's filled in.
 - [x] **Review the ~21 uncommitted WIP files in `src/`** (UI polish + admin
