@@ -1,5 +1,11 @@
 # Polytheta — Project TODO
 
+> **TestFlight is LIVE (2026-08-08).** `bash scripts/testflight_release.sh`
+> archives + signs + uploads headlessly. A distribution cert/key now lives in
+> this Mac's keychain (created via the ASC API), so releases need no cable and
+> no Xcode GUI. Issuer ID + key ID are in .env.local.
+
+
 Grouped by what's blocking each item. Anything under "Blocked on Andrew" needs
 an account action, business attestation, or terms acceptance that can't be
 delegated; everything else is buildable.
