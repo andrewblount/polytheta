@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import {
+  approveAccessRequest,
   createUser,
+  rejectAccessRequest,
   saveBasket,
   saveManualOverride,
   runManualSync,
@@ -59,6 +61,29 @@ export async function createUserAction(
 
   revalidatePath("/admin/users");
   redirect("/admin/users?created=1");
+}
+
+export async function approveAccessRequestAction(formData: FormData) {
+  await requireAppUser("admin");
+
+  await approveAccessRequest({
+    requestId: String(formData.get("requestId") ?? ""),
+    password: String(formData.get("password") ?? ""),
+    role: String(formData.get("role") ?? "member") as "admin" | "member",
+    status: String(formData.get("status") ?? "active") as "active" | "inactive",
+  });
+
+  revalidatePath("/admin/users");
+  redirect("/admin/users?approved=1");
+}
+
+export async function rejectAccessRequestAction(formData: FormData) {
+  await requireAppUser("admin");
+
+  await rejectAccessRequest(String(formData.get("requestId") ?? ""));
+
+  revalidatePath("/admin/users");
+  redirect("/admin/users?rejected=1");
 }
 
 export async function saveManualOverrideAction(formData: FormData) {

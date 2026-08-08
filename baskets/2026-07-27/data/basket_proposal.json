@@ -145,7 +145,8 @@
         "thesis_coverage": "2/5",
         "thesis_passed": 2,
         "pot_proxy_pct": 37
-      }
+      },
+      "name": "SELLAS Life Sciences Group, Inc."
     },
     {
       "side": "call",
@@ -193,7 +194,8 @@
         "thesis_coverage": "2/5",
         "thesis_passed": 2,
         "pot_proxy_pct": 39
-      }
+      },
+      "name": "Applied Digital Corporation"
     },
     {
       "side": "call",
@@ -241,7 +243,8 @@
         "thesis_coverage": "2/5",
         "thesis_passed": 2,
         "pot_proxy_pct": 37
-      }
+      },
+      "name": "SolarEdge Technologies, Inc."
     },
     {
       "side": "call",
@@ -289,7 +292,8 @@
         "thesis_coverage": "2/5",
         "thesis_passed": 2,
         "pot_proxy_pct": 34
-      }
+      },
+      "name": "Canadian Solar Inc."
     },
     {
       "side": "put",
@@ -337,7 +341,8 @@
         "thesis_coverage": "2/5",
         "thesis_passed": 2,
         "pot_proxy_pct": 39
-      }
+      },
+      "name": "Boston Scientific Corporation"
     },
     {
       "side": "put",
@@ -385,7 +390,8 @@
         "thesis_coverage": "2/5",
         "thesis_passed": 2,
         "pot_proxy_pct": 34
-      }
+      },
+      "name": "PayPal Holdings, Inc."
     }
   ],
   "totals": {

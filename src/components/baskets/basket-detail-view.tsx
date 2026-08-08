@@ -3,11 +3,27 @@ import type { BasketData } from "@/lib/types";
 
 import { OrderBlockCard } from "@/components/baskets/order-block-card";
 import { ResponsivePositionTable } from "@/components/baskets/responsive-position-table";
+import { resolvedSnapshot } from "@/components/baskets/settled-outcome";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
 export function BasketDetailView({ basket }: { basket: BasketData }) {
+  // The archive reads best when the week's verdict sits next to its
+  // reasoning. Only spoken once every leg has actually settled.
+  const allPositions = [...basket.callPositions, ...basket.putPositions];
+  const settledLegs = allPositions
+    .map((position) => ({ position, snapshot: resolvedSnapshot(position) }))
+    .filter((entry) => entry.snapshot !== null);
+  const fullySettled =
+    allPositions.length > 0 && settledLegs.length === allPositions.length;
+  const settledPnl = settledLegs.reduce(
+    (sum, entry) => sum + (entry.snapshot?.pnlAmount ?? 0),
+    0,
+  );
+  const settledWinners = settledLegs.filter(
+    (entry) => (entry.snapshot?.pnlAmount ?? 0) >= 0,
+  ).length;
   return (
     <div className="space-y-8">
       <section className="grid gap-6 lg:grid-cols-[1.4fr_0.6fr]">
@@ -23,6 +39,17 @@ export function BasketDetailView({ basket }: { basket: BasketData }) {
               Published {formatDateTimeLabel(basket.publicationDate)}. Last refresh{" "}
               {formatDateTimeLabel(basket.lastRefreshAt)}.
             </p>
+            {fullySettled ? (
+              <p
+                className={`mt-2 text-sm font-semibold ${
+                  settledPnl >= 0 ? "text-emerald-500" : "text-red-500"
+                }`}
+              >
+                Settled. {settledWinners} of {settledLegs.length} legs kept their
+                credit, {settledPnl >= 0 ? "+" : "\u2212"}
+                {formatCurrency(Math.abs(settledPnl))} modeled for the week.
+              </p>
+            ) : null}
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {basket.quickSummary.map((metric) => (

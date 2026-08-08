@@ -20,6 +20,7 @@ import { runFilterAndRefine } from './lib/shortlist.mjs';
 import { runBuildBasket } from './lib/build_basket.mjs';
 import { importProposal } from './lib/import_proposal.mjs';
 import { sendBasketEmail } from './lib/basket_email.mjs';
+import { buildAlertPlan } from './lib/google_alerts.mjs';
 
 const __filename = url.fileURLToPath(import.meta.url);
 const REPO_ROOT = path.resolve(path.dirname(__filename), '..');
@@ -247,6 +248,15 @@ const tvAlerts = [
 ].join('\n');
 fs.writeFileSync(path.join(BASKET_DIR, 'tradingview_alerts.md'), tvAlerts + '\n');
 log(`tradingview artifacts: watchlist (${proposal.picks.length} symbols) + alert levels`);
+
+// Google Alerts plan — created Monday and deleted after settlement by the
+// scheduled assistant tasks (Google retired the Alerts API).
+const alertPlan = buildAlertPlan(proposal);
+fs.writeFileSync(
+  path.join(BASKET_DIR, 'google_alerts.json'),
+  JSON.stringify(alertPlan, null, 2) + '\n',
+);
+log(`google alerts plan: ${alertPlan.alerts.length} queries, remove after ${alertPlan.remove_after}`);
 
 // Email the trading instructions (independent of DB publish — the basket
 // should reach the inbox even if the site is down).

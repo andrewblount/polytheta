@@ -23,7 +23,7 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <p className="eyebrow text-[10px] text-muted-foreground">Current basket</p>
+              <p className="eyebrow text-xs text-muted-foreground">Current basket</p>
               <CardTitle className="mt-3 text-2xl">{basket.title}</CardTitle>
             </div>
             <Button asChild>
@@ -33,7 +33,7 @@ export default async function DashboardPage() {
           <CardContent className="grid gap-3 sm:grid-cols-2">
             {basket.quickSummary.map((metric) => (
               <div key={metric.label} className="rounded-2xl border border-border/70 p-4">
-                <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{metric.label}</p>
+                <p className="text-xs font-medium uppercase tracking-[0.1em] text-muted-foreground">{metric.label}</p>
                 <p className="mt-3 text-lg font-semibold">{metric.value}</p>
               </div>
             ))}
@@ -68,7 +68,7 @@ export default async function DashboardPage() {
       </section>
       <section className="space-y-4">
         <div>
-          <p className="eyebrow text-[10px] text-muted-foreground">Live positions</p>
+          <p className="eyebrow text-xs text-muted-foreground">Live positions</p>
           <h2 className="mt-2 text-2xl font-semibold">What needs attention now</h2>
         </div>
         <ResponsivePositionTable positions={dashboard.livePositions} />

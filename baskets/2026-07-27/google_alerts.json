@@ -1,0 +1,43 @@
+{
+  "basket_date": "2026-07-27",
+  "expiry": "2026-07-31",
+  "remove_after": "2026-07-31",
+  "alerts": [
+    {
+      "ticker": "SLS",
+      "side": "call",
+      "company": "SELLAS Life Sciences",
+      "query": "\"SELLAS Life Sciences\" (acquisition OR acquire OR takeover OR buyout OR merger OR \"tender offer\" OR \"going private\" OR \"strategic alternatives\" OR \"stake in\")"
+    },
+    {
+      "ticker": "APLD",
+      "side": "call",
+      "company": "Applied Digital",
+      "query": "\"Applied Digital\" (acquisition OR acquire OR takeover OR buyout OR merger OR \"tender offer\" OR \"going private\" OR \"strategic alternatives\" OR \"stake in\")"
+    },
+    {
+      "ticker": "SEDG",
+      "side": "call",
+      "company": "SolarEdge Technologies",
+      "query": "\"SolarEdge Technologies\" (acquisition OR acquire OR takeover OR buyout OR merger OR \"tender offer\" OR \"going private\" OR \"strategic alternatives\" OR \"stake in\")"
+    },
+    {
+      "ticker": "CSIQ",
+      "side": "call",
+      "company": "Canadian Solar",
+      "query": "\"Canadian Solar\" (acquisition OR acquire OR takeover OR buyout OR merger OR \"tender offer\" OR \"going private\" OR \"strategic alternatives\" OR \"stake in\")"
+    },
+    {
+      "ticker": "BSX",
+      "side": "put",
+      "company": "Boston Scientific",
+      "query": "\"Boston Scientific\" (bankruptcy OR \"chapter 11\" OR \"going concern\" OR fraud OR \"SEC investigation\" OR probe OR restatement OR delisting OR recall OR \"data breach\" OR \"guidance cut\" OR \"short seller\" OR \"class action\" OR \"offering\")"
+    },
+    {
+      "ticker": "PYPL",
+      "side": "put",
+      "company": "PayPal",
+      "query": "\"PayPal\" (bankruptcy OR \"chapter 11\" OR \"going concern\" OR fraud OR \"SEC investigation\" OR probe OR restatement OR delisting OR recall OR \"data breach\" OR \"guidance cut\" OR \"short seller\" OR \"class action\" OR \"offering\")"
+    }
+  ]
+}

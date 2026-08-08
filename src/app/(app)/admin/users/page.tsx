@@ -1,11 +1,12 @@
 import { updateUserAccessAction } from "@/app/(app)/admin/actions";
 import { CreateUserForm } from "@/components/admin/create-user-form";
+import { PendingAccessRequestCard } from "@/components/admin/pending-access-request-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatDateTimeLabel } from "@/lib/format";
-import { listAdminUsers } from "@/server/repos/baskets";
+import { listAdminUsers, listPendingAccessRequests } from "@/server/repos/baskets";
 
 export default async function AdminUsersPage({
   searchParams,
@@ -13,7 +14,10 @@ export default async function AdminUsersPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = searchParams ? await searchParams : undefined;
-  const users = await listAdminUsers();
+  const [users, pendingAccessRequests] = await Promise.all([
+    listAdminUsers(),
+    listPendingAccessRequests(),
+  ]);
 
   return (
     <div className="space-y-8">
@@ -26,6 +30,35 @@ export default async function AdminUsersPage({
           User created successfully.
         </p>
       ) : null}
+      {params?.approved ? (
+        <p className="rounded-2xl border border-success/20 bg-success/10 px-4 py-3 text-sm text-success">
+          Access request approved and user created successfully.
+        </p>
+      ) : null}
+      {params?.rejected ? (
+        <p className="rounded-2xl border border-warning/20 bg-warning/10 px-4 py-3 text-sm text-warning">
+          Access request rejected.
+        </p>
+      ) : null}
+      <div className="space-y-4">
+        <div>
+          <p className="eyebrow text-[10px] text-muted-foreground">Pending requests</p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight">Review and approve access</h2>
+        </div>
+        {pendingAccessRequests.length === 0 ? (
+          <Card>
+            <CardContent className="pt-6 text-sm text-muted-foreground">
+              No pending access requests right now.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4">
+            {pendingAccessRequests.map((request) => (
+              <PendingAccessRequestCard key={request.id} request={request} />
+            ))}
+          </div>
+        )}
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>Create user</CardTitle>

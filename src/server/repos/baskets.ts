@@ -2,6 +2,7 @@ import { desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
+  accessRequests,
   basketMetrics,
   basketRules,
   baskets,
@@ -21,6 +22,7 @@ import {
   demoUsers,
 } from "@/lib/demo-data";
 import type {
+  AccessRequestRecord,
   AdminUserRecord,
   AnalyticsSummary,
   BasketData,
@@ -329,6 +331,28 @@ export async function listAdminUsers(): Promise<AdminUserRecord[]> {
       : null,
     lastLoginAt: row.lastLoginAt ? asIsoString(row.lastLoginAt) : null,
     identityConfirmedAt: null,
+    createdAt: asIsoString(row.createdAt),
+  }));
+}
+
+export async function listPendingAccessRequests(): Promise<AccessRequestRecord[]> {
+  if (!db) {
+    return [];
+  }
+
+  const rows = await db
+    .select()
+    .from(accessRequests)
+    .where(eq(accessRequests.status, "new"))
+    .orderBy(desc(accessRequests.createdAt));
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    company: row.company,
+    message: row.message,
+    status: row.status,
     createdAt: asIsoString(row.createdAt),
   }));
 }

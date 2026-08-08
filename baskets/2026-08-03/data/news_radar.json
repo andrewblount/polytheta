@@ -1,0 +1,98 @@
+{
+  "ASTS": {
+    "call": [],
+    "put": []
+  },
+  "BOIL": {
+    "call": [],
+    "put": []
+  },
+  "DJT": {
+    "call": [],
+    "put": []
+  },
+  "DKNG": {
+    "call": [],
+    "put": []
+  },
+  "ETHA": {
+    "call": [],
+    "put": []
+  },
+  "FXI": {
+    "call": [],
+    "put": []
+  },
+  "HOOD": {
+    "call": [],
+    "put": [
+      {
+        "title": "Robinhood Ventures Fund II (RVII) Announces Launch of Initial Public Offering",
+        "link": "https://finance.yahoo.com/markets/stocks/articles/robinhood-ventures-fund-ii-rvii-131000806.html",
+        "publisher": "GlobeNewswire",
+        "publishedAt": "2026-08-03T13:10:00.000Z",
+        "matched": "public offering"
+      }
+    ]
+  },
+  "MARA": {
+    "call": [],
+    "put": []
+  },
+  "MSTR": {
+    "call": [],
+    "put": []
+  },
+  "OUST": {
+    "call": [],
+    "put": []
+  },
+  "PBR": {
+    "call": [],
+    "put": []
+  },
+  "PFE": {
+    "call": [
+      {
+        "title": "AstraZeneca Shares Drop, Bristol Myers Squibb’s Climb After Merger Talks Reports",
+        "link": "https://finance.yahoo.com/m/9599b8cb-5516-386a-999d-f4c64e1e2234/astrazeneca-shares-drop%2C.html",
+        "publisher": "The Wall Street Journal",
+        "publishedAt": "2026-08-03T09:55:00.000Z",
+        "matched": "merger"
+      }
+    ],
+    "put": [
+      {
+        "title": "‘Something Was Wrong.’ Hasbro’s Lessons From a Cyberattack.",
+        "link": "https://finance.yahoo.com/m/20e0031a-320e-360c-8e60-9c5e6d01cf05/%E2%80%98something-was-wrong.%E2%80%99.html",
+        "publisher": "The Wall Street Journal",
+        "publishedAt": "2026-08-03T10:45:00.000Z",
+        "matched": "cyberattack"
+      }
+    ]
+  },
+  "RGTI": {
+    "call": [],
+    "put": []
+  },
+  "RIOT": {
+    "call": [],
+    "put": []
+  },
+  "RIVN": {
+    "call": [],
+    "put": []
+  },
+  "SLV": {
+    "call": [],
+    "put": []
+  },
+  "SQQQ": {
+    "call": [],
+    "put": []
+  },
+  "ZETA": {
+    "call": [],
+    "put": []
+  }
+}

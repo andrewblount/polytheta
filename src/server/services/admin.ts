@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
+  accessRequests,
   basketMetrics,
   basketRules,
   baskets,
@@ -449,6 +450,66 @@ export async function createUser({
     .returning();
 
   return { id: profile.id, email: profile.email };
+}
+
+export async function approveAccessRequest({
+  requestId,
+  password,
+  role,
+  status,
+}: {
+  requestId: string;
+  password: string;
+  role: UserRole;
+  status: UserStatus;
+}) {
+  if (!db) {
+    return;
+  }
+
+  const [request] = await db
+    .select()
+    .from(accessRequests)
+    .where(eq(accessRequests.id, requestId))
+    .limit(1);
+
+  if (!request) {
+    throw new Error("Access request not found.");
+  }
+
+  if (request.status !== "new") {
+    throw new Error("Access request has already been processed.");
+  }
+
+  await createUser({
+    fullName: request.name,
+    email: request.email,
+    password,
+    role,
+    status,
+  });
+
+  await db
+    .update(accessRequests)
+    .set({
+      status: "approved",
+      updatedAt: new Date(),
+    })
+    .where(eq(accessRequests.id, requestId));
+}
+
+export async function rejectAccessRequest(requestId: string) {
+  if (!db) {
+    return;
+  }
+
+  await db
+    .update(accessRequests)
+    .set({
+      status: "rejected",
+      updatedAt: new Date(),
+    })
+    .where(eq(accessRequests.id, requestId));
 }
 
 export async function saveManualOverride({

@@ -20,28 +20,29 @@ export function MemberShell({
   user: AppUserProfile;
   admin?: boolean;
 }) {
-  const navigation = admin ? adminNavigation : memberNavigation;
+  const isAdminUser = admin || user.role === "admin";
+  const navigation = isAdminUser ? adminNavigation : memberNavigation;
 
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto grid min-h-screen max-w-[1600px] lg:grid-cols-[280px_1fr]">
         <aside className="hidden border-r border-border/60 px-5 py-6 lg:block">
-          <Wordmark href={admin ? "/admin" : "/app/dashboard"} />
+          <Wordmark href={isAdminUser ? "/admin" : "/app/dashboard"} />
           <div className="mt-8 space-y-2">
             {navigation.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center rounded-2xl px-4 py-3 text-sm text-muted-foreground transition hover:bg-muted/60 hover:text-foreground"
+                className="flex items-center rounded-2xl px-4 py-3 text-[15px] font-medium text-muted-foreground transition hover:bg-muted/60 hover:text-foreground"
               >
                 {item.label}
               </Link>
             ))}
           </div>
           <div className="mt-8 rounded-3xl border border-border/70 bg-muted/30 p-4">
-            <p className="eyebrow text-[10px] text-muted-foreground">Access</p>
-            <p className="mt-2 text-sm font-medium">{user.fullName}</p>
-            <p className="text-xs text-muted-foreground">{user.email}</p>
+            <p className="eyebrow text-xs text-muted-foreground">Access</p>
+            <p className="mt-2 text-base font-semibold">{user.fullName}</p>
+            <p className="text-sm text-muted-foreground">{user.email}</p>
             <div className="mt-3 flex items-center gap-2">
               <Badge variant={user.role === "admin" ? "accent" : "default"}>
                 {user.role}
@@ -57,14 +58,14 @@ export function MemberShell({
             <div className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
               <div className="flex items-center gap-3">
                 <div className="lg:hidden">
-                  <Wordmark href={admin ? "/admin" : "/app/dashboard"} />
+                  <Wordmark href={isAdminUser ? "/admin" : "/app/dashboard"} />
                 </div>
                 <div className="hidden lg:block">
-                  <p className="eyebrow text-[10px] text-muted-foreground">
-                    {admin ? "Admin Workspace" : "Member Workspace"}
+                  <p className="eyebrow text-xs text-muted-foreground">
+                    {isAdminUser ? "Admin Workspace" : "Member Workspace"}
                   </p>
                   <h1 className="text-lg font-semibold tracking-tight">
-                    {admin ? "Operations & publishing" : "Weekly basket intelligence"}
+                    {isAdminUser ? "Operations & publishing" : "Weekly basket intelligence"}
                   </h1>
                 </div>
               </div>
@@ -81,8 +82,8 @@ export function MemberShell({
                     </AvatarFallback>
                   </Avatar>
                   <div className="text-right">
-                    <p className="text-xs font-medium">{user.fullName}</p>
-                    <p className="text-[11px] text-muted-foreground">{user.email}</p>
+                    <p className="text-sm font-semibold">{user.fullName}</p>
+                    <p className="text-sm text-muted-foreground">{user.email}</p>
                   </div>
                 </div>
                 <LogoutButton />

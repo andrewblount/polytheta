@@ -56,7 +56,7 @@ export default async function HomePage() {
             ].map((item) => (
               <Card key={item.label} className="bg-card/60">
                 <CardHeader>
-                  <p className="eyebrow text-[10px] text-muted-foreground">{item.label}</p>
+                  <p className="eyebrow text-xs text-muted-foreground">{item.label}</p>
                   <CardTitle className="mt-3 text-lg">{item.value}</CardTitle>
                 </CardHeader>
               </Card>
@@ -67,7 +67,7 @@ export default async function HomePage() {
           <div className="glass-panel rounded-[32px] border border-border/70 p-6">
             <div className="mb-6 flex items-start justify-between">
               <div>
-                <p className="eyebrow text-[10px] text-muted-foreground">Current member view</p>
+                <p className="eyebrow text-xs text-muted-foreground">Current member view</p>
                 <h2 className="mt-3 text-2xl font-semibold">Latest basket snapshot</h2>
               </div>
               <Lock className="size-5 text-accent" />
@@ -76,7 +76,7 @@ export default async function HomePage() {
               {previewBaskets.map((basket) => (
                 <Card key={basket.id} className="bg-background/40">
                   <CardHeader>
-                    <p className="eyebrow text-[10px] text-muted-foreground">
+                    <p className="eyebrow text-xs text-muted-foreground">
                       {basket.status}
                     </p>
                     <CardTitle className="mt-2 text-xl">{basket.title}</CardTitle>
@@ -87,7 +87,7 @@ export default async function HomePage() {
                         key={metric.label}
                         className="rounded-2xl border border-border/70 bg-background/40 p-3"
                       >
-                        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                        <p className="text-xs font-medium uppercase tracking-[0.1em] text-muted-foreground">
                           {metric.label}
                         </p>
                         <p className="mt-2 text-lg font-semibold">{metric.value}</p>

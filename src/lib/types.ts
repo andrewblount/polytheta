@@ -186,6 +186,16 @@ export interface AdminUserRecord extends AppUserProfile {
   identityConfirmedAt?: string | null;
 }
 
+export interface AccessRequestRecord {
+  id: string;
+  name: string;
+  email: string;
+  company?: string | null;
+  message?: string | null;
+  status: string;
+  createdAt: string;
+}
+
 export interface SyncJobRecord {
   id: string;
   jobType: string;

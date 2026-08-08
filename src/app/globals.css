@@ -6,7 +6,7 @@
   --card: rgba(255, 255, 255, 0.78);
   --card-foreground: #11151e;
   --muted: #dde2ea;
-  --muted-foreground: #5f6776;
+  --muted-foreground: #4e5b6f;
   --border: rgba(17, 21, 30, 0.12);
   --accent: #3e6ae1;
   --accent-foreground: #f8fbff;
@@ -42,7 +42,7 @@
   --card: rgba(10, 20, 36, 0.78);
   --card-foreground: #f1f4fa;
   --muted: rgba(125, 147, 178, 0.16);
-  --muted-foreground: #93a6c0;
+  --muted-foreground: #b3c1d6;
   --border: rgba(148, 163, 184, 0.16);
   --accent: #88b4ff;
   --accent-foreground: #07111e;
@@ -100,8 +100,9 @@ select:focus-visible,
 }
 
 .eyebrow {
-  letter-spacing: 0.18em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .data-grid {

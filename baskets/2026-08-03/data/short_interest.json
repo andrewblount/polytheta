@@ -1,0 +1,110 @@
+{
+  "ASTS": {
+    "si_pct": 19.93,
+    "shares_short": 59349055,
+    "short_ratio": 3.08,
+    "fetched_at": "2026-08-03T13:47:11.532Z"
+  },
+  "BOIL": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-08-03T13:47:11.596Z"
+  },
+  "DJT": {
+    "si_pct": 10.23,
+    "shares_short": 16548994,
+    "short_ratio": 3.24,
+    "fetched_at": "2026-08-03T13:47:11.533Z"
+  },
+  "DKNG": {
+    "si_pct": 8.16,
+    "shares_short": 39353188,
+    "short_ratio": 3.49,
+    "fetched_at": "2026-08-03T13:47:11.533Z"
+  },
+  "ETHA": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-08-03T13:47:11.630Z"
+  },
+  "FXI": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-08-03T13:47:12.033Z"
+  },
+  "HOOD": {
+    "si_pct": 4.88,
+    "shares_short": 38088351,
+    "short_ratio": 1.28,
+    "fetched_at": "2026-08-03T13:47:12.049Z"
+  },
+  "MARA": {
+    "si_pct": 33.15,
+    "shares_short": 110275677,
+    "short_ratio": 2.44,
+    "fetched_at": "2026-08-03T13:47:12.036Z"
+  },
+  "MSTR": {
+    "si_pct": 11.76,
+    "shares_short": 40275607,
+    "short_ratio": 1.51,
+    "fetched_at": "2026-08-03T13:47:12.034Z"
+  },
+  "OUST": {
+    "si_pct": 9.31,
+    "shares_short": 6057607,
+    "short_ratio": 1.12,
+    "fetched_at": "2026-08-03T13:47:12.162Z"
+  },
+  "PBR": {
+    "si_pct": null,
+    "shares_short": 47713240,
+    "short_ratio": 2.75,
+    "fetched_at": "2026-08-03T13:47:12.570Z"
+  },
+  "PFE": {
+    "si_pct": 2.87,
+    "shares_short": 163820439,
+    "short_ratio": 3.21,
+    "fetched_at": "2026-08-03T13:47:12.566Z"
+  },
+  "RGTI": {
+    "si_pct": 18.54,
+    "shares_short": 61351381,
+    "short_ratio": 2.17,
+    "fetched_at": "2026-08-03T13:47:12.570Z"
+  },
+  "RIOT": {
+    "si_pct": 15.32,
+    "shares_short": 53394795,
+    "short_ratio": 3.44,
+    "fetched_at": "2026-08-03T13:47:12.567Z"
+  },
+  "RIVN": {
+    "si_pct": 12.39,
+    "shares_short": 140540265,
+    "short_ratio": 3.34,
+    "fetched_at": "2026-08-03T13:47:12.669Z"
+  },
+  "SLV": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-08-03T13:47:13.075Z"
+  },
+  "SQQQ": {
+    "si_pct": null,
+    "shares_short": null,
+    "short_ratio": null,
+    "fetched_at": "2026-08-03T13:47:13.074Z"
+  },
+  "ZETA": {
+    "si_pct": 14.26,
+    "shares_short": 31820346,
+    "short_ratio": 3.38,
+    "fetched_at": "2026-08-03T13:47:13.076Z"
+  }
+}

@@ -198,6 +198,9 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
     const sig = p.signals ?? null;
     return {
       side: p.side, ticker: p.ticker, family: p.family,
+      // Company name drives Google Alert queries — a bare ticker is useless
+      // as a news query ("SLS" is also the Space Launch System).
+      name: sm.name && sm.name !== p.ticker ? sm.name : null,
       px: +px.toFixed(2), K: p.K, bid, ask, cr: mid,
       iv: +iv.toFixed(3), delta: +delta.toFixed(3),
       atr: +atr.toFixed(2), buf,

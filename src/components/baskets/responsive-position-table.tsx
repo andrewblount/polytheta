@@ -4,6 +4,7 @@ import { formatCurrency, formatPercent } from "@/lib/format";
 import type { PositionData } from "@/lib/types";
 
 import { PositionStateBadge } from "@/components/baskets/position-state-badge";
+import { SettledOutcome, resolvedSnapshot } from "@/components/baskets/settled-outcome";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -39,38 +40,7 @@ export function ResponsivePositionTable({
             </thead>
             <tbody>
               {positions.map((position) => (
-                <tr key={position.id} className="border-t border-border/60">
-                  <td className="sticky left-0 bg-background/95 px-4 py-4">
-                    <Link
-                      href={`/app/positions/${position.id}`}
-                      className="font-semibold hover:text-accent"
-                    >
-                      {position.ticker}
-                    </Link>
-                    <p className="text-xs text-muted-foreground">
-                      {position.companyName ?? position.thesisSummary}
-                    </p>
-                  </td>
-                  <td className="px-4 py-4">{formatCurrency(position.entryUnderlyingPrice)}</td>
-                  <td className="px-4 py-4">
-                    {formatCurrency(position.strike, { maximumFractionDigits: 2 })}
-                  </td>
-                  <td className="px-4 py-4">{formatPercent(position.delta, 0)}</td>
-                  <td className="px-4 py-4">
-                    {formatCurrency(position.estimatedEntryCredit)}
-                  </td>
-                  <td className="px-4 py-4">{position.contracts}</td>
-                  <td className="px-4 py-4">{formatCurrency(position.margin)}</td>
-                  <td className="px-4 py-4">
-                    <PositionStateBadge state={position.latestPerformance.state} />
-                  </td>
-                  <td className="px-4 py-4">
-                    {formatPercent(position.latestPerformance.creditCapturePct, 0)}
-                  </td>
-                  <td className="px-4 py-4 text-muted-foreground">
-                    {new Date(position.latestPerformance.observedAt).toLocaleString()}
-                  </td>
-                </tr>
+                <PositionRows key={position.id} position={position} />
               ))}
             </tbody>
           </table>
@@ -100,6 +70,9 @@ export function ResponsivePositionTable({
               />
               <Metric label="Margin" value={formatCurrency(position.margin)} />
               <Metric label="Contracts" value={String(position.contracts)} />
+              <div className="col-span-2">
+                <SettledOutcome position={position} />
+              </div>
             </CardContent>
           </Card>
         ))}
@@ -108,10 +81,57 @@ export function ResponsivePositionTable({
   );
 }
 
+function PositionRows({ position }: { position: PositionData }) {
+  const settled = resolvedSnapshot(position);
+  return (
+    <>
+      <tr key={position.id} className="border-t border-border/60">
+                  <td className="sticky left-0 bg-background/95 px-4 py-4">
+                    <Link
+                      href={`/app/positions/${position.id}`}
+                      className="font-semibold hover:text-accent"
+                    >
+                      {position.ticker}
+                    </Link>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {position.companyName ?? position.thesisSummary}
+                    </p>
+                  </td>
+                  <td className="px-4 py-4">{formatCurrency(position.entryUnderlyingPrice)}</td>
+                  <td className="px-4 py-4">
+                    {formatCurrency(position.strike, { maximumFractionDigits: 2 })}
+                  </td>
+                  <td className="px-4 py-4">{formatPercent(position.delta, 0)}</td>
+                  <td className="px-4 py-4">
+                    {formatCurrency(position.estimatedEntryCredit)}
+                  </td>
+                  <td className="px-4 py-4">{position.contracts}</td>
+                  <td className="px-4 py-4">{formatCurrency(position.margin)}</td>
+                  <td className="px-4 py-4">
+                    <PositionStateBadge state={position.latestPerformance.state} />
+                  </td>
+                  <td className="px-4 py-4">
+                    {formatPercent(position.latestPerformance.creditCapturePct, 0)}
+                  </td>
+                  <td className="px-4 py-4 text-muted-foreground">
+                    {new Date(position.latestPerformance.observedAt).toLocaleString()}
+                  </td>
+                </tr>
+      {settled ? (
+        <tr className="border-t border-border/30">
+          <td colSpan={10} className="px-4 pb-4 pt-0">
+            <SettledOutcome position={position} />
+          </td>
+        </tr>
+      ) : null}
+    </>
+  );
+}
+
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-border/70 bg-background/30 p-3">
-      <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+      <p className="text-xs font-medium uppercase tracking-[0.1em] text-muted-foreground">{label}</p>
       <p className="mt-2 font-medium">{value}</p>
     </div>
   );

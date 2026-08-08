@@ -12,7 +12,7 @@ export function StatCard({
   return (
     <Card>
       <CardHeader>
-        <p className="eyebrow text-[10px] text-muted-foreground">{title}</p>
+        <p className="eyebrow text-xs text-muted-foreground">{title}</p>
         <CardTitle className="mt-3 text-3xl">{value}</CardTitle>
       </CardHeader>
       {description ? (

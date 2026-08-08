@@ -6,7 +6,7 @@ import { Wordmark } from "@/components/layout/wordmark";
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-6xl flex-col items-start justify-between gap-4 px-4 py-6 sm:flex-row sm:items-center sm:px-6 lg:px-8">
         <Wordmark />
         <div className="flex items-center gap-3">
           <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">

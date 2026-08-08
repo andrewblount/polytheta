@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Instrument_Serif, Manrope } from "next/font/google";
+import { Instrument_Serif, Public_Sans } from "next/font/google";
 
 import { siteConfig } from "@/lib/brand";
 
@@ -7,9 +7,10 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 
 import "./globals.css";
 
-const manrope = Manrope({
+const publicSans = Public_Sans({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const instrumentSerif = Instrument_Serif({
@@ -36,17 +37,11 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${manrope.variable} ${instrumentSerif.variable} h-full antialiased`}
+      data-scroll-behavior="smooth"
+      className={`${publicSans.variable} ${instrumentSerif.variable} dark h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem={false}
-          disableTransitionOnChange
-        >
-          {children}
-        </ThemeProvider>
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );

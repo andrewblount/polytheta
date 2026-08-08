@@ -11,11 +11,13 @@ export default async function ContactPage({
 }) {
   const params = await searchParams;
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6 sm:py-16 lg:px-8">
       <Card>
         <CardHeader>
           <p className="eyebrow text-xs text-muted-foreground">Request access</p>
-          <CardTitle className="mt-3 text-4xl">Tell us who you are and how you plan to use Polytheta.</CardTitle>
+          <CardTitle className="mt-3 text-3xl leading-tight sm:text-4xl">
+            Tell us who you are and how you plan to use Polytheta.
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {params.submitted === "1" ? (
@@ -51,8 +53,10 @@ export default async function ContactPage({
                 placeholder="Tell us about your workflow, team, and what you'd want from the member experience."
               />
             </div>
-            <div className="flex justify-end">
-              <Button type="submit">Request access</Button>
+            <div className="flex justify-stretch sm:justify-end">
+              <Button type="submit" className="w-full sm:w-auto">
+                Request access
+              </Button>
             </div>
           </form>
         </CardContent>
