@@ -114,7 +114,13 @@ async function buildBasketFromDb(slug: string): Promise<BasketData | null> {
 
   const hydratedPositions = positionRows.map((row) => {
     const history = snapshotsByPositionId.get(row.id) ?? [];
-    const latest = history.at(-1);
+    // A settlement outranks the clock. An early backfill stamped entry
+    // snapshots with the moment it ran rather than the moment of entry,
+    // which put them after the real Expiry-Resolved row and made every
+    // archived week read as pnl zero, state safe. Settled is settled.
+    const latest =
+      history.find((snapshot) => snapshot.confidence === "Expiry-Resolved") ??
+      history.at(-1);
     if (!latest) {
       return null;
     }
