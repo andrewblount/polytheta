@@ -10,19 +10,23 @@ struct ArchiveView: View {
             List {
                 if let error { ErrorBanner(message: error) }
                 ForEach(baskets) { b in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(b.weekOf).font(.subheadline.weight(.medium))
-                            Text("\(b.names) names · GSRS \(b.gsrs, specifier: "%.2f")")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 3) {
-                            Text(money(Double(b.totalEstimatedCredit)))
-                                .font(.subheadline.weight(.semibold))
-                            Text(b.status)
-                                .font(.caption2)
-                                .foregroundStyle(b.status == "published" ? .green : .secondary)
+                    NavigationLink {
+                        ArchiveBasketView(slug: b.slug, weekOf: b.weekOf)
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(b.weekOf).font(.subheadline.weight(.medium))
+                                Text("\(b.names) names · GSRS \(b.gsrs, specifier: "%.2f")")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 3) {
+                                Text(money(Double(b.totalEstimatedCredit)))
+                                    .font(.subheadline.weight(.semibold))
+                                Text(b.status)
+                                    .font(.caption2)
+                                    .foregroundStyle(b.status == "published" ? .green : .secondary)
+                            }
                         }
                     }
                 }
