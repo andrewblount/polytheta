@@ -70,18 +70,70 @@ delegated; everything else is buildable.
       supported public API; only unofficial reverse-engineered clients, which
       carry account-lockout risk — recommend skipping or treating as
       manual-import only.
+
+      **IBKR, decided.** Use the Client Portal Web API, not TWS. TWS needs a
+      gateway process running locally with a session that expires and needs
+      re-authenticating by hand, which is the wrong shape for anything on a
+      schedule — the same weekly-token problem Schwab already imposes, twice
+      over. Client Portal is OAuth and runs headless.
+
+      Scope it as read-then-write, in that order: pull positions and fills
+      first so IBKR accounts appear in briefings and the ledger alongside
+      Schwab, and only add order placement once the read path has been right
+      for a few weeks. Account mode (paper | live) from the item below has to
+      exist before any IBKR write path, or paper fills contaminate the real
+      track record. Nothing about this changes the rule that Polytheta never
+      initiates execution on its own.
 - [ ] **Paper vs. real account switching.** Add an account-mode concept
       (paper | live) on trades and snapshots so paper results never
       contaminate the real track record, with the mode visible in the apps and
       briefings. Verify first whether Schwab's API exposes paperMoney
       accounts at all — if it doesn't, paper mode may need to be a local-only
       ledger flag rather than a broker connection.
-- [ ] **Make historical entries clickable with thesis.** Partly done: the
-      Basket tab already drills into per-position decision cards (signals,
-      weights, pass/fail, screen checks) and "Why this basket." Remaining
-      work is the *Archive* tab and the site's basket archive — make each
-      historical basket and position open the same decision view, so a past
-      trade can be read back with the reasoning that produced it.
+- [ ] **Settled history: every past position clickable, showing its
+      original thesis, what it actually did, and why.** Three parts that
+      only pay off together, because the point is reading the reasoning and
+      the result on one screen.
+
+      1. *Join the data.* Entry thesis already exists per position in
+         `baskets/<date>/data/basket_proposal.json` under `picks` (side,
+         ticker, family, px, K, bid, ask, cr, iv, delta, atr, buf). Settled
+         outcomes already exist via `netlify/functions/settle-weekend.mts`
+         and `scripts/backfill_settled.mjs`. Nothing currently joins them.
+         Write one settled record per position holding both, plus whether
+         and when it breached the strike.
+      2. *Show it.* The Basket tab already renders per-position decision
+         cards (signals, weights, pass/fail, screen checks) and "Why this
+         basket." Reuse that component in the Archive tab
+         (`src/app/(app)/app/baskets`), position detail
+         (`src/app/(app)/app/positions`) and the public site archive, with
+         an outcome panel added: credit collected, settle price, modeled
+         P&L, strike breach and when. Once real fills land in the ledger,
+         the same panel carries actual against modeled.
+      3. *Attach the post mortem.* Link each losing position to its autopsy
+         (below), so clicking a loss shows what the system saw, what
+         happened, and which guard has since been added for it.
+
+- [ ] **Generate an autopsy for every losing leg, and cover the put side.**
+      Mostly done for calls and worth reading before starting:
+      `docs/trade_autopsy_2026-05-11.md` already covers all four ITM call
+      losses, validates across all 53 settled call legs (thrusty entries
+      averaged −$4,133, calm entries +$7,070), and three fixes shipped on
+      26 July off the back of it — the frenzy guard, Monday revalidation
+      (`scripts/verify_basket_live.mjs`) and stop-breach alerts.
+
+      What is left:
+      - **The put side has never had this treatment.** The whole analysis
+        above is call-only. Run the same method on settled put legs before
+        assuming the same failure modes apply, because they probably do not.
+      - **Make it a generated artifact, not a hand-written doc.** Every
+        future loss should get an autopsy automatically, on the same four
+        headings the FCEL one uses: what the system saw at entry, what
+        actually happened, why the loss was that size, and whether it
+        generalizes. Hand-written analysis does not survive contact with a
+        busy month.
+      - Test each shipped guard against the record it was built from, so
+        the frenzy guard and revalidation are measured rather than assumed.
 - [ ] **Modeled-vs-actual performance view** once real fills accumulate in the
       trades ledger — the slippage between what the system recommended and
       what actually filled.
