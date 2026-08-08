@@ -26,6 +26,9 @@ targets:
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_CFBundleDisplayName: Polytheta
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # HTTPS only, no custom crypto — skips the export-compliance prompt
+        # on every TestFlight upload.
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
   PolythetaMac:
     type: application
     platform: macOS
