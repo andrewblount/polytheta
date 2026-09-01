@@ -326,12 +326,16 @@ export async function updateUserAccess({
   role,
   status,
   password,
+  startingCapital,
+  trackingStartDate,
 }: {
   userId: string;
   fullName: string;
   role: UserRole;
   status: UserStatus;
   password?: string;
+  startingCapital?: string;
+  trackingStartDate?: string;
 }) {
   if (!db) {
     return;
@@ -355,12 +359,34 @@ export async function updateUserAccess({
     throw new Error("Password must be at least 8 characters.");
   }
 
+  let capitalValue: string | null | undefined;
+  if (startingCapital !== undefined) {
+    const cleaned = startingCapital.replace(/[$,\s]/g, "");
+    if (cleaned.length === 0) {
+      capitalValue = null;
+    } else {
+      const parsed = Number(cleaned);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        throw new Error("Starting capital must be a positive number.");
+      }
+      capitalValue = parsed > 0 ? parsed.toFixed(2) : null;
+    }
+  }
+
+  let trackingValue: string | null | undefined;
+  if (trackingStartDate !== undefined) {
+    const trimmed = trackingStartDate.trim();
+    trackingValue = /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : null;
+  }
+
   await db
     .update(userProfiles)
     .set({
       fullName: normalizedFullName,
       role,
       status,
+      ...(capitalValue !== undefined ? { startingCapital: capitalValue } : {}),
+      ...(trackingValue !== undefined ? { trackingStartDate: trackingValue } : {}),
       updatedAt: new Date(),
     })
     .where(eq(userProfiles.id, userId));

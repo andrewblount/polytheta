@@ -54,6 +54,9 @@ function getDemoUser(): AppUserProfile | null {
     acknowledgedRiskAt: demo.acknowledgedRiskAt,
     lastLoginAt: demo.lastLoginAt,
     createdAt: demo.createdAt,
+    startingCapital: null,
+    trackingStartDate: null,
+    notificationPrefs: null,
   };
 }
 
@@ -105,6 +108,9 @@ async function upsertProfileFromIdentity(): Promise<AppUserProfile | null> {
       acknowledgedRiskAt: null,
       lastLoginAt: new Date().toISOString(),
       createdAt: new Date().toISOString(),
+      startingCapital: null,
+      trackingStartDate: null,
+      notificationPrefs: null,
     };
   }
 
@@ -134,6 +140,9 @@ async function upsertProfileFromIdentity(): Promise<AppUserProfile | null> {
       acknowledgedRiskAt: created.acknowledgedRiskAt?.toISOString() ?? null,
       lastLoginAt: created.lastLoginAt?.toISOString() ?? null,
       createdAt: created.createdAt.toISOString(),
+      startingCapital: created.startingCapital != null ? Number(created.startingCapital) : null,
+      trackingStartDate: created.trackingStartDate ?? null,
+      notificationPrefs: created.notificationPrefs ?? null,
     };
   }
 
@@ -158,6 +167,9 @@ async function upsertProfileFromIdentity(): Promise<AppUserProfile | null> {
     acknowledgedRiskAt: updated.acknowledgedRiskAt?.toISOString() ?? null,
     lastLoginAt: updated.lastLoginAt?.toISOString() ?? null,
     createdAt: updated.createdAt.toISOString(),
+    startingCapital: updated.startingCapital != null ? Number(updated.startingCapital) : null,
+    trackingStartDate: updated.trackingStartDate ?? null,
+    notificationPrefs: updated.notificationPrefs ?? null,
   };
 }
 

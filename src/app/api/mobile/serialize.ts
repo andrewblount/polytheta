@@ -1,4 +1,4 @@
-import type { BasketData, PositionData } from "@/lib/types";
+import type { BasketData, PositionData, TradeRecord } from "@/lib/types";
 
 // Shared serializers for the mobile API so the current basket and any
 // historical basket return an identical shape — the apps use one decoder.
@@ -71,5 +71,23 @@ export function leanBasket(basket: BasketData) {
     },
     calls: basket.callPositions.map(leanPosition),
     puts: basket.putPositions.map(leanPosition),
+  };
+}
+
+export function leanTrade(t: TradeRecord) {
+  return {
+    id: t.id,
+    positionId: t.positionId,
+    ticker: t.ticker,
+    side: t.side,
+    action: t.action,
+    strike: t.strike,
+    expiry: t.expiry,
+    quantity: t.quantity,
+    price: t.price,
+    fees: t.fees,
+    broker: t.broker,
+    executedAt: t.executedAt,
+    notes: t.notes,
   };
 }

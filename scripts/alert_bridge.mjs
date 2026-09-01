@@ -22,6 +22,7 @@
 //   * PER-RUN CAP: at most MAX_PER_RUN sends per invocation, a circuit breaker.
 //   * osascript runs with a hard timeout so a hung Messages app can't stall.
 
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -62,7 +63,24 @@ function saveState(state) {
   for (const [id, v] of Object.entries(state.sent)) {
     if (new Date(v.at).getTime() < cutoff) delete state.sent[id];
   }
+  for (const [hash, at] of Object.entries(state.texts ?? {})) {
+    if (new Date(at).getTime() < cutoff) delete state.texts[hash];
+  }
   fs.writeFileSync(STATE_FILE, JSON.stringify(state));
+}
+
+// Second, independent guard after the August runaway: even if the API ever
+// hands back the same briefing under a fresh row id, identical TEXT never
+// goes out twice in 24h.
+function textHash(text) {
+  return crypto.createHash('sha1').update(text).digest('hex');
+}
+function textAlreadySent(state, text) {
+  return Boolean((state.texts ?? {})[textHash(text)]);
+}
+function recordText(state, text) {
+  state.texts = state.texts ?? {};
+  state.texts[textHash(text)] = new Date().toISOString();
 }
 
 if (!TO) { console.error('ALERT_IMESSAGE_TO not set in .env.local'); process.exit(1); }
@@ -104,10 +122,21 @@ for (const a of alerts) {
     state.sent[a.id] = { at: new Date().toISOString(), attempts: 0, delivered: true, skipped: 'stale' };
     continue;
   }
-  const prefix = a.meta?.kind === 'radar' ? '🚨' : '⚠️';
+  // Briefings carry their own ☀️/🌙 mood — the warning triangle made routine
+  // scorecards read like incidents. Reserve prefixes for real alerts.
+  const kind = a.meta?.kind;
+  const prefix = kind === 'radar' ? '🚨 ' : kind === 'briefing' ? '' : '⚠️ ';
+  const body = `${prefix}${a.message}`;
+  if (textAlreadySent(state, body)) {
+    state.sent[a.id] = { at: new Date().toISOString(), attempts: 0, delivered: true, skipped: 'duplicate-text' };
+    saveState(state);
+    console.log(`skipped duplicate text: ${a.message.slice(0, 60)}`);
+    continue;
+  }
   try {
-    sendIMessage(`${prefix} ${a.message}`);
+    sendIMessage(body);
     state.sent[a.id] = { at: new Date().toISOString(), attempts: (prior?.attempts ?? 0) + 1, delivered: true };
+    recordText(state, body);
     saveState(state);
     sent += 1;
     console.log(`sent: ${a.message.slice(0, 70)}`);

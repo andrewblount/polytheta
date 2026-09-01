@@ -1,5 +1,5 @@
 import { formatCurrency, formatDateLabel, formatDateTimeLabel } from "@/lib/format";
-import type { BasketData } from "@/lib/types";
+import type { BasketData, TradeRecord } from "@/lib/types";
 
 import { OrderBlockCard } from "@/components/baskets/order-block-card";
 import { ResponsivePositionTable } from "@/components/baskets/responsive-position-table";
@@ -8,7 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
-export function BasketDetailView({ basket }: { basket: BasketData }) {
+export function BasketDetailView({
+  basket,
+  trades = [],
+}: {
+  basket: BasketData;
+  trades?: TradeRecord[];
+}) {
   // The archive reads best when the week's verdict sits next to its
   // reasoning. Only spoken once every leg has actually settled.
   const allPositions = [...basket.callPositions, ...basket.putPositions];
@@ -199,6 +205,8 @@ export function BasketDetailView({ basket }: { basket: BasketData }) {
         </section>
       ) : null}
 
+      {trades.length > 0 ? <TradesLedger trades={trades} basket={basket} /> : null}
+
       <section className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -232,5 +240,70 @@ export function BasketDetailView({ basket }: { basket: BasketData }) {
         </Card>
       </section>
     </div>
+  );
+}
+
+function TradesLedger({ trades, basket }: { trades: TradeRecord[]; basket: BasketData }) {
+  const netPremium = trades.reduce((sum, trade) => {
+    const gross = trade.price * 100 * trade.quantity;
+    return sum + (trade.action === "sell-to-open" ? gross : -gross) - trade.fees;
+  }, 0);
+  const modeledCredit = basket.portfolioSummary.totalEstimatedCredit;
+
+  return (
+    <section className="space-y-4">
+      <div>
+        <p className="eyebrow text-[10px] text-muted-foreground">Execution</p>
+        <h2 className="mt-2 text-2xl font-semibold">Trades this week</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Actual fills logged against this basket&apos;s recommendations. Net premium{" "}
+          <span className="font-medium text-foreground">{formatCurrency(Math.round(netPremium))}</span>
+          {modeledCredit > 0 ? (
+            <> vs {formatCurrency(modeledCredit)} modeled at entry.</>
+          ) : null}
+        </p>
+      </div>
+      <Card>
+        <CardContent className="overflow-x-auto pt-6">
+          <table className="w-full min-w-[720px] text-sm">
+            <thead>
+              <tr className="border-b border-border/70 text-left text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                <th className="pb-3 pr-4 font-medium">Executed</th>
+                <th className="pb-3 pr-4 font-medium">Contract</th>
+                <th className="pb-3 pr-4 font-medium">Action</th>
+                <th className="pb-3 pr-4 text-right font-medium">Qty</th>
+                <th className="pb-3 pr-4 text-right font-medium">Price</th>
+                <th className="pb-3 pr-4 text-right font-medium">Fees</th>
+                <th className="pb-3 text-right font-medium">Net</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trades.map((trade) => {
+                const gross = trade.price * 100 * trade.quantity;
+                const net = (trade.action === "sell-to-open" ? gross : -gross) - trade.fees;
+                return (
+                  <tr key={trade.id} className="border-b border-border/40 last:border-0">
+                    <td className="py-3 pr-4 whitespace-nowrap">{formatDateTimeLabel(trade.executedAt)}</td>
+                    <td className="py-3 pr-4 font-medium whitespace-nowrap">
+                      {trade.ticker} {trade.side === "call" ? "C" : "P"} ${trade.strike} · {formatDateLabel(trade.expiry)}
+                    </td>
+                    <td className="py-3 pr-4 whitespace-nowrap">
+                      {trade.action === "sell-to-open" ? "Sell to open" : "Buy to close"}
+                      {trade.broker ? <span className="text-muted-foreground"> · {trade.broker}</span> : null}
+                    </td>
+                    <td className="py-3 pr-4 text-right">{trade.quantity}</td>
+                    <td className="py-3 pr-4 text-right">${trade.price.toFixed(2)}</td>
+                    <td className="py-3 pr-4 text-right">${trade.fees.toFixed(2)}</td>
+                    <td className={`py-3 text-right font-medium ${net >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+                      {formatCurrency(Math.round(net))}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+    </section>
   );
 }

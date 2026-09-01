@@ -68,6 +68,14 @@ export const userProfiles = pgTable("user_profiles", {
   status: userStatusEnum("status").default("active").notNull(),
   acknowledgedRiskAt: timestamp("acknowledged_risk_at", { withTimezone: true }),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+  // Multi-user tracking: each member commits their own capital and follows
+  // the same weekly baskets. Returns compound the system's weekly
+  // return-on-cash over this base from the tracking start date forward.
+  startingCapital: numeric("starting_capital", { precision: 14, scale: 2 }),
+  trackingStartDate: date("tracking_start_date"),
+  // Per-user notification toggles (briefing emails). The iMessage/SMS
+  // bridge stays account-wide via app_settings.
+  notificationPrefs: jsonb("notification_prefs").$type<Record<string, boolean>>(),
   ...timestamps,
 });
 

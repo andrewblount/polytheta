@@ -4,6 +4,9 @@ import Foundation
 
 struct SummaryResponse: Codable {
     let basket: MobileBasket?
+    // Present on /api/mobile/baskets/[slug]: the executed fills logged
+    // against this basket's recommendations. Absent on /summary.
+    let trades: [Trade]?
 }
 
 struct MobileBasket: Codable {

@@ -1,7 +1,7 @@
-import { desc, gte } from "drizzle-orm";
+import { desc, eq, gte } from "drizzle-orm";
 
 import { db } from "@/db";
-import { schwabSnapshots, syncLogs, trades } from "@/db/schema";
+import { schwabSnapshots, syncLogs, trades, userProfiles } from "@/db/schema";
 import { env } from "@/lib/env";
 
 import { getCurrentBasket } from "@/server/repos/baskets";
@@ -9,6 +9,7 @@ import { getPerformanceReport } from "@/server/repos/performance";
 
 import { alertEmailShell, kvRowsHtml } from "./email";
 import { getNotificationSettings } from "./settings";
+import { getMemberPerformance } from "./member-performance";
 import { sendTwilioMessage } from "./twilio";
 
 // Daily briefings: a morning read on the basket right after the open, and an
@@ -120,20 +121,27 @@ export async function composeBriefing(slot: "open" | "close") {
       : "") +
     `<p style="margin:14px 0 0;font-size:11px;color:#98a2b3">Modeled figures assume recommended entries held to expiry. Verify actuals at the broker.</p>`;
 
-  const html = alertEmailShell({
-    banner: slot === "open" ? "OPEN BRIEFING" : "CLOSE BRIEFING",
-    bannerColor: slot === "open" ? "#175cd3" : "#0b1524",
-    title,
-    bodyHtml,
-    footerHtml: `<a href="${env.appUrl}/app/dashboard" style="color:#2f6fed">Open dashboard →</a>`,
-  });
+  const buildHtml = (personalRows?: Array<[string, string]>) =>
+    alertEmailShell({
+      banner: slot === "open" ? "OPEN BRIEFING" : "CLOSE BRIEFING",
+      bannerColor: slot === "open" ? "#175cd3" : "#0b1524",
+      title,
+      bodyHtml:
+        (personalRows && personalRows.length
+          ? `<h2 style="margin:0 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:#667085">Your account</h2>` +
+            kvRowsHtml(personalRows) +
+            `<div style="height:14px"></div>`
+          : "") + bodyHtml,
+      footerHtml: `<a href="${env.appUrl}/app/dashboard" style="color:#2f6fed">Open dashboard →</a>`,
+    });
+  const html = buildHtml();
 
   const compact =
     `${slot === "open" ? "☀️" : "🌙"} ${slot === "open" ? "Open" : "Close"}: day ${fmtMoney(dayPnl)} | wk ${fmtMoney(weekPnl)} | total ${fmtMoney(totalReturn)}` +
     (schwab?.liquidationValue != null ? ` | Schwab $${Math.round(schwab.liquidationValue).toLocaleString()}` : "") +
     (positions.length ? ` | ${positions.map((p) => p.ticker).join(" ")}` : " | no positions");
 
-  return { title, html, compact, dayPnl, weekPnl, totalReturn };
+  return { title, html, buildHtml, compact, dayPnl, weekPnl, totalReturn };
 }
 
 export async function sendBriefing(slot: "open" | "close") {
@@ -163,6 +171,73 @@ export async function sendBriefing(slot: "open" | "close") {
       }),
     });
     results.email = response.ok;
+  }
+
+  // Fan out to members who opted into briefing emails in their own settings,
+  // each with their tracked account line up top. Andrew's env address is
+  // handled above, so it's excluded here to avoid doubles.
+  if (env.sendGridApiKey && env.sendGridFromEmail && db) {
+    const prefKey = slot === "open" ? "briefing_open_email" : "briefing_close_email";
+    const memberRows = await db
+      .select()
+      .from(userProfiles)
+      .where(eq(userProfiles.status, "active"));
+    const recipients = memberRows.filter(
+      (member) =>
+        member.notificationPrefs?.[prefKey] === true &&
+        member.email &&
+        member.email.toLowerCase() !== env.accessRequestNotifyEmail.toLowerCase(),
+    );
+    let memberSends = 0;
+    for (const member of recipients) {
+      try {
+        const mine = await getMemberPerformance({
+          startingCapital:
+            member.startingCapital != null ? Number(member.startingCapital) : null,
+          trackingStartDate: member.trackingStartDate ?? null,
+        });
+        const personalRows: Array<[string, string]> = mine
+          ? [
+              ["Your tracked value", `$${Math.round(mine.currentValue).toLocaleString()}`],
+              [
+                "Your total return",
+                `${mine.totalReturn >= 0 ? "+" : "-"}$${Math.abs(Math.round(mine.totalReturn)).toLocaleString()} (${mine.totalReturnPct >= 0 ? "+" : ""}${mine.totalReturnPct}%)`,
+              ],
+              ...(mine.liveWeekPnl != null
+                ? ([[
+                    "Your week so far (modeled)",
+                    `${mine.liveWeekPnl >= 0 ? "+" : "-"}$${Math.abs(mine.liveWeekPnl).toLocaleString()}`,
+                  ]] as Array<[string, string]>)
+                : []),
+            ]
+          : [];
+        const compactLine = mine
+          ? `${briefing.compact} | you $${Math.round(mine.currentValue).toLocaleString()}`
+          : briefing.compact;
+        const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${env.sendGridApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            personalizations: [{ to: [{ email: member.email }], subject: briefing.title }],
+            from: { email: env.sendGridFromEmail },
+            content: [
+              { type: "text/plain", value: compactLine },
+              { type: "text/html", value: briefing.buildHtml(personalRows) },
+            ],
+          }),
+        });
+        if (response.ok) memberSends += 1;
+      } catch (error) {
+        console.error(
+          `member briefing email failed for ${member.email}:`,
+          error instanceof Error ? error.message : error,
+        );
+      }
+    }
+    if (recipients.length > 0) results.memberEmails = `${memberSends}/${recipients.length}`;
   }
 
   if (prefs.imessage && db) {

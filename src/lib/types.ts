@@ -180,6 +180,27 @@ export interface AppUserProfile {
   acknowledgedRiskAt?: string | null;
   lastLoginAt?: string | null;
   createdAt: string;
+  startingCapital?: number | null;
+  trackingStartDate?: string | null;
+  notificationPrefs?: Record<string, boolean> | null;
+}
+
+// An executed fill from the trades ledger, joined to a basket through the
+// recommendation it executed.
+export interface TradeRecord {
+  id: string;
+  positionId: string | null;
+  ticker: string;
+  side: "call" | "put";
+  action: "sell-to-open" | "buy-to-close";
+  strike: number;
+  expiry: string;
+  quantity: number;
+  price: number;
+  fees: number;
+  broker: string | null;
+  executedAt: string;
+  notes: string | null;
 }
 
 export interface AdminUserRecord extends AppUserProfile {

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { BasketDetailView } from "@/components/baskets/basket-detail-view";
-import { getBasketBySlug } from "@/server/repos/baskets";
+import { getBasketBySlug, getTradesForBasket } from "@/server/repos/baskets";
 
 export default async function BasketDetailPage({
   params,
@@ -13,5 +13,6 @@ export default async function BasketDetailPage({
   if (!basket) {
     notFound();
   }
-  return <BasketDetailView basket={basket} />;
+  const trades = await getTradesForBasket(basket.id);
+  return <BasketDetailView basket={basket} trades={trades} />;
 }

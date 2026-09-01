@@ -12,6 +12,7 @@ import {
   positionAlerts,
   positions,
   syncJobs,
+  trades,
   userProfiles,
 } from "@/db/schema";
 import {
@@ -29,6 +30,7 @@ import type {
   DashboardData,
   PositionDetailData,
   SyncJobRecord,
+  TradeRecord,
 } from "@/lib/types";
 import { uniqueBy } from "@/lib/utils";
 
@@ -338,6 +340,48 @@ export async function listAdminUsers(): Promise<AdminUserRecord[]> {
     lastLoginAt: row.lastLoginAt ? asIsoString(row.lastLoginAt) : null,
     identityConfirmedAt: null,
     createdAt: asIsoString(row.createdAt),
+    startingCapital: row.startingCapital != null ? Number(row.startingCapital) : null,
+    trackingStartDate: row.trackingStartDate ?? null,
+    notificationPrefs: row.notificationPrefs ?? null,
+  }));
+}
+
+// Executed fills for one basket's recommendations — the archive drill-down
+// shows what was actually traded next to what was recommended.
+export async function getTradesForBasket(basketId: string): Promise<TradeRecord[]> {
+  if (!db) {
+    return [];
+  }
+
+  const positionRows = await db
+    .select({ id: positions.id })
+    .from(positions)
+    .where(eq(positions.basketId, basketId));
+  const positionIds = positionRows.map((row) => row.id);
+  if (positionIds.length === 0) {
+    return [];
+  }
+
+  const rows = await db
+    .select()
+    .from(trades)
+    .where(inArray(trades.positionId, positionIds))
+    .orderBy(trades.executedAt);
+
+  return rows.map((row) => ({
+    id: row.id,
+    positionId: row.positionId,
+    ticker: row.ticker,
+    side: row.side,
+    action: row.action,
+    strike: asNumber(row.strike),
+    expiry: typeof row.expiry === "string" ? row.expiry : asIsoString(row.expiry).slice(0, 10),
+    quantity: row.quantity,
+    price: asNumber(row.price),
+    fees: asNumber(row.fees),
+    broker: row.broker ?? null,
+    executedAt: asIsoString(row.executedAt),
+    notes: row.notes ?? null,
   }));
 }
 

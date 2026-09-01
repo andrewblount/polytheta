@@ -1,7 +1,7 @@
-import { getBasketBySlug } from "@/server/repos/baskets";
+import { getBasketBySlug, getTradesForBasket } from "@/server/repos/baskets";
 
 import { mobileAuthOk, unauthorized } from "../../auth";
-import { leanBasket } from "../../serialize";
+import { leanBasket, leanTrade } from "../../serialize";
 
 export const dynamic = "force-dynamic";
 
@@ -16,5 +16,6 @@ export async function GET(
   const { slug } = await params;
   const basket = await getBasketBySlug(slug);
   if (!basket) return Response.json({ error: "not found" }, { status: 404 });
-  return Response.json({ basket: leanBasket(basket) });
+  const trades = await getTradesForBasket(basket.id);
+  return Response.json({ basket: leanBasket(basket), trades: trades.map(leanTrade) });
 }

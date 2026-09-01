@@ -10,6 +10,7 @@ struct ArchiveBasketView: View {
     let weekOf: String
 
     @State private var basket: MobileBasket?
+    @State private var trades: [Trade] = []
     @State private var error: String?
     @State private var loading = false
 
@@ -56,6 +57,41 @@ struct ArchiveBasketView: View {
 
                 positionSection("Calls", b.calls)
                 positionSection("Puts", b.puts)
+
+                if !trades.isEmpty {
+                    Section {
+                        ForEach(trades) { t in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text(t.ticker).font(.subheadline.weight(.semibold))
+                                    Text("\(t.side == "call" ? "C" : "P") $\(t.strike, specifier: "%.2f")")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text(money(t.cashFlow))
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(t.cashFlow >= 0 ? .green : .red)
+                                }
+                                HStack {
+                                    Text("\(t.action == "sell-to-open" ? "STO" : "BTC") \(t.quantity)x @ \(t.price, specifier: "%.2f")\(t.broker.map { " · \($0)" } ?? "")")
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text(String(t.executedAt.prefix(10)))
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        LabeledContent("Net premium") {
+                            let net = trades.reduce(0) { $0 + $1.cashFlow }
+                            Text(money(net))
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(net >= 0 ? .green : .red)
+                        }
+                    } header: {
+                        Text("Trades this week")
+                    } footer: {
+                        Text("Actual fills logged against this basket's recommendations.")
+                    }
+                }
 
                 Section("Market at entry") {
                     LabeledContent("VIX", value: String(format: "%.2f", b.market.vix))
@@ -111,7 +147,9 @@ struct ArchiveBasketView: View {
         loading = true
         defer { loading = false }
         do {
-            basket = try await api.basket(slug: slug)
+            let response = try await api.basketWithTrades(slug: slug)
+            basket = response.basket
+            trades = response.trades ?? []
             error = nil
         } catch {
             self.error = error.localizedDescription

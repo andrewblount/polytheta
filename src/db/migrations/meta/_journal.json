@@ -8,6 +8,13 @@
       "when": 1774992869337,
       "tag": "0000_chubby_mockingbird",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788280925717,
+      "tag": "0001_graceful_giant_girl",
+      "breakpoints": true
     }
   ]
 }

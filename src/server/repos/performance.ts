@@ -30,6 +30,7 @@ export interface WeeklyPerformance {
   losses: number;
   pnl: number;
   margin: number;
+  cashNeeded: number;
   credit: number;
   romPct: number | null;
   worstLeg: SettledLeg | null;
@@ -142,6 +143,7 @@ export async function getPerformanceReport(): Promise<PerformanceReport | null> 
       losses,
       pnl: Math.round(pnl),
       margin,
+      cashNeeded: basket.cashNeeded,
       credit,
       romPct: margin > 0 ? +((pnl / margin) * 100).toFixed(2) : null,
       worstLeg,

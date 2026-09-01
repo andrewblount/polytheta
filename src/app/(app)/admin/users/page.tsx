@@ -97,6 +97,16 @@ export default async function AdminUsersPage({
                     {user.identityConfirmedAt ? formatDateTimeLabel(user.identityConfirmedAt) : "Confirmed externally"}
                   </p>
                 </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                    Tracking base
+                  </p>
+                  <p className="mt-2 text-sm">
+                    {user.startingCapital != null
+                      ? `$${Math.round(user.startingCapital).toLocaleString()}${user.trackingStartDate ? ` since ${user.trackingStartDate}` : ""}`
+                      : "Not set"}
+                  </p>
+                </div>
               </div>
               <form action={updateUserAccessAction} className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_180px_180px_1fr_auto]">
                 <input type="hidden" name="userId" value={user.id} />
@@ -119,6 +129,19 @@ export default async function AdminUsersPage({
                 <div>
                   <Label>New password</Label>
                   <Input name="password" type="password" placeholder="Leave blank to keep current" />
+                </div>
+                <div>
+                  <Label>Starting capital (USD)</Label>
+                  <Input
+                    name="startingCapital"
+                    inputMode="decimal"
+                    placeholder="Not set"
+                    defaultValue={user.startingCapital != null ? String(user.startingCapital) : ""}
+                  />
+                </div>
+                <div>
+                  <Label>Tracking start</Label>
+                  <Input name="trackingStartDate" type="date" defaultValue={user.trackingStartDate ?? ""} />
                 </div>
                 <div className="flex items-end">
                   <Button type="submit">Save</Button>

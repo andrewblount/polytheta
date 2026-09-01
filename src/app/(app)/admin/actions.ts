@@ -35,8 +35,11 @@ export async function updateUserAccessAction(formData: FormData) {
       String(formData.get("password") ?? "").trim().length > 0
         ? String(formData.get("password"))
         : undefined,
+    startingCapital: String(formData.get("startingCapital") ?? ""),
+    trackingStartDate: String(formData.get("trackingStartDate") ?? ""),
   });
   revalidatePath("/admin/users");
+  revalidatePath("/app/dashboard");
 }
 
 export async function createUserAction(
