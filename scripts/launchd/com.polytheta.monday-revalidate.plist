@@ -21,11 +21,11 @@
   <key>ProgramArguments</key>
   <array>
     <string>/opt/homebrew/bin/node</string>
-    <string>/Users/andrewblount/Local/development/polytheta/scripts/verify_basket_live.mjs</string>
+    <string>/Users/andrewblount/Dropbox/development/polytheta/scripts/verify_basket_live.mjs</string>
   </array>
 
   <key>WorkingDirectory</key>
-  <string>/Users/andrewblount/Local/development/polytheta</string>
+  <string>/Users/andrewblount/Dropbox/development/polytheta</string>
 
   <key>EnvironmentVariables</key>
   <dict>
@@ -35,9 +35,9 @@
 
   <key>RunAtLoad</key><false/>
   <key>StandardOutPath</key>
-  <string>/Users/andrewblount/Local/development/polytheta/scripts/launchd/monday-revalidate.out.log</string>
+  <string>/Users/andrewblount/Dropbox/development/polytheta/scripts/launchd/monday-revalidate.out.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/andrewblount/Local/development/polytheta/scripts/launchd/monday-revalidate.err.log</string>
+  <string>/Users/andrewblount/Dropbox/development/polytheta/scripts/launchd/monday-revalidate.err.log</string>
   <key>WakeSystem</key><true/>
 </dict>
 </plist>

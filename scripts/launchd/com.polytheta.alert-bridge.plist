@@ -28,8 +28,8 @@
 
   <key>RunAtLoad</key><false/>
   <key>StandardOutPath</key>
-  <string>/Users/andrewblount/Local/development/polytheta/scripts/launchd/alert-bridge.out.log</string>
+  <string>/Users/andrewblount/Dropbox/development/polytheta/scripts/launchd/alert-bridge.out.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/andrewblount/Local/development/polytheta/scripts/launchd/alert-bridge.err.log</string>
+  <string>/Users/andrewblount/Dropbox/development/polytheta/scripts/launchd/alert-bridge.err.log</string>
 </dict>
 </plist>

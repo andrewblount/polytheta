@@ -34,11 +34,11 @@
   <key>ProgramArguments</key>
   <array>
     <string>/opt/homebrew/bin/node</string>
-    <string>/Users/andrewblount/Local/development/polytheta/scripts/run_weekly_basket.mjs</string>
+    <string>/Users/andrewblount/Dropbox/development/polytheta/scripts/run_weekly_basket.mjs</string>
   </array>
 
   <key>WorkingDirectory</key>
-  <string>/Users/andrewblount/Local/development/polytheta</string>
+  <string>/Users/andrewblount/Dropbox/development/polytheta</string>
 
   <key>EnvironmentVariables</key>
   <dict>
@@ -51,9 +51,9 @@
   <!-- Logs stream to the basket data dir per run; these are the launchd-level
        stdout/stderr for the process. -->
   <key>StandardOutPath</key>
-  <string>/Users/andrewblount/Local/development/polytheta/scripts/launchd/weekly-basket.out.log</string>
+  <string>/Users/andrewblount/Dropbox/development/polytheta/scripts/launchd/weekly-basket.out.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/andrewblount/Local/development/polytheta/scripts/launchd/weekly-basket.err.log</string>
+  <string>/Users/andrewblount/Dropbox/development/polytheta/scripts/launchd/weekly-basket.err.log</string>
 
   <!-- If launchd is asked to run this while the Mac is asleep, wake so the
        job actually fires. -->
