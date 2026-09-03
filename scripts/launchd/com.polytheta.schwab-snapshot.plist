@@ -24,11 +24,11 @@
   <key>ProgramArguments</key>
   <array>
     <string>/opt/homebrew/bin/node</string>
-    <string>/Users/andrewblount/Local/development/polytheta/scripts/schwab_snapshot.mjs</string>
+    <string>/Users/andrewblount/Dropbox/development/polytheta/scripts/schwab_snapshot.mjs</string>
   </array>
 
   <key>WorkingDirectory</key>
-  <string>/Users/andrewblount/Local/development/polytheta</string>
+  <string>/Users/andrewblount/Dropbox/development/polytheta</string>
 
   <key>EnvironmentVariables</key>
   <dict>
@@ -38,8 +38,8 @@
 
   <key>RunAtLoad</key><false/>
   <key>StandardOutPath</key>
-  <string>/Users/andrewblount/Local/development/polytheta/scripts/launchd/schwab-snapshot.out.log</string>
+  <string>/Users/andrewblount/Dropbox/development/polytheta/scripts/launchd/schwab-snapshot.out.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/andrewblount/Local/development/polytheta/scripts/launchd/schwab-snapshot.err.log</string>
+  <string>/Users/andrewblount/Dropbox/development/polytheta/scripts/launchd/schwab-snapshot.err.log</string>
 </dict>
 </plist>
