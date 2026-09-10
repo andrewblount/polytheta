@@ -229,6 +229,22 @@ export async function getCurrentBasket(now = new Date()) {
   return !db && env.useDemoData ? demoBaskets[0] : null;
 }
 
+export async function getLatestPublishedBasketSummary(now = new Date()) {
+  const week = currentWeek(now);
+  if (db) {
+    const [latest] = await db.select({ slug: baskets.slug, title: baskets.title, weekOf: baskets.weekOf })
+      .from(baskets)
+      .where(and(eq(baskets.status, "published"), lt(baskets.weekOf, week)))
+      .orderBy(desc(baskets.weekOf)).limit(1);
+    return latest ?? null;
+  }
+  const latest = env.useDemoData
+    ? demoBaskets.filter(basket => basket.status === "published" && basket.weekOf < week)
+      .sort((a, b) => b.weekOf.localeCompare(a.weekOf))[0]
+    : null;
+  return latest ? { slug: latest.slug, title: latest.title, weekOf: latest.weekOf } : null;
+}
+
 export async function listBaskets() {
   if (db) {
     const rows = await db

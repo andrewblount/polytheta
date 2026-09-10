@@ -37,7 +37,7 @@ final class APIClient: ObservableObject {
         guard isConfigured, let url = URL(string: baseURL + path) else {
             throw APIError.notConfigured
         }
-        var request = URLRequest(url: url)
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 20
         let (data, response) = try await URLSession.shared.data(for: request)

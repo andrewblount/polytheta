@@ -2,7 +2,9 @@ import SwiftUI
 
 struct DashboardView: View {
     @EnvironmentObject var api: APIClient
+    @Environment(\.scenePhase) private var scenePhase
     @State private var basket: MobileBasket?
+    @State private var availability: BasketAvailability?
     @State private var error: String?
     @State private var loading = false
 
@@ -47,7 +49,7 @@ struct DashboardView: View {
                                 Label("No tradable picks in this basket", systemImage: "exclamationmark.octagon.fill")
                                     .font(.subheadline.weight(.bold))
                                     .foregroundStyle(.red)
-                                Text("The Monday build published no positions — either the pipeline failed or nothing passed the screens. Check the Alerts tab and your email before trading anything.")
+                                Text("The published basket has no qualifying positions. Check the Alerts tab for details.")
                                     .font(.footnote)
                                     .foregroundStyle(.secondary)
                             }
@@ -66,14 +68,52 @@ struct DashboardView: View {
                         LabeledContent("P/C", value: String(format: "%.2f", b.market.putCallRatio))
                     }
                 } else if !loading && error == nil {
-                    Text(api.isConfigured ? "No published basket." : "Add your API token in Settings to connect.")
-                        .foregroundStyle(.secondary)
+                    if api.isConfigured {
+                        Section {
+                            Text(availability?.title ?? "No basket published for the current week")
+                                .font(.headline)
+                            Text(availability?.message ?? "Pull down to refresh. Earlier weeks are available in the Archive tab.")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        if let next = availability?.nextScheduled {
+                            Section(next.title) {
+                                scheduleRow("Research starts", next.preparationLabel)
+                                scheduleRow("Final refresh starts", next.finalRefreshLabel)
+                                scheduleRow("Entry window", next.entryLabel)
+                                Text(next.note).font(.footnote).foregroundStyle(.secondary)
+                            }
+                        }
+                        if let latest = availability?.latestPublished {
+                            Section("Last published · Archive") {
+                                NavigationLink {
+                                    ArchiveBasketView(slug: latest.slug, weekOf: latest.weekOf)
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Week of \(latest.weekOf)").font(.headline)
+                                        Text("Historical basket").font(.caption).foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Text("Add your API token in Settings to connect.").foregroundStyle(.secondary)
+                    }
                 }
             }
             .navigationTitle("Current Basket")
             .refreshable { await load() }
             .task { await load() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { Task { await load() } }
+            }
             .overlay { if loading && basket == nil { ProgressView() } }
+        }
+    }
+
+    func scheduleRow(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.caption).foregroundStyle(.secondary)
+            Text(value).font(.subheadline)
         }
     }
 
@@ -133,11 +173,13 @@ struct DashboardView: View {
     }
 
     func load() async {
-        guard api.isConfigured else { return }
+        guard api.isConfigured, !loading else { return }
         loading = true
         defer { loading = false }
         do {
-            basket = try await api.summary().basket
+            let summary = try await api.summary()
+            basket = summary.basket
+            availability = summary.availability
             error = nil
         } catch {
             self.error = error.localizedDescription

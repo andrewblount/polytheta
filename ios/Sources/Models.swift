@@ -4,9 +4,34 @@ import Foundation
 
 struct SummaryResponse: Codable {
     let basket: MobileBasket?
+    let availability: BasketAvailability?
     // Present on /api/mobile/baskets/[slug]: the executed fills logged
     // against this basket's recommendations. Absent on /summary.
     let trades: [Trade]?
+}
+
+struct BasketAvailability: Codable {
+    let weekOf: String
+    let state: String
+    let title: String
+    let message: String
+    let nextScheduled: ScheduledBasket?
+    let latestPublished: PublishedBasketSummary?
+}
+
+struct ScheduledBasket: Codable {
+    let weekOf: String
+    let title: String
+    let preparationLabel: String
+    let finalRefreshLabel: String
+    let entryLabel: String
+    let note: String
+}
+
+struct PublishedBasketSummary: Codable {
+    let slug: String
+    let title: String
+    let weekOf: String
 }
 
 struct MobileBasket: Codable {
