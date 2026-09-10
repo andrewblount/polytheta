@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.polytheta.ib-execution</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/opt/homebrew/bin/node</string>
+		<string>/Users/andrewblount/Library/CloudStorage/Dropbox/development/polytheta/scripts/broker/worker.mjs</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>/Users/andrewblount/Library/CloudStorage/Dropbox/development/polytheta</string>
+	<key>StartInterval</key>
+	<integer>60</integer>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>StandardOutPath</key>
+	<string>/Users/andrewblount/Library/CloudStorage/Dropbox/development/polytheta/scripts/launchd/ib-execution.out.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/andrewblount/Library/CloudStorage/Dropbox/development/polytheta/scripts/launchd/ib-execution.err.log</string>
+</dict>
+</plist>

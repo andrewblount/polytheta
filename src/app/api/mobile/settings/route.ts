@@ -1,3 +1,4 @@
+import { getBrokerSettings, saveBrokerSettings, getBrokerStatus } from "@/server/services/broker-settings";
 import {
   DEFAULT_NOTIFICATIONS,
   NOTIFICATION_CATEGORIES,
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   if (!mobileAuthOk(request)) return unauthorized();
-  return Response.json({ notifications: await getNotificationSettings() });
+  return Response.json({ notifications: await getNotificationSettings(), broker: await getBrokerSettings(), brokerStatus: await getBrokerStatus() });
 }
 
 // Body: { notifications: { briefing_close: { email: false }, ... } } — partial
@@ -20,11 +21,16 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!mobileAuthOk(request)) return unauthorized();
 
-  let body: { notifications?: Record<string, Record<string, unknown>> };
+  let body: { broker?: Record<string, unknown>; notifications?: Record<string, Record<string, unknown>> };
   try {
     body = await request.json();
   } catch {
     return Response.json({ error: "invalid JSON" }, { status: 400 });
+  }
+  let broker;
+  if (body.broker) {
+    try { broker = await saveBrokerSettings({ ...await getBrokerSettings(), ...body.broker }); }
+    catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Invalid trading settings" }, { status: 400 }); }
   }
   const incoming = body.notifications ?? {};
   const current = await getNotificationSettings();
@@ -37,5 +43,5 @@ export async function POST(request: Request) {
     }
   }
   await saveNotificationSettings(merged);
-  return Response.json({ notifications: merged });
+  return Response.json({ notifications: merged, broker: broker ?? await getBrokerSettings() });
 }

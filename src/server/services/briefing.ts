@@ -1,6 +1,7 @@
-import { desc, eq, gte } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
+import { easternTime, marketSession, weeklyExpiry } from "../../../shared/market-calendar.mjs";
 import { schwabSnapshots, syncLogs, trades, userProfiles } from "@/db/schema";
 import { env } from "@/lib/env";
 
@@ -49,7 +50,7 @@ export async function composeBriefing(slot: "open" | "close") {
   const schwab = await latestSchwab();
 
   const positions = basket ? [...basket.callPositions, ...basket.putPositions] : [];
-  const today = new Date().toISOString().slice(0, 10);
+  const today = easternTime().date;
 
   let dayPnl = 0;
   let weekPnl = 0;
@@ -59,10 +60,10 @@ export async function composeBriefing(slot: "open" | "close") {
       (a, b) => new Date(a.observedAt).getTime() - new Date(b.observedAt).getTime(),
     );
     const latest = history[history.length - 1] ?? p.latestPerformance;
-    const prevSession = [...history].reverse().find((s) => s.observedAt.slice(0, 10) < today);
+    const prevSession = [...history].reverse().find((s) => easternTime(new Date(s.observedAt)).date < today);
     const latestPnl = latest?.pnlAmount ?? 0;
     const prevPnl = prevSession?.pnlAmount ?? 0;
-    const d = latest && latest.observedAt.slice(0, 10) === today ? latestPnl - prevPnl : 0;
+    const d = latest && easternTime(new Date(latest.observedAt)).date === today ? latestPnl - prevPnl : 0;
     dayPnl += d;
     weekPnl += latestPnl;
     rows.push([
@@ -72,7 +73,9 @@ export async function composeBriefing(slot: "open" | "close") {
   }
 
   const settledTotal = report?.stats.totalPnl ?? 0;
-  const totalReturn = settledTotal + weekPnl;
+  // The report already includes settled legs in the current week.
+  const currentSettled = report?.weeks.find(w => w.weekOf === basket?.weekOf)?.pnl ?? 0;
+  const totalReturn = settledTotal + weekPnl - currentSettled;
 
   // Actuals from the trades ledger.
   let actualNetPremium = 0;
@@ -89,7 +92,7 @@ export async function composeBriefing(slot: "open" | "close") {
     }
   }
 
-  const isFriday = new Date().getUTCDay() === 5;
+  const isFriday = today === weeklyExpiry(today);
   const title =
     slot === "open"
       ? `Open briefing — ${today}`
@@ -115,7 +118,7 @@ export async function composeBriefing(slot: "open" | "close") {
     (positions.length
       ? `<h2 style="margin:16px 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:#667085">Positions${basket ? ` — ${basket.title}` : ""}</h2>` +
         kvRowsHtml(rows)
-      : `<p style="margin:14px 0 0;font-size:14px;color:#b42318;font-weight:600">No positions in the current basket.</p>`) +
+      : `<p style="margin:14px 0 0;font-size:14px;color:#b42318;font-weight:600">This week’s basket is not available. No previous week is being presented as current.</p>`) +
     (slot === "close" && isFriday
       ? `<p style="margin:14px 0 0;font-size:13px;background:#eff8ff;border:1px solid #b2ddff;border-radius:8px;padding:10px 12px">Expiry day: positions settle after today's close — the weekend settlement pass records final results, and Monday's briefing carries the completed week.</p>`
       : "") +
@@ -145,6 +148,7 @@ export async function composeBriefing(slot: "open" | "close") {
 }
 
 export async function sendBriefing(slot: "open" | "close") {
+  if (!marketSession(easternTime().date).open) return { sent: false, reason: "market-holiday-or-weekend" };
   const settings = await getNotificationSettings();
   const prefs = settings[slot === "open" ? "briefing_open" : "briefing_close"] ?? {};
   if (!prefs.email && !prefs.imessage && !prefs.sms && !prefs.whatsapp) {

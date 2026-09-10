@@ -149,7 +149,7 @@ export interface BasketData {
 }
 
 export interface DashboardData {
-  currentBasket: BasketData;
+  currentBasket: BasketData | null;
   livePositions: PositionData[];
   warningPositions: PositionData[];
   latestRefreshAt: string;

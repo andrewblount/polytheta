@@ -10,7 +10,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { neon } from '@neondatabase/serverless';
+import postgres from 'postgres';
 
 const DISCLAIMER =
   'I am not a financial advisor, registered broker, or investment professional. ' +
@@ -168,9 +168,15 @@ const RULES = [
   ],
 ];
 
-export async function importProposal(proposalPath, { publish = false, sql: injected } = {}) {
+export async function importProposal(proposalPath, { publish = false, connectionFactory = () => postgres(requireUrl(), { max: 1 }) } = {}) {
   const proposal = JSON.parse(fs.readFileSync(proposalPath, 'utf8'));
-  const sql = injected ?? neon(requireUrl());
+  const connection = connectionFactory();
+  try {
+    return await connection.begin(tx => importInTransaction(proposal, publish, { query: (text, params) => tx.unsafe(text, params) }));
+  } finally { await connection.end(); }
+}
+
+async function importInTransaction(proposal, publish, sql) {
 
   const basketDate = proposal.basket_date;
   const expiry = proposal.expiry;
@@ -186,7 +192,7 @@ export async function importProposal(proposalPath, { publish = false, sql: injec
 
   const totalMargin = (totals.callMargin ?? 0) + (totals.putMargin ?? 0);
   const totalCredit = (totals.callCredit ?? 0) + (totals.putCredit ?? 0);
-  const cashNeeded = Math.round(totalMargin / 4); // 4x portfolio-margin leverage
+  const cashNeeded = Math.round(proposal.total_backing_capital ?? totalMargin / 4); // 4x portfolio-margin leverage
   const callCount = picks.filter((p) => p.side === 'call').length;
   const putCount = picks.filter((p) => p.side === 'put').length;
 
@@ -225,44 +231,19 @@ export async function importProposal(proposalPath, { publish = false, sql: injec
     .join(' ');
 
   // ---- baskets (upsert on slug) ----
-  const existing = await sql.query('select id from baskets where slug = $1', [slug]);
+  await sql.query('select pg_advisory_xact_lock(hashtext($1))', [slug]);
+  const existing = await sql.query('select id, status from baskets where slug = $1', [slug]);
   const status = publish ? 'published' : 'archived';
   let basketId;
 
   if (existing.length) {
     basketId = existing[0].id;
-    await sql.query(
-      `update baskets set title=$2, week_of=$3, publication_date=$4, status=$5, gsrs=$6,
-         radar_status=$7, cash_needed=$8, disclaimer=$9, quick_summary=$10, commentary=$11,
-         updated_at=now()
-       where id=$1`,
-      [
-        basketId,
-        `Weekly Basket — ${prettyDate} Entry`,
-        basketDate,
-        proposal.generated_ts,
-        status,
-        proposal.gsrs,
-        'Auto — radars not evaluated',
-        cashNeeded,
-        DISCLAIMER,
-        JSON.stringify(quickSummary),
-        commentary,
-      ],
-    );
-    // Replace children so re-imports stay clean.
-    for (const t of [
-      'performance_snapshots',
-      'position_alerts',
-      'thesis_signals',
-      'basket_rules',
-      'broker_order_blocks',
-      'positions',
-      'market_conditions',
-      'basket_metrics',
-    ]) {
-      await sql.query(`delete from ${t} where basket_id = $1`, [basketId]);
-    }
+    // A retry must not delete positions, fills, alert deduplication or performance.
+    const stored = await sql.query('select ticker, side, strike, expiry, contracts, estimated_entry_credit from positions where basket_id=$1 order by sort_order', [basketId]);
+    const identity = rows => JSON.stringify(rows.map(p => [p.ticker, p.side, Number(p.K ?? p.strike), (p.expiry instanceof Date ? p.expiry.toISOString().slice(0,10) : String(p.expiry ?? expiry).slice(0,10)), Number(p.contracts), Number(p.cr ?? p.estimated_entry_credit)]).sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
+    if (identity(stored) !== identity(picks)) throw new Error(`Published basket ${basketDate} is immutable; create an explicit revision instead of overwriting its trade history`);
+    if (existing[0].status !== status) await sql.query('update baskets set status=$2, updated_at=now() where id=$1', [basketId, status]);
+    return { slug, basketId, basketDate, expiry, status, positions: stored.length, totalMargin, totalCredit, unchanged: true };
   } else {
     const ins = await sql.query(
       `insert into baskets

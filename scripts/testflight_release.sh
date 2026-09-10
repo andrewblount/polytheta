@@ -9,17 +9,19 @@
 #   ASC_KEY_ID       e.g. C56YUK7PRG   (filename of ~/.appstoreconnect/private_keys/AuthKey_<ID>.p8)
 #   ASC_ISSUER_ID    UUID from App Store Connect > Users and Access > Integrations
 #
-# Once the build finishes Apple processing (5-15 min), it appears in
-# TestFlight on every device signed into Andrew's Apple ID — iPhone and iPad
-# alike — and updates arrive as normal notifications.
+# After upload, verify Apple processing and assignment to the internal tester
+# group before reporting the build as available in TestFlight.
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT/ios"
 
-# shellcheck disable=SC1091
-[ -f "$REPO_ROOT/.env.local" ] && set -a && . "$REPO_ROOT/.env.local" && set +a
+# Parse dotenv as data: database URLs and other values are not shell code.
+if [ -f "$REPO_ROOT/.env.local" ]; then
+  ASC_KEY_ID="${ASC_KEY_ID:-$(node --env-file="$REPO_ROOT/.env.local" -p 'process.env.ASC_KEY_ID || ""')}"
+  ASC_ISSUER_ID="${ASC_ISSUER_ID:-$(node --env-file="$REPO_ROOT/.env.local" -p 'process.env.ASC_ISSUER_ID || ""')}"
+fi
 
 : "${ASC_KEY_ID:?Set ASC_KEY_ID in .env.local (e.g. C56YUK7PRG)}"
 : "${ASC_ISSUER_ID:?Set ASC_ISSUER_ID in .env.local — App Store Connect > Users and Access > Integrations > App Store Connect API}"
@@ -32,29 +34,32 @@ AUTH=(-authenticationKeyPath "$KEY_PATH"
       -authenticationKeyIssuerID "$ASC_ISSUER_ID")
 
 # Build number must strictly increase for each TestFlight upload.
-CURRENT=$(grep -m1 'CURRENT_PROJECT_VERSION' project.yml | sed 's/[^0-9]//g')
+CURRENT=$(rg -m1 'CURRENT_PROJECT_VERSION' project.yml | sed 's/[^0-9]//g')
 BUILD="${ASC_BUILD:-$((CURRENT + 1))}"
 echo "==> Releasing build $BUILD"
 sed -i '' "s/CURRENT_PROJECT_VERSION: \"[0-9]*\"/CURRENT_PROJECT_VERSION: \"$BUILD\"/g" project.yml
 xcodegen generate >/dev/null
 
-rm -rf build/Polytheta.xcarchive build/export
+RELEASE_DIR="build/releases/$BUILD"
+mkdir -p "$RELEASE_DIR"
 
 echo "==> Archiving"
-xcodebuild -project Polytheta.xcodeproj -scheme Polytheta \
+# Xcode's system rsync launches its peer through PATH; Homebrew rsync uses
+# incompatible flags. Keep Apple tools first for archive and export.
+PATH=/usr/bin:/bin:/usr/sbin:/sbin xcodebuild -project Polytheta.xcodeproj -scheme Polytheta \
   -destination 'generic/platform=iOS' \
-  -archivePath build/Polytheta.xcarchive \
+  -archivePath "$RELEASE_DIR/Polytheta.xcarchive" \
   -allowProvisioningUpdates "${AUTH[@]}" \
   archive
 
 echo "==> Exporting"
-xcodebuild -exportArchive \
-  -archivePath build/Polytheta.xcarchive \
-  -exportPath build/export \
+PATH=/usr/bin:/bin:/usr/sbin:/sbin xcodebuild -exportArchive \
+  -archivePath "$RELEASE_DIR/Polytheta.xcarchive" \
+  -exportPath "$RELEASE_DIR/export" \
   -exportOptionsPlist ExportOptions.plist \
   -allowProvisioningUpdates "${AUTH[@]}"
 
-IPA=$(find build/export -name '*.ipa' | head -1)
+IPA=$(find "$RELEASE_DIR/export" -name '*.ipa' | head -1)
 [ -n "$IPA" ] || { echo "No .ipa produced" >&2; exit 1; }
 
 echo "==> Uploading $IPA"
@@ -62,5 +67,4 @@ xcrun altool --upload-app -f "$IPA" -t ios \
   --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
 
 echo
-echo "Uploaded build $BUILD. Apple processing takes ~5-15 minutes;"
-echo "TestFlight will notify on iPhone and iPad when it's ready to install."
+echo "Uploaded build $BUILD. Verify processing and internal tester assignment in App Store Connect."

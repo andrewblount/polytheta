@@ -90,6 +90,7 @@ struct SettingsView: View {
                         Text(testResult).font(.footnote).foregroundStyle(.secondary)
                     }
                 }
+                BrokerSettingsSection()
                 Section("Notifications") {
                     if let settingsError { ErrorBanner(message: settingsError) }
                     ForEach(categories, id: \.key) { cat in

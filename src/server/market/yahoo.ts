@@ -1,4 +1,5 @@
 import yahooFinance from "yahoo-finance2";
+import { retryRead } from "../../../shared/retry.mjs";
 
 import type {
   HistoricalPrice,
@@ -13,61 +14,22 @@ function normalizeExpiration(input: string | Date) {
   return date.toISOString().slice(0, 10);
 }
 
-const yahooClient = yahooFinance as unknown as {
-  quote: (ticker: string) => Promise<{
-    symbol: string;
-    regularMarketPrice?: number;
-    currency?: string;
-    regularMarketTime?: number;
-  }>;
-  chart: (
-    ticker: string,
-    options: {
-      period1: Date;
-      period2: Date;
-      interval: string;
-      return: "array";
-    },
-  ) => Promise<{
-    quotes: Array<{
-      date: Date;
-      open?: number;
-      high?: number;
-      low?: number;
-      close?: number;
-      volume?: number;
-    }>;
-  }>;
-  options: (
-    ticker: string,
-    options: { date: Date },
-  ) => Promise<{
-    expirationDate: string | Date;
-    calls?: Array<{
-      contractSymbol: string;
-      strike: number;
-      bid?: number | null;
-      ask?: number | null;
-      lastPrice?: number | null;
-      impliedVolatility?: number | null;
-      inTheMoney?: boolean | null;
-    }>;
-    puts?: Array<{
-      contractSymbol: string;
-      strike: number;
-      bid?: number | null;
-      ask?: number | null;
-      lastPrice?: number | null;
-      impliedVolatility?: number | null;
-      inTheMoney?: boolean | null;
-    }>;
-  }>;
-};
+function createYahooClient(signal?: AbortSignal, timeoutMs = 15000) {
+  return new yahooFinance({ validation: { logErrors: false, logOptionsErrors: false }, suppressNotices: ["yahooSurvey"],
+    fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.any([AbortSignal.timeout(timeoutMs), ...(init?.signal ? [init.signal] : []), ...(signal ? [signal] : [])]) }),
+  });
+}
 
 export class YahooMarketDataProvider implements MarketDataProvider {
+  private readonly client: ReturnType<typeof createYahooClient>;
+  private readonly attempts: number;
+  constructor({ signal, requestTimeoutMs = 15000, attempts = 3 }: { signal?: AbortSignal; requestTimeoutMs?: number; attempts?: number } = {}) {
+    this.client = createYahooClient(signal, requestTimeoutMs);
+    this.attempts = attempts;
+  }
   async getQuote(ticker: string): Promise<QuoteResult | null> {
     try {
-      const quote = await yahooClient.quote(ticker);
+      const quote = await retryRead(() => this.client.quote(ticker), { attempts: this.attempts });
       if (!quote.regularMarketPrice) {
         return null;
       }
@@ -77,7 +39,7 @@ export class YahooMarketDataProvider implements MarketDataProvider {
         regularMarketPrice: quote.regularMarketPrice,
         currency: quote.currency,
         marketTime: quote.regularMarketTime
-          ? new Date(quote.regularMarketTime * 1000).toISOString()
+          ? new Date(quote.regularMarketTime).toISOString()
           : undefined,
       };
     } catch {
@@ -91,12 +53,11 @@ export class YahooMarketDataProvider implements MarketDataProvider {
     endDate: string,
   ): Promise<HistoricalPrice[]> {
     try {
-      const chart = await yahooClient.chart(ticker, {
+      const chart = await retryRead(() => this.client.chart(ticker, {
         period1: new Date(startDate),
         period2: new Date(endDate),
         interval: "1d",
-        return: "array",
-      });
+      }), { attempts: this.attempts });
 
       return chart.quotes.map((quote) => ({
         date: quote.date.toISOString(),
@@ -116,15 +77,17 @@ export class YahooMarketDataProvider implements MarketDataProvider {
     expiry: string,
   ): Promise<OptionChainResult | null> {
     try {
-      const result = await yahooClient.options(ticker, {
+      const result = await retryRead(() => this.client.options(ticker, {
         date: new Date(expiry),
-      });
+      }), { attempts: this.attempts });
 
-      const normalizedExpiry = normalizeExpiration(result.expirationDate);
-      const calls = (result.calls ?? []).map((contract) =>
+      const series = result.options.find(option => normalizeExpiration(option.expirationDate) === expiry);
+      if (!series) return null;
+      const normalizedExpiry = normalizeExpiration(series.expirationDate);
+      const calls = (series.calls ?? []).map((contract) =>
         this.normalizeContract(contract, "call", normalizedExpiry),
       );
-      const puts = (result.puts ?? []).map((contract) =>
+      const puts = (series.puts ?? []).map((contract) =>
         this.normalizeContract(contract, "put", normalizedExpiry),
       );
 

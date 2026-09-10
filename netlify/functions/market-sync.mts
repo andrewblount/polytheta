@@ -1,16 +1,10 @@
 import type { Config } from "@netlify/functions";
 
-// Skip syncs when US markets are closed: prices don't move, so hourly
-// re-pricing overnight and on weekends only burns Neon compute and network
-// transfer (the free-plan allowance nearly ran out in July 2026 doing
-// exactly that). Window is generous around the 9:30–16:00 ET session, in
-// UTC to sidestep server timezones (13:00–22:00 UTC covers EDT and EST).
-// Saturday settlement is handled by settle-weekend.mts.
+import { easternTime, marketSession } from "../../shared/market-calendar.mjs";
+
 function marketLikelyOpen(now = new Date()) {
-  const day = now.getUTCDay(); // 0 Sun ... 6 Sat
-  if (day === 0 || day === 6) return false;
-  const hour = now.getUTCHours();
-  return hour >= 13 && hour <= 22;
+  const t = easternTime(now), session = marketSession(t.date);
+  return session.open && t.minutes >= session.openMinute && t.minutes <= session.closeMinute + 30;
 }
 
 const handler = async () => {

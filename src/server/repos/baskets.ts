@@ -1,6 +1,8 @@
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, lt, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
+import { env } from "@/lib/env";
+import { currentWeek, addDays, sessionClose } from "../../../shared/market-calendar.mjs";
 import {
   accessRequests,
   basketMetrics,
@@ -121,7 +123,7 @@ async function buildBasketFromDb(slug: string): Promise<BasketData | null> {
     // which put them after the real Expiry-Resolved row and made every
     // archived week read as pnl zero, state safe. Settled is settled.
     const latest =
-      history.find((snapshot) => snapshot.confidence === "Expiry-Resolved") ??
+      [...history].reverse().find((snapshot) => snapshot.confidence === "Expiry-Resolved" && +new Date(snapshot.observedAt) >= +sessionClose(row.expiry)) ??
       history.at(-1);
     if (!latest) {
       return null;
@@ -204,20 +206,21 @@ async function buildBasketFromDb(slug: string): Promise<BasketData | null> {
 }
 
 export async function getBasketBySlug(slug: string) {
-  return (await buildBasketFromDb(slug)) ?? buildBasketFromDemo(slug);
+  return db ? buildBasketFromDb(slug) : env.useDemoData ? buildBasketFromDemo(slug) : null;
 }
 
-export async function getCurrentBasket() {
+export async function getCurrentBasket(now = new Date()) {
+  const week = currentWeek(now);
   if (db) {
     const current = await db.query.baskets.findFirst({
-      where: eq(baskets.status, "published"),
+      where: and(eq(baskets.status, "published"), gte(baskets.weekOf, week), lt(baskets.weekOf, addDays(week, 7))),
       orderBy: desc(baskets.weekOf),
     });
     if (current) {
       return getBasketBySlug(current.slug);
     }
   }
-  return demoBaskets[0];
+  return !db && env.useDemoData ? demoBaskets[0] : null;
 }
 
 export async function listBaskets() {
@@ -233,13 +236,13 @@ export async function listBaskets() {
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
-  if (!db) {
+  if (!db && env.useDemoData) {
     return demoDashboard();
   }
 
   const currentBasket = await getCurrentBasket();
   if (!currentBasket) {
-    return demoDashboard();
+    return { currentBasket: null, livePositions: [], warningPositions: [], latestRefreshAt: "" };
   }
 
   const livePositions = [...currentBasket.callPositions, ...currentBasket.putPositions];

@@ -46,3 +46,15 @@ export async function updateMyTrackingAction(formData: FormData) {
   revalidatePath("/app/dashboard");
   revalidatePath("/app/performance");
 }
+
+export async function updateBrokerSettingsAction(formData: FormData) {
+  await requireAppUser("admin");
+  const { getBrokerSettings, saveBrokerSettings } = await import("@/server/services/broker-settings");
+  const current = await getBrokerSettings();
+  const updates: Record<string, unknown> = { ...current, connection: String(formData.get("connection")), pauseEntries: formData.get("pauseEntries") === "on" };
+  updates.excludedTickers = String(formData.get("excludedTickers") ?? "");
+  updates.strikeOverrides = JSON.parse(String(formData.get("strikeOverrides") ?? "[]"));
+  for (const key of ["entryCapitalPct", "maxTrades", "callAllocationPct", "putAllocationPct", "reserveLeverageCeiling", "minimumCreditRatio", "entryTimeoutSeconds", "maxExitPremiumMultiple"]) updates[key] = Number(formData.get(key));
+  await saveBrokerSettings(updates);
+  revalidatePath("/app/settings");
+}

@@ -25,12 +25,9 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import YahooFinance from 'yahoo-finance2';
+import { createYahooClient } from './yahoo_client.mjs';
 
-const yf = new YahooFinance({
-  validation: { logErrors: false, logOptionsErrors: false },
-  suppressNotices: ['yahooSurvey'],
-});
+const yf = createYahooClient();
 
 export function loadOverrides(repoRoot) {
   const file = path.join(repoRoot, 'baskets', 'thesis_overrides.json');
@@ -53,7 +50,7 @@ export async function fetchShortInterest(tickers, cacheFile, { concurrency = 5 }
   if (cacheFile && fs.existsSync(cacheFile)) {
     try { cache = JSON.parse(fs.readFileSync(cacheFile, 'utf8')); } catch { cache = {}; }
   }
-  const missing = tickers.filter((t) => !(t in cache));
+  const missing = tickers.filter(t => !cache[t] || cache[t].error || Date.now() - new Date(cache[t].fetched_at).getTime() > 6 * 3600000);
   for (let i = 0; i < missing.length; i += concurrency) {
     const batch = missing.slice(i, i + concurrency);
     const results = await Promise.all(
@@ -99,13 +96,15 @@ export function evaluateSignals({ ticker, side, siCache, overrides, autoRadar = 
     o.glassdoor == null ? null : side === 'call' ? o.glassdoor <= 3.4 : o.glassdoor > 3.5;
   const buybackPass =
     o.buyback == null ? null : side === 'call' ? o.buyback === 0 : o.buyback === 1;
-  const radarVal = (side === 'call' ? o.acq_radar : o.gap_radar) ?? autoRadar;
+  // A manual clean flag must never suppress a newly detected event.
+  const overrideRadar = side === 'call' ? o.acq_radar : o.gap_radar;
+  const radarVal = autoRadar === 'triggered' || overrideRadar === 'triggered' ? 'triggered' : autoRadar;
   const radarPass = radarVal == null ? null : radarVal === 'clean';
 
   // Hard disqualifiers per the spec: active buyback on call side ("automatic
   // skip, no exceptions"), any triggered radar on its side.
   const disqualified =
-    (side === 'call' && o.buyback === -1) || radarVal === 'triggered';
+    (side === 'call' && o.buyback === -1) || radarVal !== 'clean';
 
   const all = [siPass, fanPass, culturePass, buybackPass, radarPass];
   const known = all.filter((v) => v != null).length;

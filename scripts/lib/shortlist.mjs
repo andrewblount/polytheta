@@ -92,7 +92,7 @@ function highVol(r) {
 // the full chain rows for a ticker, re-select the strike that satisfies ALL
 // documented constraints, or return null so the name drops out of the pool.
 // -----------------------------------------------------------------------------
-export function selectCompliantStrike({ side, price, atr, rows }) {
+export function selectCompliantStrike({ side, price, atr, rows, minimumOtmPct = 0 }) {
   if (!Number.isFinite(price) || !Number.isFinite(atr) || atr <= 0) return null;
   const want = side === 'call' ? 'call' : 'put';
   const floor = side === 'call' ? MIN_ATR_BUF_CALL : MIN_ATR_BUF_PUT;
@@ -110,6 +110,8 @@ export function selectCompliantStrike({ side, price, atr, rows }) {
     if (delta < DELTA_MIN - 1e-9 || delta > DELTA_MAX + 1e-9) continue;
     if (mid < MIN_CREDIT) continue;
     const buf = side === 'call' ? (strike - price) / atr : (price - strike) / atr;
+    const otm = (side === 'call' ? strike - price : price - strike) / price * 100;
+    if (otm + 1e-9 < minimumOtmPct) continue;
     if (buf < floor - 1e-9) continue;
     // Within the compliant set prefer the richest credit; the delta ceiling
     // already caps how close to the money we can get.
@@ -122,12 +124,12 @@ export function selectCompliantStrike({ side, price, atr, rows }) {
 
 // Re-point each summary row's best_call_/best_put_ fields at spec-compliant
 // strikes. Names with no compliant strike on a side lose that side entirely.
-export function applyCompliantStrikes(summary, chainsByTicker) {
+export function applyCompliantStrikes(summary, chainsByTicker, minimumFor = () => 0) {
   let callReplaced = 0, putReplaced = 0, callDropped = 0, putDropped = 0;
   for (const r of summary) {
     const rows = chainsByTicker.get(r.ticker) ?? [];
-    const call = selectCompliantStrike({ side: 'call', price: r.price, atr: r.atr14, rows });
-    const put = selectCompliantStrike({ side: 'put', price: r.price, atr: r.atr14, rows });
+    const call = selectCompliantStrike({ side: 'call', price: r.price, atr: r.atr14, rows, minimumOtmPct: minimumFor(r.ticker, 'call') });
+    const put = selectCompliantStrike({ side: 'put', price: r.price, atr: r.atr14, rows, minimumOtmPct: minimumFor(r.ticker, 'put') });
     if (call) {
       if (r.best_call_strike !== call.strike) callReplaced++;
       r.best_call_strike = call.strike; r.best_call_credit = call.mid; r.best_call_iv = call.iv;
@@ -297,10 +299,10 @@ function pickTop({ pool, side, n = 4, already = new Set(), signalsByT = {} }) {
   return { picks, skipped };
 }
 
-export function autoPick({ refined_summary, earningsByT, holdStart, holdEnd, n_per_side = 4, signalsBySide = { call: {}, put: {} }, putsAllowed = true }) {
+export function autoPick({ refined_summary, earningsByT, holdStart, holdEnd, n_per_side = 4, callCount = n_per_side, putCount = n_per_side, signalsBySide = { call: {}, put: {} }, putsAllowed = true }) {
   const noEarnings = (r) => {
     const e = earningsByT[r.ticker];
-    if (!e || !e.next_date) return true;
+    if (!e || e.error || !e.next_date || e.next_date < holdStart) return false;
     return !(e.next_date >= holdStart && e.next_date <= holdEnd);
   };
   // Signal-aware ordering: names with more confirmed thesis signals rank
@@ -327,8 +329,8 @@ export function autoPick({ refined_summary, earningsByT, holdStart, holdEnd, n_p
     // For puts we prefer names with real market cap — tier-1 defensives.
     .sort((a, b) => (signalRank('put', b.ticker) - signalRank('put', a.ticker)) || ((b.market_cap || 0) - (a.market_cap || 0)));
 
-  const call = pickTop({ pool: callPool, side: 'call', n: n_per_side, signalsByT: signalsBySide.call });
-  const put  = pickTop({ pool: putPool,  side: 'put',  n: n_per_side, signalsByT: signalsBySide.put, already: new Set(call.picks.map((p) => p.ticker)) });
+  const call = callCount === 0 ? { picks: [], skipped: [] } : pickTop({ pool: callPool, side: 'call', n: callCount, signalsByT: signalsBySide.call });
+  const put = putCount === 0 ? { picks: [], skipped: [] } : pickTop({ pool: putPool,  side: 'put',  n: putCount, signalsByT: signalsBySide.put, already: new Set(call.picks.map((p) => p.ticker)) });
   return {
     picks: [...call.picks, ...put.picks],
     skipped: { calls: call.skipped, puts: put.skipped },

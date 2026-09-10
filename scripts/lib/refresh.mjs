@@ -1,14 +1,51 @@
 // Generic weekly Yahoo refresh (macro + universe quotes + options chains).
 // Extracted from scripts/_run_weekly_refresh_*.mjs so the same code runs every week.
 
-import YahooFinance from 'yahoo-finance2';
+import { createYahooClient } from './yahoo_client.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
+import { easternTime, sessionClose } from '../../shared/market-calendar.mjs';
+import { retryRead } from '../../shared/retry.mjs';
 
-const yf = new YahooFinance({
-  validation: { logErrors: false, logOptionsErrors: false },
-  suppressNotices: ['yahooSurvey'],
-});
+const yf = createYahooClient();
+export const WEEKLYS_SOURCE = 'https://www.cboe.com/available_weeklys/get_csv_download/';
+
+export function parseCboeWeeklys(text) {
+  const equity = text.split('Available Weeklys - Equity')[1];
+  if (!equity) throw new Error('Cboe equity weekly-options section missing');
+  const tickers = [...equity.matchAll(/^"([A-Z]{1,5})","/gm)].map(match => match[1]);
+  if (!tickers.length) throw new Error('Cboe equity weekly-options list is empty');
+  return [...new Set(tickers)].sort();
+}
+
+export async function refreshWeeklyUniverse(OUT, { force = false, now = new Date(), fetchImpl = fetch } = {}) {
+  const metadataFile = path.join(OUT, 'weeklys_universe_source.json');
+  const target = path.join(OUT, 'weeklys_universe.csv');
+  let old = {};
+  try { old = JSON.parse(fs.readFileSync(metadataFile, 'utf8')); } catch { /* old unsourced seed */ }
+  const age = +now - Date.parse(old.fetched_at);
+  if (!force && old.source === WEEKLYS_SOURCE && Number.isFinite(age) && age >= 0 && age < 6 * 3600000 && fs.existsSync(target)) return { ...old, cached: true };
+  const { text, tickers } = await retryRead(async () => {
+    const response = await fetchImpl(WEEKLYS_SOURCE, { signal: AbortSignal.timeout(20000) });
+    if (!response.ok) throw new Error(`Cboe weekly universe HTTP ${response.status}`);
+    const text = await response.text(), tickers = parseCboeWeeklys(text);
+    if (tickers.length < 100) throw new Error('Cboe weekly equity universe unexpectedly small; refusing partial data');
+    return { text, tickers };
+  });
+  if (fs.existsSync(target)) {
+    const archive = path.join(OUT, 'refresh_history', now.toISOString().replaceAll(':', '-'), 'universe');
+    fs.mkdirSync(archive, { recursive: true });
+    fs.copyFileSync(target, path.join(archive, 'weeklys_universe.csv'));
+    if (fs.existsSync(metadataFile)) fs.copyFileSync(metadataFile, path.join(archive, 'weeklys_universe_source.json'));
+    const raw = path.join(OUT, 'cboe_weeklys_source.csv');
+    if (fs.existsSync(raw)) fs.copyFileSync(raw, path.join(archive, 'cboe_weeklys_source.csv'));
+  }
+  fs.writeFileSync(path.join(OUT, 'cboe_weeklys_source.csv'), text);
+  fs.writeFileSync(target, ['ticker', ...tickers].join('\n'));
+  const metadata = { source: WEEKLYS_SOURCE, fetched_at: now.toISOString(), count: tickers.length };
+  fs.writeFileSync(metadataFile, JSON.stringify(metadata, null, 2));
+  return metadata;
+}
 
 function csvRow(vals) {
   return vals
@@ -114,44 +151,64 @@ async function runMacro(OUT) {
 // mostly trade $40–$100. Filename kept for resume-logic compatibility.
 const PRICE_MIN = 8;
 const PRICE_MAX = 100;
-async function runUniverseQuotes(OUT) {
+export async function runUniverseQuotes(OUT, { client = yf, now = new Date(), sleep = ms => new Promise(r => setTimeout(r, ms)) } = {}) {
   const unifile = path.join(OUT, 'weeklys_universe.csv');
   if (!fs.existsSync(unifile)) throw new Error(`missing ${unifile}`);
-  const clean = fs.readFileSync(unifile, 'utf8').trim().split(/\r?\n/).slice(1)
-    .filter((t) => /^[A-Z]{1,5}$/.test(t));
+  const clean = [...new Set(fs.readFileSync(unifile, 'utf8').trim().split(/\r?\n/).slice(1)
+    .filter((t) => /^[A-Z]{1,5}$/.test(t)))];
+  if (!clean.length) throw new Error('Weekly universe is empty');
+  const stateFile = path.join(OUT, 'universe_quote_state.json');
+  let cached = {}, quarantine = {};
+  try { const state = JSON.parse(fs.readFileSync(stateFile, 'utf8')); cached = state.quotes ?? {}; quarantine = state.quarantine ?? {}; } catch { /* first run */ }
+  const valid = record => record && easternTime(new Date(record.marketTime)).date === easternTime(now).date && +now - Date.parse(record.fetchedAt) >= 0 && +now - Date.parse(record.fetchedAt) < 2 * 3600000;
+  cached = Object.fromEntries(Object.entries(cached).filter(([ticker, record]) => clean.includes(ticker) && Number.isFinite(Date.parse(record?.marketTime)) && valid(record)));
+  quarantine = Object.fromEntries(Object.entries(quarantine).filter(([ticker, record]) => clean.includes(ticker) && +now - Date.parse(record.checked_at) >= 0 && +now - Date.parse(record.checked_at) < 2 * 3600000));
   const rows = [
     'ticker,price,currency,exchange,market_cap,avg_volume,shares_outstanding,prev_close,fifty_two_wk_high,fifty_two_wk_low,eps_fwd,pe_fwd,name',
   ];
   const errs = [];
   const batchSize = 50;
-  let done = 0;
-  for (let i = 0; i < clean.length; i += batchSize) {
-    const batch = clean.slice(i, i + batchSize);
-    try {
-      const quotes = await yf.quote(batch);
-      for (const q of quotes) {
-        // Monday pre-dawn runs: prefer the live premarket price over
-        // Friday's close so strikes/buffers are computed against reality
-        // (FCEL entered 16% below its actual Monday price when this used
-        // stale closes). Thin names without premarket quotes fall back.
-        const price = q.preMarketPrice ?? q.regularMarketPrice;
-        rows.push(csvRow([
-          q.symbol, price, q.currency, q.fullExchangeName, q.marketCap,
-          q.averageDailyVolume10Day ?? q.averageDailyVolume3Month,
-          q.sharesOutstanding, q.regularMarketPreviousClose,
-          q.fiftyTwoWeekHigh, q.fiftyTwoWeekLow, q.epsForward, q.forwardPE,
-          q.longName ?? q.shortName,
-        ]));
-      }
-      done += quotes.length;
-    } catch (e) {
-      errs.push({ batch: batch.join(','), err: e.message });
+  const recordQuote = q => {
+    if (!q || !clean.includes(q.symbol)) return;
+    const price = q.marketState === 'PRE' ? q.preMarketPrice ?? q.regularMarketPrice : q.regularMarketPrice;
+    if (!Number.isFinite(price) || price <= 0 || !q.regularMarketTime || !Number.isFinite(+new Date(q.regularMarketTime)) || easternTime(new Date(q.regularMarketTime)).date !== easternTime(now).date) {
+      quarantine[q.symbol] = { reason: 'Yahoo returned no usable current-session quote', checked_at: now.toISOString() };
+      return;
     }
-    await new Promise((r) => setTimeout(r, 250));
+    cached[q.symbol] = { marketTime: new Date(q.regularMarketTime).toISOString(), fetchedAt: now.toISOString(), row: csvRow([
+      q.symbol, price, q.currency, q.fullExchangeName, q.marketCap,
+      q.averageDailyVolume10Day ?? q.averageDailyVolume3Month,
+      q.sharesOutstanding, q.regularMarketPreviousClose,
+      q.fiftyTwoWeekHigh, q.fiftyTwoWeekLow, q.epsForward, q.forwardPE,
+      q.longName ?? q.shortName,
+    ]) };
+  };
+  const missing = clean.filter(ticker => !cached[ticker] && !quarantine[ticker]);
+  for (let i = 0; i < missing.length; i += batchSize) {
+    const batch = missing.slice(i, i + batchSize);
+    try {
+      const quotes = await client.quote(batch);
+      for (const q of quotes) recordQuote(q);
+      for (const ticker of batch) if (!cached[ticker] && !quarantine[ticker]) {
+        try {
+          // A missing batch member is not proof of delisting. Require an
+          // explicit per-symbol not-found response before quarantining it.
+          recordQuote(await client.quote(ticker));
+          if (!cached[ticker] && !quarantine[ticker]) errs.push({ ticker, err: 'Quote omitted from batch; retry required' });
+        } catch (error) {
+          if (error.name === 'NotFoundError' || /quote not found|no quote found|no data found.*delisted/i.test(error.message)) quarantine[ticker] = { reason: error.message, checked_at: now.toISOString() };
+          else errs.push({ ticker, err: error.message });
+        }
+      }
+    } catch (e) {
+      for (const ticker of batch) errs.push({ ticker, err: e.message });
+    }
+    fs.writeFileSync(stateFile, JSON.stringify({ quotes: cached, quarantine, errors: errs }, null, 2));
+    await sleep(250);
   }
+  for (const ticker of clean) if (cached[ticker]) rows.push(cached[ticker].row);
   fs.writeFileSync(path.join(OUT, 'universe_quotes.csv'), rows.join('\n'));
-  if (errs.length)
-    fs.writeFileSync(path.join(OUT, 'universe_quote_errors.json'), JSON.stringify(errs, null, 2));
+  fs.writeFileSync(path.join(OUT, 'universe_quote_errors.json'), JSON.stringify(errs, null, 2));
 
   const header = rows[0].split(',');
   const priceIdx = header.indexOf('price');
@@ -162,7 +219,12 @@ async function runUniverseQuotes(OUT) {
     if (Number.isFinite(p) && p >= PRICE_MIN && p <= PRICE_MAX) filtered.push(rows[i]);
   }
   fs.writeFileSync(path.join(OUT, 'universe_8to40.csv'), filtered.join('\n'));
-  return { done, errors: errs.length, filtered: filtered.length - 1 };
+  const result = { expected: clean.length, done: Object.keys(cached).length, errors: errs.length, quarantined: Object.keys(quarantine).length, filtered: filtered.length - 1 };
+  fs.writeFileSync(path.join(OUT, 'universe_quote_quality.json'), JSON.stringify({ ...result, quarantine, checked_at: now.toISOString() }, null, 2));
+  // Keep the Cboe denominator, including unavailable names. Transient failures
+  // retry; at most 5% explicitly unusable names may be quarantined for this cohort.
+  if (errs.length || result.done < result.expected * 0.95) throw new Error(`Universe quote import incomplete: ${result.done}/${result.expected}; saved successful quotes and will retry missing tickers`);
+  return result;
 }
 
 // Step 3: option chains + IV summary (resumable via _chains_state.json).
@@ -180,8 +242,13 @@ async function runChains(OUT, EXPIRY_ISO, { chunkLimit = 999999 } = {}) {
   const stateFile = path.join(OUT, '_chains_state.json');
   let state = { done: [], errors: [] };
   if (fs.existsSync(stateFile)) state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+  // A refreshed primary universe can remove old symbols. They must not inflate
+  // chain coverage for the currently eligible, price-filtered universe.
+  const expected = new Set(allTickers.map(row => row.ticker));
+  state.done = [...new Set(state.done)].filter(ticker => expected.has(ticker));
   const doneSet = new Set(state.done);
-  const errSet = new Set(state.errors.map((e) => e.ticker));
+  // Errors are retried on the next run, never counted as completed.
+  state.errors = [];
 
   const chainsFile = path.join(OUT, `chains_${EXPIRY_ISO}_v2.csv`);
   const summaryFile = path.join(OUT, 'chain_summary_v2.csv');
@@ -193,10 +260,10 @@ async function runChains(OUT, EXPIRY_ISO, { chunkLimit = 999999 } = {}) {
   const now = new Date();
   const histStart = new Date(now.getTime() - 365 * 86400 * 1000);
   const expiryDate = new Date(EXPIRY_ISO + 'T00:00:00Z');
-  const T = Math.max((expiryDate.getTime() - now.getTime()) / (365 * 86400 * 1000), 1 / 365);
+  const T = Math.max((sessionClose(EXPIRY_ISO).getTime() - now.getTime()) / (365 * 86400 * 1000), 1 / (365 * 24));
   const r = 0.043;
 
-  const remaining = allTickers.filter((t) => !doneSet.has(t.ticker) && !errSet.has(t.ticker));
+  const remaining = allTickers.filter((t) => !doneSet.has(t.ticker));
   const work = remaining.slice(0, chunkLimit);
   let processed = 0;
   for (const { ticker, price } of work) {
@@ -219,17 +286,11 @@ async function runChains(OUT, EXPIRY_ISO, { chunkLimit = 999999 } = {}) {
           : null;
       const mom1d = momPct(1), mom3d = momPct(3), mom10d = momPct(10);
 
-      let chain;
-      try { chain = await yf.options(ticker, { date: expiryDate }); } catch { chain = null; }
-      if (!chain) {
-        const all = await yf.options(ticker);
-        const exps = (all?.expirationDates ?? []).map((d) => new Date(d));
-        const target = exps.find((d) => Math.abs(d.getTime() - expiryDate.getTime()) < 86400000 * 2);
-        if (target) chain = await yf.options(ticker, { date: target });
-      }
-      if (!chain || !chain.options || !chain.options.length) throw new Error('no chain');
-      const calls = chain.options[0].calls ?? [];
-      const puts = chain.options[0].puts ?? [];
+      const chain = await yf.options(ticker, { date: expiryDate });
+      const expiryChain = chain?.options?.find(o => new Date(o.expirationDate).toISOString().slice(0, 10) === EXPIRY_ISO);
+      if (!expiryChain) throw new Error('Requested expiry unavailable; refusing a different contract date');
+      const calls = expiryChain.calls ?? [];
+      const puts = expiryChain.puts ?? [];
 
       let atmSum = 0, atmN = 0, bestCall = null, bestPut = null, cVol = 0, pVol = 0;
       const chainOut = [];
@@ -282,12 +343,28 @@ async function runChains(OUT, EXPIRY_ISO, { chunkLimit = 999999 } = {}) {
   return { total: allTickers.length, done: state.done.length, errors: state.errors.length, processed };
 }
 
-export async function runRefresh({ OUT, EXPIRY_ISO, chunkLimit }) {
-  const stepMacro = await runMacro(OUT);
-  let stepQ = { skipped: true, reason: 'universe_quotes.csv exists' };
-  if (!fs.existsSync(path.join(OUT, 'universe_quotes.csv'))) {
-    stepQ = await runUniverseQuotes(OUT);
+export async function runRefresh({ OUT, EXPIRY_ISO, chunkLimit, force = false }) {
+  const manifestFile = path.join(OUT, 'data_refresh.json');
+  let manifest = {};
+  try { manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8')); } catch { /* first run */ }
+  const age = Date.now() - new Date(manifest.started_at).getTime();
+  if (force || !Number.isFinite(age) || age < 0 || age > 2 * 3600000 || manifest.expiry !== EXPIRY_ISO) {
+    // Preserve previous source artifacts before creating a coherent fresh run.
+    const archive = path.join(OUT, 'refresh_history', new Date().toISOString().replaceAll(':', '-'));
+    fs.mkdirSync(archive, { recursive: true });
+    for (const file of ['universe_quotes.csv', 'universe_8to40.csv', 'universe_quote_state.json', 'universe_quote_errors.json', 'universe_quote_quality.json', '_chains_state.json', `chains_${EXPIRY_ISO}_v2.csv`, 'chain_summary_v2.csv', 'data_refresh.json']) {
+      const old = path.join(OUT, file);
+      if (fs.existsSync(old)) fs.renameSync(old, path.join(archive, file));
+    }
+    manifest = { started_at: new Date().toISOString(), expiry: EXPIRY_ISO };
+    fs.writeFileSync(manifestFile, JSON.stringify(manifest));
   }
+  const stepMacro = await runMacro(OUT);
+  const stepQ = await runUniverseQuotes(OUT);
   const stepChains = await runChains(OUT, EXPIRY_ISO, { chunkLimit });
+  manifest.completed_at = new Date().toISOString();
+  manifest.chains = stepChains;
+  fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 2));
+  if (!stepChains.total || stepChains.done < stepChains.total * 0.95 || stepChains.processed >= (chunkLimit ?? Infinity) && stepChains.done < stepChains.total) throw new Error('Incomplete chain coverage; saved progress for retry');
   return { macro: stepMacro, universe: stepQ, chains: stepChains };
 }

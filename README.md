@@ -120,3 +120,11 @@ These checks pass in this workspace:
 npm run lint
 npm run build
 ```
+
+## Live IB service and trading rules
+
+- [Entry, exit, allocation and exact GSRS formula](docs/trading_rules.md), also visible at `/trading-rules`.
+- [IB configuration, execution and reconciliation guide](docs/ib_operations.md).
+- `/app/live` and the iOS / paired Watch app show only attributable PolyTheta positions, actual entry fills and IB marks. Owner-confirmed exits are queued for the broker worker; a queued request is not a confirmed fill.
+- `npm test` exercises the exchange calendar, source recovery, allocation, strike minimums, news relevance, broker adapters and order-state safety with synthetic data. It never connects to a broker or sends email.
+- `npm run ib:check` is a read-only broker check. Settings changes and deployment do not activate orders.

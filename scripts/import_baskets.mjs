@@ -71,7 +71,7 @@ const results = [];
 for (const p of proposals) {
   const publish = p.date === newest;
   try {
-    const r = await importProposal(p.file, { publish, sql });
+    const r = await importProposal(p.file, { publish });
     results.push(r);
     console.log(
       `  ${r.basketDate}  ${String(r.status).padEnd(9)} ${r.positions} positions  ` +
@@ -85,7 +85,7 @@ for (const p of proposals) {
 
 // Anything already in the DB that we did not just publish gets archived, so
 // there is exactly one published basket at a time.
-if (results.length) {
+if (results.some(result => result.basketDate === newest && result.status === 'published')) {
   const publishedSlug = `weekly-basket-${newest}`;
   await sql.query(`update baskets set status='archived', updated_at=now() where slug <> $1 and status='published'`, [
     publishedSlug,

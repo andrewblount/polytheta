@@ -17,6 +17,10 @@ import url from 'node:url';
 import { runFilterAndRefine, autoPick, applyCompliantStrikes, MIN_ATR_BUF_PUT, DELTA_MIN, DELTA_MAX, MAX_SPREAD } from './shortlist.mjs';
 import { fetchShortInterest, loadOverrides, evaluateSignals } from './thesis_signals.mjs';
 import { scanRadar } from './news_radar.mjs';
+import { calculateGsrs } from '../../shared/gsrs.mjs';
+import { DEFAULT_BROKER_SETTINGS, validateBrokerSettings, basketCounts, isExcluded } from '../../shared/broker-settings.mjs';
+import { minimumOtmFor, otmPercent } from '../../shared/strike-settings.mjs';
+import { firstSessionOfWeek, easternTime } from '../../shared/market-calendar.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), '..', '..');
 
@@ -49,45 +53,54 @@ function nakedMarginPerContract(price, strike, premium, side) {
   return Math.max(a, b) + premium * 100;
 }
 
-export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget = 55000, nPerSide = 4 }) {
-  const HOLD_START = BASKET_DATE;
+// Solve affordability before publishing a basket. Reducing the basket count
+// increases each equal allocation, but may never change the configured split.
+export function selectAffordableBasket({ settings, modelEquity, gsrs, select }) {
+  for (let total = settings.maxTrades; total > 0; total--) {
+    const counts = basketCounts({ ...settings, maxTrades: total });
+    if (counts.total !== total) continue;
+    const baseScale = gsrs >= 3 && counts.puts ? 0.5 : 1;
+    const allocation = scale => modelEquity * settings.entryCapitalPct / 100 * scale / total;
+    let auto = select(counts, allocation(baseScale));
+    if (auto.picks.length !== total) continue;
+    if (auto.picks.some(pick => pick.frenzy === 'elevated')) auto = select(counts, allocation(baseScale * 0.5));
+    if (auto.picks.filter(pick => pick.side === 'call').length !== counts.calls || auto.picks.filter(pick => pick.side === 'put').length !== counts.puts) continue;
+    const allocationScale = baseScale * (auto.picks.some(pick => pick.frenzy === 'elevated') ? 0.5 : 1);
+    return { auto, picks: auto.picks, allocationScale, backingPerTrade: allocation(allocationScale) };
+  }
+  return { auto: { picks: [], skipped: { calls: [], puts: [] }, pool_counts: { calls: 0, puts: 0 } }, picks: [], allocationScale: 1, backingPerTrade: 0 };
+}
+
+export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget = 55000, nPerSide = 4, brokerSettings = DEFAULT_BROKER_SETTINGS }) {
+  const settings = validateBrokerSettings(brokerSettings);
+  const HOLD_START = firstSessionOfWeek(BASKET_DATE);
   const HOLD_END = EXPIRY_ISO;
 
-  const { all: enrichedSummary } = runFilterAndRefine(OUT);
+  const { all } = runFilterAndRefine(OUT);
+  const enrichedSummary = all.filter(row => !isExcluded(row, settings));
   const chains = readCsv(path.join(OUT, `chains_${EXPIRY_ISO}_v2.csv`));
   const macroRows = readCsv(path.join(OUT, 'macro_quotes.csv'));
   const macroByT = Object.fromEntries(macroRows.map((m) => [m.ticker, m]));
   const earningsByT = JSON.parse(fs.readFileSync(path.join(OUT, 'earnings_dates.json'), 'utf8'));
 
-  // TV macros (HY_OAS + PC) — prefer live values from tv_macros.json.
-  const TV_CARRY_HY_OAS = 2.86, TV_CARRY_PC = 0.55;
-  let HY_OAS = TV_CARRY_HY_OAS, PC = TV_CARRY_PC;
-  let tv_macros_source = { hy_oas: 'carried', pc: 'carried' };
-  try {
-    const tv = JSON.parse(fs.readFileSync(path.join(OUT, 'tv_macros.json'), 'utf8'));
-    if (Number.isFinite(tv?.hy_oas?.value)) {
-      HY_OAS = tv.hy_oas.value;
-      tv_macros_source.hy_oas = `FRED:BAMLH0A0HYM2 ${tv.hy_oas.date}`;
-    }
-    if (Number.isFinite(tv?.pc_ratio?.total)) {
-      PC = tv.pc_ratio.total;
-      tv_macros_source.pc = `CBOE total P/C${tv?.pc_ratio?.as_of ? ` ${tv.pc_ratio.as_of}` : ''}`;
-    }
-  } catch (_) { /* keep carry defaults */ }
+  const tv = JSON.parse(fs.readFileSync(path.join(OUT, 'tv_macros.json'), 'utf8'));
+  const HY_OAS = tv.hy_oas?.value, PC = tv.pc_ratio?.total;
+  if (!Number.isFinite(HY_OAS) || HY_OAS <= 0 || !Number.isFinite(PC) || PC <= 0 || tv.error ||
+      Date.now() - Date.parse(tv.fetched_ts) > 2 * 3600000) throw new Error('Macro inputs are unavailable or stale; retry data import');
+  const tv_macros_source = { hy_oas: `FRED:BAMLH0A0HYM2 ${tv.hy_oas.date}`, pc: `CBOE ${tv.pc_ratio.as_of}` };
+  const refresh = JSON.parse(fs.readFileSync(path.join(OUT, 'data_refresh.json'), 'utf8'));
+  if (refresh.expiry !== EXPIRY_ISO || Date.now() - Date.parse(refresh.started_at) > 2 * 3600000) throw new Error('Yahoo source snapshot is stale');
 
   // ---- GSRS first: it gates put-side participation and sizing ----
   const macro = (t) => parseFloat(macroByT[t]?.price);
   const macroPrev = (t) => parseFloat(macroByT[t]?.prev_close);
   const VIX = macro('^VIX'), VIX_prev = macroPrev('^VIX');
   const SPY = macro('SPY'), SPX = macro('^GSPC'), SKEW = macro('^SKEW'), MOVE = macro('^MOVE');
+  if (![SPY, SPX, VIX, VIX_prev, SKEW, MOVE].every(x => Number.isFinite(x) && x > 0)) throw new Error('Missing required Yahoo macro values');
   const vix_change = VIX - VIX_prev;
-  const vix_norm = Math.max(0, Math.min(10, (VIX - 10) / 4 + Math.max(0, vix_change) * 0.5));
-  const skew_norm = Math.max(0, Math.min(10, (SKEW - 100) / 10));
-  const hyoas_avg5 = 3.59;
-  const hyoas_norm = Math.max(0, Math.min(10, ((HY_OAS - 1.5) / (hyoas_avg5 - 1.5)) * 5));
-  const move_norm = Math.max(0, Math.min(10, (MOVE - 50) / 10));
-  const pc_norm = Math.max(0, Math.min(10, (1 - PC) * 7));
-  const gsrs = +(0.40 * vix_norm + 0.20 * skew_norm + 0.20 * hyoas_norm + 0.10 * move_norm + 0.10 * pc_norm).toFixed(2);
+  const score = calculateGsrs({ VIX, VIX_prev, SKEW, HY_OAS, MOVE, PC });
+  const { vix: vix_norm, skew: skew_norm, hyoas: hyoas_norm, move: move_norm, pc: pc_norm } = score.components;
+  const gsrs = score.score;
 
   // GSRS bands per the spec ("apply strictly to all put-side positions"):
   //   0–3  full sizing, doubles allowed
@@ -95,7 +108,7 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
   //   5–7  prohibit new put entries
   //   7–10 prohibit new puts + hedge (flagged in the summary)
   let putBudget = nameBudget;
-  let putDoublesAllowed = true;
+  let putDoublesAllowed = false;
   let putsAllowed = true;
   let gsrsBand = '0-3';
   if (gsrs >= 7) { putsAllowed = false; putDoublesAllowed = false; putBudget = 0; gsrsBand = '7-10'; }
@@ -109,7 +122,7 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
     if (!arr) { arr = []; chainsByTicker.set(row.ticker, arr); }
     arr.push(row);
   }
-  const strikeStats = applyCompliantStrikes(enrichedSummary, chainsByTicker);
+  const strikeStats = applyCompliantStrikes(enrichedSummary, chainsByTicker, (ticker, side) => minimumOtmFor(settings, ticker, side, EXPIRY_ISO));
 
   // ---- Thesis signals: live short interest + manual overrides ----
   // Fetch SI only for plausible pool members (bounded API load).
@@ -125,7 +138,7 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
   // Pre-entry news radar: fresh M&A chatter disqualifies call candidates,
   // fresh downside-gap news disqualifies put candidates. Clean scans feed
   // the thesis scorecard (manual overrides still win).
-  const radarCache = await scanRadar(boundedCandidates, path.join(OUT, 'news_radar.json'));
+  const radarCache = await scanRadar(boundedCandidates, path.join(OUT, 'news_radar.json'), { names: Object.fromEntries(enrichedSummary.map(r => [r.ticker, r.name ?? ''])) });
   const autoRadarFor = (ticker, side) => {
     const scan = radarCache[ticker];
     if (!scan || scan.error) return null;
@@ -148,10 +161,17 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
     }
   }
 
-  const auto = autoPick({
-    refined_summary: enrichedSummary,
-    earningsByT, holdStart: HOLD_START, holdEnd: HOLD_END, n_per_side: nPerSide,
-    signalsBySide, putsAllowed,
+  const modelEquity = Number(process.env.POLYTHETA_MODEL_EQUITY ?? 1000000);
+  if (!Number.isFinite(modelEquity) || modelEquity <= 0) throw new Error('Invalid model equity');
+  const { auto, picks, allocationScale, backingPerTrade } = selectAffordableBasket({ settings, modelEquity, gsrs,
+    select: (counts, perTrade) => autoPick({
+      refined_summary: enrichedSummary.map(row => ({ ...row,
+        best_call_strike: Math.max(Number(row.price), Number(row.best_call_strike)) * 100 <= perTrade ? row.best_call_strike : null,
+        best_put_strike: Math.max(Number(row.price), Number(row.best_put_strike)) * 100 <= perTrade ? row.best_put_strike : null,
+      })),
+      earningsByT, holdStart: HOLD_START, holdEnd: HOLD_END, n_per_side: nPerSide, callCount: counts.calls, putCount: counts.puts,
+      signalsBySide, putsAllowed,
+    }),
   });
 
   function findStrike(t, type, K) {
@@ -164,7 +184,6 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
     return (e.next_date >= HOLD_START && e.next_date <= HOLD_END) ? e.next_date : null;
   }
 
-  const picks = auto.picks;
   const blocked = picks.filter((p) => earningsConflict(p.ticker));
   if (blocked.length) {
     throw new Error(`earnings filter blocked auto-picks — the pool filter should have caught these: ${blocked.map((b) => b.ticker).join(',')}`);
@@ -173,7 +192,7 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
   const enriched = picks.map((p) => {
     const row = findStrike(p.ticker, p.side, p.K);
     const sm = getSummary(p.ticker);
-    if (!row || !sm) { console.warn(`missing chain row for ${p.ticker} ${p.K} ${p.side}`); return null; }
+    if (!row || !sm) throw new Error(`Selected trade lost its source chain: ${p.ticker} ${p.K} ${p.side}`);
     const px = parseFloat(sm.price);
     const bid = parseFloat(row.bid);
     const ask = parseFloat(row.ask);
@@ -186,10 +205,10 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
     const buf = +((p.side === 'call' ? p.K - px : px - p.K) / atr).toFixed(2);
     // Frenzy guard: elevated pre-entry thrust halves the allocation (mirrors
     // the spec's Fan-Score >= 8 half-sizing rule, applied mechanically).
-    const frenzied = p.frenzy === 'elevated';
-    const sideBudget = (p.side === 'put' ? putBudget : nameBudget) / (frenzied ? 2 : 1);
+    const sideBudget = backingPerTrade;
     const marginPer = nakedMarginPerContract(px, p.K, mid, p.side);
-    const contracts = Math.max(1, Math.round(sideBudget / marginPer));
+    const contracts = Math.floor(sideBudget / (Math.max(px, p.K) * 100));
+    if (contracts < 1) throw new Error(`Selected trade exceeds its equal capital allocation: ${p.ticker}`);
     const margin = Math.round(contracts * marginPer);
     const credit = Math.round(contracts * mid * 100);
     const earningsDate = earningsByT[p.ticker]?.next_date ?? null;
@@ -202,6 +221,8 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
       // as a news query ("SLS" is also the Space Launch System).
       name: sm.name && sm.name !== p.ticker ? sm.name : null,
       px: +px.toFixed(2), K: p.K, bid, ask, cr: mid,
+      minimum_otm_pct: minimumOtmFor(settings, p.ticker, p.side, EXPIRY_ISO),
+      entry_otm_pct: +otmPercent(p.side, p.K, px).toFixed(3),
       iv: +iv.toFixed(3), delta: +delta.toFixed(3),
       atr: +atr.toFixed(2), buf,
       hvR: Number.isFinite(hvR) ? Math.round(hvR) : null,
@@ -210,7 +231,12 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
       thesis: p.thesis,
       si_pct: sig?.si_pct ?? null,
       contracts, credit, margin, spread,
-      doubles_allowed: p.side === 'put' ? putDoublesAllowed : true,
+      allocated_capital: backingPerTrade,
+      capital_backing: contracts * Math.max(px, p.K) * 100,
+      credit_at_bid: Math.round(contracts * bid * 100),
+      midpoint_to_bid_cost: Math.round(contracts * (mid - bid) * 100),
+      pricing_basis: "modeled midpoint; executable credit requires broker fill",
+      doubles_allowed: false,
       frenzy: p.frenzy ?? 'unknown',
       mom: p.mom ?? null,
       rule_checks: {
@@ -236,9 +262,14 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
   }, { callCredit: 0, putCredit: 0, callMargin: 0, putMargin: 0 });
 
   const proposal = {
-    basket_date: BASKET_DATE, expiry: EXPIRY_ISO,
+    basket_date: BASKET_DATE, entry_date: easternTime().date, first_session: HOLD_START, expiry: EXPIRY_ISO,
+    data_observed_at: refresh.started_at,
+    policy: 'v3-news-only-no-doubling',
+    allocation_settings: settings, allocation_scale: allocationScale, model_equity: modelEquity,
+    total_backing_capital: picks.length * backingPerTrade,
+    gsrs_calculation: score,
     generated_ts: new Date().toISOString(),
-    entry_note: `Monday ${BASKET_DATE} entry / Friday ${EXPIRY_ISO} weekly expiry. Auto-generated by scripts/run_weekly_basket.mjs.`,
+    entry_note: `Week ${BASKET_DATE}; entry ${easternTime().date}; exchange-adjusted expiry ${EXPIRY_ISO}. Auto-generated by scripts/run_weekly_basket.mjs.`,
     hold_window: { start: HOLD_START, end: HOLD_END },
     earnings_filter_applied: true,
     earnings_in_window_count_universe: Object.values(earningsByT)

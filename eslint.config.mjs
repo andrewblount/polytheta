@@ -13,6 +13,9 @@ const eslintConfig = defineConfig([
     "build/**",
     ".netlify/**",
     "next-env.d.ts",
+    "schwab/**", // separate, gitignored application
+    "baskets/**", // generated data and historical research
+    "**/node_modules/**",
   ]),
 ]);
 

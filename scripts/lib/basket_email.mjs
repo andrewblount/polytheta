@@ -4,6 +4,7 @@
 // Old proposals lack some fields (si_pct, frenzy, constraints); render "—".
 
 import { orderBlocks } from './import_proposal.mjs';
+import { assertCurrentProposal, assertCurrentDelivery } from '../../shared/market-calendar.mjs';
 
 const esc = (s) => String(s ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 const money = (n) => `$${Math.round(n).toLocaleString()}`;
@@ -18,7 +19,7 @@ function gsrsChip(gsrs) {
   return chip(`GSRS ${gsrs}`, '#fef3f2', '#b42318');
 }
 
-export function buildBasketEmailHtml(proposal) {
+export function buildBasketEmailHtml(proposal, { deliveryRetry = false } = {}) {
   const p = proposal;
   const cons = p.constraints ?? {};
   const calls = p.picks.filter((x) => x.side === 'call');
@@ -66,9 +67,11 @@ export function buildBasketEmailHtml(proposal) {
 <div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #e4e7ec;border-radius:12px;overflow:hidden">
   <div style="background:#0b1524;color:#ffffff;padding:16px 20px">
     <div style="font-size:15px;font-weight:700;letter-spacing:.3px"><span style="color:#88b4ff">Θ</span> POLYTHETA — WEEKLY BASKET</div>
-    <div style="font-size:12px;color:#98a2b3;margin-top:2px">Entry ${esc(p.basket_date)} · Expiry ${esc(p.expiry)} · Hold to expiry (policy v3)</div>
+    <div style="font-size:12px;color:#98a2b3;margin-top:2px">Week ${esc(p.basket_date)} · Entry ${esc(p.entry_date ?? p.basket_date)} · Expiry ${esc(p.expiry)} · Hold to expiry (policy v3)</div>
   </div>
   <div style="padding:20px">
+    ${deliveryRetry ? '<p style="padding:12px;background:#fffaeb;color:#93370d;font-weight:700">DELAYED DELIVERY — this is the original published basket. Its modeled prices have not been refreshed. Verify current quotes before any entry.</p>' : ''}
+    <p style="font-size:12px;color:#475467">Original basket generated: ${esc(p.generated_ts)}<br>Original market-data snapshot: ${esc(p.data_observed_at)}</p>
     <div style="margin:0 0 10px">${gsrsChip(p.gsrs)} ${cons.put_budget != null ? chip(`put budget ${money(cons.put_budget)}/name`, '#f2f4f7', '#475467') : ''} ${cons.gsrs_band ? chip(`band ${cons.gsrs_band}`, '#f2f4f7', '#475467') : ''}</div>
     ${marketHtml}
     ${sideTable('Calls (short)', calls, '#b42318')}
@@ -76,15 +79,15 @@ export function buildBasketEmailHtml(proposal) {
     <table style="width:100%;border-collapse:collapse;font-size:13px;margin:16px 0 0;background:#f9fafb;border:1px solid #e4e7ec;border-radius:8px">
       <tr>
         <td style="padding:10px 12px"><div style="font-size:10px;text-transform:uppercase;color:#98a2b3">Total margin</div><div style="font-weight:700">${money(totalMargin)}</div></td>
-        <td style="padding:10px 12px"><div style="font-size:10px;text-transform:uppercase;color:#98a2b3">Cash at 4x</div><div style="font-weight:700">${money(totalMargin / 4)}</div></td>
+        <td style="padding:10px 12px"><div style="font-size:10px;text-transform:uppercase;color:#98a2b3">Allocated capital</div><div style="font-weight:700">${money(p.total_backing_capital ?? totalMargin / 4)}</div></td>
         <td style="padding:10px 12px"><div style="font-size:10px;text-transform:uppercase;color:#98a2b3">Est. credit</div><div style="font-weight:700;color:#027a48">${money(totalCredit)}</div></td>
         <td style="padding:10px 12px"><div style="font-size:10px;text-transform:uppercase;color:#98a2b3">RoM max</div><div style="font-weight:700">${rom}%</div></td>
       </tr>
     </table>
     <h2 style="margin:20px 0 4px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;color:#101828">Copy-paste orders</h2>
-    <p style="margin:0 0 4px;font-size:12px;color:#667085">Verify every strike, credit, and margin figure against the live chain before submitting. The 07:35/08:35 revalidation email flags anything stale.</p>
+    <p style="margin:0 0 4px;font-size:12px;color:#667085">Verify every strike, credit, and margin figure against a fresh IB quote before submitting.</p>
     ${blocksHtml}
-    <p style="margin:16px 0 0;font-size:13px;font-weight:700;color:#027a48">Basket loaded — ready to execute.</p>
+    <p style="margin:16px 0 0;font-size:13px;color:#475467">Published basket. Automated entry requires fresh market data and all current execution checks.</p>
   </div>
   <div style="padding:12px 20px;border-top:1px solid #e4e7ec;font-size:12px;color:#667085">
     <a href="https://polytheta.com/app/baskets/current" style="color:#2f6fed">Open in Polytheta →</a>
@@ -94,27 +97,30 @@ export function buildBasketEmailHtml(proposal) {
 </body></html>`;
 }
 
-export async function sendBasketEmail(proposal, { subjectPrefix = '' } = {}) {
+export async function sendBasketEmail(proposal, { subjectPrefix = '', deliveryRetry = false, now = new Date(), fetchImpl = fetch } = {}) {
+  (deliveryRetry ? assertCurrentDelivery : assertCurrentProposal)(proposal, now);
   const key = process.env.SENDGRID_API_KEY;
   const from = process.env.SENDGRID_FROM_EMAIL;
   const to = process.env.STOP_ALERT_EMAIL || process.env.ACCESS_REQUEST_NOTIFY_EMAIL || 'ablount@bluecielo.com';
   if (!key || !from) return { sent: false, reason: 'sendgrid-not-configured' };
 
   const totalCredit = (proposal.totals?.callCredit ?? 0) + (proposal.totals?.putCredit ?? 0);
-  const subject = `${subjectPrefix}Weekly Basket ${proposal.basket_date} — ${proposal.picks.length} names, ~$${Math.round(totalCredit).toLocaleString()} credit, GSRS ${proposal.gsrs}`;
+  const subject = `${subjectPrefix}${deliveryRetry ? '[Delayed delivery] ' : ''}Weekly Basket ${proposal.basket_date} — ${proposal.picks.length} names, ~$${Math.round(totalCredit).toLocaleString()} credit, GSRS ${proposal.gsrs}`;
+  const provenance = `${deliveryRetry ? 'DELAYED DELIVERY: original published basket; prices have not been refreshed.\n' : ''}Original basket generated: ${proposal.generated_ts}\nOriginal market-data snapshot: ${proposal.data_observed_at}`;
   const text = proposal.picks
     .map((x) => `${x.side.toUpperCase()} ${x.ticker} $${x.K} ${proposal.expiry} — ${x.contracts}x @ ${x.cr} (margin $${x.margin.toLocaleString()})`)
     .join('\n');
 
-  const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
+  const res = await fetchImpl('https://api.sendgrid.com/v3/mail/send', {
     method: 'POST',
+    signal: AbortSignal.timeout(20000),
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       personalizations: [{ to: [{ email: to }], subject }],
       from: { email: from },
       content: [
-        { type: 'text/plain', value: `${subject}\n\n${text}\n\nVerify against live chains before trading.` },
-        { type: 'text/html', value: buildBasketEmailHtml(proposal) },
+        { type: 'text/plain', value: `${subject}\n\n${provenance}\n\n${text}\n\nPrices are modeled midpoints, not fills. Bid-side credit can be lower; use verified IB quotes and actual fills.` },
+        { type: 'text/html', value: buildBasketEmailHtml(proposal, { deliveryRetry }) },
       ],
     }),
   });

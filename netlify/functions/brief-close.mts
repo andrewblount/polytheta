@@ -1,17 +1,9 @@
 import type { Config } from "@netlify/functions";
 
-// Evening briefing after the US close, with the same DST-proof double-fire +
-// ET window guard as brief-open (16:02–16:45 ET, weekdays).
-function inCloseWindow(now = new Date()) {
-  const et = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
-  const day = et.getDay();
-  if (day === 0 || day === 6) return false;
-  const mins = et.getHours() * 60 + et.getMinutes();
-  return mins >= 16 * 60 + 2 && mins <= 16 * 60 + 45;
-}
+import { inBriefingWindow } from "../../shared/market-calendar.mjs";
 
 const handler = async () => {
-  if (!inCloseWindow()) return new Response("skipped: outside close window", { status: 200 });
+  if (!inBriefingWindow("close")) return new Response("skipped: outside close window", { status: 200 });
   const baseUrl = process.env.URL ?? process.env.NEXT_PUBLIC_APP_URL;
   if (!baseUrl) return new Response("Missing URL", { status: 500 });
   const response = await fetch(`${baseUrl}/api/internal/briefing?slot=close`, {
@@ -24,6 +16,6 @@ const handler = async () => {
 export default handler;
 
 export const config: Config = {
-  // 20:10 UTC = 16:10 ET during EDT; 21:10 UTC covers EST.
-  schedule: "10 20,21 * * 1-5",
+  // Include 13:10 ET early closes, plus normal closes in EDT/EST.
+  schedule: "10 17,18,20,21 * * 1-5",
 };

@@ -32,11 +32,12 @@ export function PositionDetailView({ position }: { position: PositionDetailData 
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Live position state</CardTitle>
+            <CardTitle>Modeled position state</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm">
             {[
               ["Entry underlying", formatCurrency(position.entryUnderlyingPrice)],
+              ["OTM at modeled entry", `${((position.side === "call" ? position.strike - position.entryUnderlyingPrice : position.entryUnderlyingPrice - position.strike) / position.entryUnderlyingPrice * 100).toFixed(2)}%`],
               ["Latest underlying", formatCurrency(position.latestPerformance.underlyingPrice)],
               ["Underlying move", formatPercent(position.latestPerformance.underlyingMovePct, 1)],
               ["Safety buffer", formatPercent(position.latestPerformance.safetyBufferPct, 1)],

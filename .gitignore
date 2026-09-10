@@ -92,3 +92,10 @@ deno.lock
 /data_history/
 baskets/retro_cache/prices.json
 ~$*.xlsx
+
+# Private execution state and source refresh history
+/runtime/
+/baskets/*/.build.lock
+/baskets/*/delivery.json
+/baskets/*/data/refresh_history/
+/baskets/*/data/data_refresh.json

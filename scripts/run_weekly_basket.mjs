@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
 import { deriveBasketDate, expiryFromBasketDate } from './lib/basket_date.mjs';
-import { runRefresh } from './lib/refresh.mjs';
+import { runRefresh, refreshWeeklyUniverse } from './lib/refresh.mjs';
 import { fetchTvMacros } from './lib/tv_macros.mjs';
 import { runEarnings } from './lib/earnings.mjs';
 import { runFilterAndRefine } from './lib/shortlist.mjs';
@@ -21,6 +21,9 @@ import { runBuildBasket } from './lib/build_basket.mjs';
 import { importProposal } from './lib/import_proposal.mjs';
 import { sendBasketEmail } from './lib/basket_email.mjs';
 import { buildAlertPlan } from './lib/google_alerts.mjs';
+import { loadBrokerSettings } from './lib/broker_settings.mjs';
+import { acquireLock } from './lib/file_lock.mjs';
+import { assertCurrentProposal, currentWeek, isMarketOpen, easternTime } from '../shared/market-calendar.mjs';
 
 const __filename = url.fileURLToPath(import.meta.url);
 const REPO_ROOT = path.resolve(path.dirname(__filename), '..');
@@ -49,60 +52,40 @@ function printHelp() {
 }
 
 const args = parseArgs(process.argv);
+if (!isMarketOpen() || easternTime().minutes < 585) { console.log('Skipped: outside exchange session after 09:45 ET'); process.exit(0); }
+if (args.date && args.date !== currentWeek()) throw new Error('Weekly publication can only target the current trading week');
 const BASKET_DATE = args.date ?? deriveBasketDate();
 const EXPIRY_ISO = expiryFromBasketDate(BASKET_DATE);
 const BASKET_DIR = path.join(REPO_ROOT, 'baskets', BASKET_DATE);
 const OUT = path.join(BASKET_DIR, 'data');
 fs.mkdirSync(OUT, { recursive: true });
+const release = acquireLock(path.join(BASKET_DIR, '.build.lock'));
+process.once('exit', release);
+const deliveryFile = path.join(BASKET_DIR, 'delivery.json');
+let delivery = {};
+try { delivery = JSON.parse(fs.readFileSync(deliveryFile, 'utf8')); } catch { /* first run */ }
+if (delivery.published && delivery.emailed) { console.log(`Week ${BASKET_DATE} already published and emailed`); process.exit(0); }
+if (delivery.published && !delivery.emailed) {
+  const saved = JSON.parse(fs.readFileSync(path.join(OUT, 'basket_proposal.json'), 'utf8'));
+  if (delivery.basket_date !== saved.basket_date || delivery.generated_ts !== saved.generated_ts || delivery.slug !== `weekly-basket-${saved.basket_date}`) throw new Error('Published delivery record does not match the saved proposal; reconciliation required');
+  const mail = await sendBasketEmail(saved, { deliveryRetry: true });
+  if (!mail.sent) throw new Error(`Basket delivery incomplete: ${mail.reason ?? mail.status}`);
+  fs.writeFileSync(deliveryFile, JSON.stringify({ ...delivery, emailed: new Date().toISOString() }, null, 2));
+  process.exit(0);
+}
 
 const log = (msg) => console.log(`[orch ${BASKET_DATE}] ${msg}`);
 log(`start expiry=${EXPIRY_ISO} out=${OUT} force=${args.force}`);
 
-// Seed weeklys_universe.csv from the most recent prior basket if this week's
-// dir doesn't have one. TradingView Cboe-Weeklys pull would give a fresh list,
-// but the universe changes slowly and the last snapshot is fine week-to-week.
-function seedUniverse() {
-  const target = path.join(OUT, 'weeklys_universe.csv');
-  if (fs.existsSync(target) && !args.force) return { seeded: false, existing: true };
-  const baskets = fs.readdirSync(path.join(REPO_ROOT, 'baskets'))
-    .filter((n) => /^\d{4}-\d{2}-\d{2}$/.test(n) && n < BASKET_DATE)
-    .sort();
-  for (let i = baskets.length - 1; i >= 0; i--) {
-    const src = path.join(REPO_ROOT, 'baskets', baskets[i], 'data', 'weeklys_universe.csv');
-    if (fs.existsSync(src)) {
-      fs.copyFileSync(src, target);
-      return { seeded: true, from: baskets[i] };
-    }
-  }
-  throw new Error('no prior weeklys_universe.csv to seed from');
-}
-const seed = seedUniverse();
-log(`universe seed: ${JSON.stringify(seed)}`);
+// Use Cboe's current equity weekly-options directory. A successful source
+// snapshot is reusable for six hours; an old unsourced seed cannot qualify.
+const universe = await refreshWeeklyUniverse(OUT, { force: args.force });
+log(`Cboe weekly universe: ${JSON.stringify(universe)}`);
 
-// Yahoo refresh (macro + universe quotes + option chains). Resumable — the
-// chain step tracks progress in _chains_state.json.
-function refreshDone() {
-  if (args.force) return false;
-  const chainsCsv = path.join(OUT, `chains_${EXPIRY_ISO}_v2.csv`);
-  const state = path.join(OUT, '_chains_state.json');
-  const universeFile = path.join(OUT, 'universe_8to40.csv');
-  // Any required artifact missing (including after a partial cleanup) means
-  // the refresh must run — never crash here.
-  if (!fs.existsSync(chainsCsv) || !fs.existsSync(state) || !fs.existsSync(universeFile)) return false;
-  try {
-    const s = JSON.parse(fs.readFileSync(state, 'utf8'));
-    const universeLines = fs.readFileSync(universeFile, 'utf8').trim().split(/\r?\n/).length - 1;
-    return (s.done.length + s.errors.length) >= universeLines;
-  } catch {
-    return false;
-  }
-}
-if (!refreshDone()) {
-  const rr = await runRefresh({ OUT, EXPIRY_ISO, chunkLimit: args.chainChunk });
-  log(`refresh: ${JSON.stringify(rr)}`);
-} else {
-  log('refresh: all chains present, skipping');
-}
+// Refresh has a source timestamp, resumes partial downloads and retries failed
+// tickers. Force invalidates all derived source artifacts, not just the outer skip.
+const rr = await runRefresh({ OUT, EXPIRY_ISO, chunkLimit: args.chainChunk, force: args.force });
+log(`refresh: ${JSON.stringify(rr)}`);
 
 // TradingView macros — always refresh (cheap, and market changes daily).
 const tv = await fetchTvMacros({ OUT, BASKET_DATE });
@@ -112,23 +95,14 @@ log(`tv_macros: HY_OAS=${tv.hy_oas?.value ?? tv.hy_oas?.error} PC=${tv.pc_ratio?
 const sl = runFilterAndRefine(OUT);
 log(`shortlist: refined_calls=${sl.calls_refined} refined_puts=${sl.puts_refined}`);
 
-// Earnings — refresh unless the file exists and is < 6 hours old.
-function earningsFresh() {
-  if (args.force) return false;
-  const f = path.join(OUT, 'earnings_dates.json');
-  if (!fs.existsSync(f)) return false;
-  const ageMs = Date.now() - fs.statSync(f).mtime.getTime();
-  return ageMs < 6 * 3600 * 1000;
-}
-if (!earningsFresh()) {
-  const er = await runEarnings({ OUT });
-  log(`earnings: ${JSON.stringify(er)}`);
-} else {
-  log('earnings: fresh, skipping');
-}
+// Each record has its own freshness/error state. Failed or newly shortlisted
+// tickers retry on every scheduled run, retaining successful fresh results.
+const er = await runEarnings({ OUT, force: args.force });
+log(`earnings: ${JSON.stringify(er)}`);
 
 // Build basket (async: fetches short interest for the candidate pool).
-const bb = await runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT });
+const brokerSettings = await loadBrokerSettings();
+const bb = await runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, brokerSettings });
 log(`build: gsrs=${bb.gsrs} totals=${JSON.stringify(bb.totals)}`);
 
 // Write concise RUN_SUMMARY.md.
@@ -258,29 +232,15 @@ fs.writeFileSync(
 );
 log(`google alerts plan: ${alertPlan.alerts.length} queries, remove after ${alertPlan.remove_after}`);
 
-// Email the trading instructions (independent of DB publish — the basket
-// should reach the inbox even if the site is down).
-try {
-  const mail = await sendBasketEmail(proposal);
-  log(mail.sent ? `basket email sent to ${mail.to}` : `basket email skipped/failed: ${mail.reason ?? mail.status}`);
-} catch (err) {
-  log(`WARNING: basket email failed — ${err.message}`);
-}
-
-// Publish to the Neon DB behind polytheta.com. Without this the site keeps
-// serving whatever was last loaded, regardless of what the orchestrator built.
-// Non-fatal: a DB outage should not lose the basket we just computed on disk.
-if (process.env.NETLIFY_DATABASE_URL || process.env.DATABASE_URL) {
-  try {
-    const imported = await importProposal(bb.outFile, { publish: true });
-    log(`published to site: ${imported.slug} (${imported.positions} positions)`);
-  } catch (err) {
-    log(`WARNING: site publish failed — ${err.message}`);
-    log('  basket is safe on disk; re-run: node scripts/import_baskets.mjs --latest');
-    process.exitCode = 1;
-  }
-} else {
-  log('site publish skipped — no NETLIFY_DATABASE_URL/DATABASE_URL in environment');
-}
-
-log('done');
+// Publish atomically before emailing, so the inbox and site refer to the same
+// immutable basket. Persist delivery status so scheduled retries are idempotent.
+assertCurrentProposal(proposal);
+if (!process.env.NETLIFY_DATABASE_URL && !process.env.DATABASE_URL) throw new Error('Database unavailable; cannot publish this week');
+const imported = await importProposal(bb.outFile, { publish: true });
+delivery = { basket_date: BASKET_DATE, generated_ts: proposal.generated_ts, published: new Date().toISOString(), slug: imported.slug };
+fs.writeFileSync(deliveryFile, JSON.stringify(delivery, null, 2));
+const mail = await sendBasketEmail(proposal);
+if (!mail.sent) throw new Error(`Basket delivery failed: ${mail.reason ?? mail.status}`);
+delivery.emailed = new Date().toISOString();
+fs.writeFileSync(deliveryFile, JSON.stringify(delivery, null, 2));
+log('published and emailed current-week basket');

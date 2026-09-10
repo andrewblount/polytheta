@@ -14,5 +14,5 @@ export async function POST(request: Request) {
   }
 
   const result = await runMarketSync(appUser?.email ?? "internal-route");
-  return NextResponse.json(result);
+  return NextResponse.json(result, { status: result.ok ? 200 : 503 });
 }

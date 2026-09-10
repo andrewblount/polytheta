@@ -1,28 +1,23 @@
 #!/usr/bin/env node
-// Monday-morning revalidation of the weekly basket against live prices.
-//
-// The orchestrator screens Sunday night on Friday closes. FCEL (May 11) had
-// closed +11.6% Friday and opened Monday far above the proposal price — the
-// entry math (strike distance, buffer, credit) was stale before the first
-// order went in. This script re-quotes every pick shortly after Monday open
-// and flags any name whose price has moved enough to invalidate the entry.
+// Session revalidation of the current week's basket against fresh quotes.
+// Flags names whose price has moved enough to invalidate the entry.
 //
 //   node scripts/verify_basket_live.mjs              # current week's basket
 //   node scripts/verify_basket_live.mjs --date 2026-07-27
 //
 // Writes baskets/<date>/REVALIDATION.md and emails a summary when any pick
-// is flagged. Run from launchd Monday ~09:35 ET.
+// is flagged. The script checks the actual exchange session before running.
 
 import fs from 'node:fs';
 import path from 'node:path';
-import YahooFinanceMod from 'yahoo-finance2';
+import { createYahooClient } from './lib/yahoo_client.mjs';
 import { deriveBasketDate } from './lib/basket_date.mjs';
+import { currentWeek, isMarketOpen, easternTime, weeklyExpiry } from '../shared/market-calendar.mjs';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '..');
 try { process.loadEnvFile(path.join(REPO_ROOT, '.env.local')); } catch { /* optional */ }
 
-const YF = YahooFinanceMod.default ?? YahooFinanceMod;
-const yf = new YF({ validation: { logErrors: false }, suppressNotices: ['yahooSurvey'] });
+const yf = createYahooClient();
 
 // Flag thresholds: price moved >4% or >0.5 ATR against the entry assumption,
 // or the remaining buffer to strike dropped below the side's floor.
@@ -33,12 +28,15 @@ const dateArg = process.argv.includes('--date')
   ? process.argv[process.argv.indexOf('--date') + 1]
   : deriveBasketDate();
 
+if (!isMarketOpen()) { console.log('Skipped: exchange closed'); process.exit(0); }
+if (dateArg !== currentWeek()) throw new Error('Refusing stale-week revalidation');
 const proposalFile = path.join(REPO_ROOT, 'baskets', dateArg, 'data', 'basket_proposal.json');
 if (!fs.existsSync(proposalFile)) {
   console.error(`No proposal at ${proposalFile}`);
   process.exit(1);
 }
 const proposal = JSON.parse(fs.readFileSync(proposalFile, 'utf8'));
+if (proposal.basket_date !== dateArg || proposal.expiry !== weeklyExpiry(dateArg)) throw new Error('Proposal is for another trading week or expiry');
 
 const rows = [];
 let flagged = 0;
@@ -46,7 +44,9 @@ for (const p of proposal.picks) {
   let live = null;
   try {
     const q = await yf.quote(p.ticker);
-    live = q?.regularMarketPrice ?? null;
+    const observed = new Date(q?.regularMarketTime);
+    const age = Date.now() - +observed;
+    if (Number.isFinite(age) && age >= -60000 && age <= 20 * 60000 && easternTime(observed).date === easternTime().date && Number.isFinite(q.regularMarketPrice) && q.regularMarketPrice > 0) live = q.regularMarketPrice;
   } catch { /* leave null */ }
   if (live == null) {
     rows.push({ ...p, live: null, verdict: 'NO QUOTE — verify manually' });
@@ -71,9 +71,9 @@ for (const p of proposal.picks) {
 }
 
 const md = [
-  `# Monday Revalidation — ${dateArg}`,
+  `# Session Revalidation — ${dateArg}`,
   '',
-  `Checked ${new Date().toISOString()} against the Sunday proposal. ${flagged ? `**${flagged} pick(s) flagged.**` : 'All picks within tolerance.'}`,
+  `Checked ${new Date().toISOString()} against the published weekly proposal. ${flagged ? `**${flagged} pick(s) flagged.**` : 'All picks within tolerance.'}`,
   '',
   '| ticker | side | K | proposal px | live | drift | live ATR buf | verdict |',
   '|--------|------|---|------------:|-----:|------:|-------------:|---------|',
@@ -118,11 +118,11 @@ const rowsHtml = rows.map((r, i) => {
 const html = `<!DOCTYPE html><html><body style="margin:0;padding:24px 12px;background:#f4f6f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#101828">
 <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e4e7ec;border-radius:12px;overflow:hidden">
   <div style="background:${flagged ? '#b54708' : '#027a48'};color:#fff;padding:14px 20px;font-size:15px;font-weight:700;letter-spacing:.3px">
-    MONDAY REVALIDATION — ${flagged ? `${flagged} PICK${flagged > 1 ? 'S' : ''} NEED ACTION` : 'ALL CLEAR'}
+    SESSION REVALIDATION — ${flagged ? `${flagged} PICK${flagged > 1 ? 'S' : ''} NEED ACTION` : 'ALL CLEAR'}
   </div>
   <div style="padding:20px">
     <h1 style="margin:0 0 4px;font-size:18px">Basket ${dateArg}</h1>
-    <p style="margin:0 0 14px;font-size:13px;color:#667085">Live quotes vs the pre-dawn proposal · checked ${new Date().toISOString().slice(0, 16).replace('T', ' ')}Z</p>
+    <p style="margin:0 0 14px;font-size:13px;color:#667085">Current quotes vs the weekly proposal · checked ${new Date().toISOString().slice(0, 16).replace('T', ' ')}Z</p>
     <table style="width:100%;border-collapse:collapse;font-size:13px">
       <tr style="color:#667085;text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.4px">
         <th style="padding:6px 10px;text-align:left">Name</th><th style="padding:6px 10px">Proposal</th><th style="padding:6px 10px">Live</th><th style="padding:6px 10px">Drift</th><th style="padding:6px 10px">ATR buf</th><th style="padding:6px 10px">Verdict</th>

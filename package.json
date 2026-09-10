@@ -11,7 +11,10 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx scripts/seed.ts"
+    "db:seed": "tsx scripts/seed.ts",
+    "test": "node --import tsx --test tests/*.test.mjs",
+    "ib:check": "node scripts/broker/worker.mjs --check",
+    "ib:run": "node scripts/broker/worker.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -30,13 +33,14 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tabs": "^1.1.13",
+    "@stoqey/ib": "^1.6.9",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "drizzle-orm": "^0.45.2",
     "jose": "^6.2.2",
     "lucide-react": "^1.7.0",
-    "next": "16.2.1",
+    "next": "^16.3.4",
     "next-themes": "^0.4.6",
     "postgres": "^3.4.8",
     "react": "19.2.4",
@@ -54,7 +58,7 @@
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
-    "eslint-config-next": "16.2.1",
+    "eslint-config-next": "^16.3.4",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5"

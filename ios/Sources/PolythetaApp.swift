@@ -10,6 +10,11 @@ struct PolythetaApp: App {
                 .environmentObject(api)
                 .preferredColorScheme(.dark)
                 .tint(Color(red: 0.53, green: 0.71, blue: 1.0)) // #88b4ff
+                .task {
+                    #if os(iOS)
+                    PhoneWatchBridge.shared.start()
+                    #endif
+                }
         }
     }
 }
@@ -19,6 +24,8 @@ struct RootView: View {
 
     var body: some View {
         TabView {
+            LiveTradesView()
+                .tabItem { Label("Live IB", systemImage: "chart.line.uptrend.xyaxis") }
             DashboardView()
                 .tabItem { Label("Basket", systemImage: "basket") }
             TradesView()
@@ -83,7 +90,7 @@ func copyToClipboard(_ text: String) {
 
 func orderLine(_ p: MobilePosition, expiry: String) -> String {
     let type = p.side == "call" ? "Call" : "Put"
-    return "Sell to Open \(p.contracts) \(p.ticker) \(expiry) \(String(format: "%.2f", p.strike).replacingOccurrences(of: ".00", with: "")) \(type) – Limit \(String(format: "%.2f", p.entryCredit)) – GTC"
+    return "Sell to Open \(p.contracts) \(p.ticker) \(expiry) \(String(format: "%.2f", p.strike).replacingOccurrences(of: ".00", with: "")) \(type) – Limit \(String(format: "%.2f", p.entryCredit)) – DAY"
 }
 
 struct ErrorBanner: View {

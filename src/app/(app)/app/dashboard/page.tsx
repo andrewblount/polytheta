@@ -15,6 +15,8 @@ export default async function DashboardPage() {
   const user = await getCurrentAppUser();
   const member = user ? await getMemberPerformance(user) : null;
 
+  if (!basket) return <Card><CardHeader><CardTitle>This week’s basket is not available yet</CardTitle></CardHeader><CardContent><p>The weekly build has not published a basket for the current trading week.</p><Link href="/app/baskets" className="underline">View past baskets</Link></CardContent></Card>;
+
   return (
     <div className="space-y-8">
       {member ? (

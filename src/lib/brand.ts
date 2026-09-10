@@ -26,6 +26,7 @@ export const memberNavigation = [
 ] as const;
 
 export const adminNavigation = [
+  { label: "Live IB trades", href: "/app/live" },
   { href: "/admin", label: "Admin Dashboard" },
   { href: "/admin/baskets", label: "Baskets" },
   { href: "/admin/users", label: "Users" },

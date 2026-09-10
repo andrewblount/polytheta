@@ -19,6 +19,8 @@
   <dict>
     <key>com.andrewblount.polytheta</key>
     <string>Polytheta App Store</string>
+    <key>com.andrewblount.polytheta.watchkitapp</key>
+    <string>Polytheta Watch App Store</string>
   </dict>
   <key>destination</key>
   <string>export</string>

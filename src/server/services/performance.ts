@@ -1,4 +1,5 @@
 import { differenceInCalendarDays } from "date-fns";
+import { sessionClose, easternTime, addDays } from "../../../shared/market-calendar.mjs";
 
 import { clamp } from "@/lib/utils";
 import type {
@@ -79,7 +80,7 @@ export function getPositionState(
   underlyingPrice: number,
   observedAt: string,
 ): PositionState {
-  const expiry = new Date(position.expiry);
+  const expiry = sessionClose(position.expiry);
   const observedDate = new Date(observedAt);
 
   if (position.manualCloseDate) {
@@ -160,7 +161,7 @@ export function buildSnapshot({
       (underlyingPrice - position.entryUnderlyingPrice) / position.entryUnderlyingPrice,
     distanceToStrike,
     safetyBufferPct,
-    daysToExpiry: differenceInCalendarDays(new Date(position.expiry), new Date(observedAt)),
+    daysToExpiry: Math.max(0, differenceInCalendarDays(new Date(position.expiry), new Date(easternTime(new Date(observedAt)).date))),
     creditCapturePct,
     pnlAmount,
     pnlPercent,
@@ -173,20 +174,23 @@ export async function generateLiveSnapshot(
   provider: MarketDataProvider,
   observedAt = new Date().toISOString(),
 ) {
+  const closeAt = sessionClose(position.expiry);
+  if (new Date(observedAt) >= closeAt) {
+    const settleDate = easternTime(closeAt).date;
+    const history = await provider.getHistoricalPrices(position.ticker, settleDate, addDays(settleDate, 1));
+    const closing = history.find(q => easternTime(new Date(q.date)).date === settleDate && Number.isFinite(q.close) && q.close > 0);
+    if (!closing) throw new Error(`No verified expiry close for ${position.ticker} on ${settleDate}; settlement will retry`);
+    const intrinsic = position.side === "call" ? Math.max(closing.close - position.strike, 0) : Math.max(position.strike - closing.close, 0);
+    return buildSnapshot({ position, observedAt: closeAt.toISOString(), underlyingPrice: closing.close,
+      optionMark: intrinsic, confidence: "Expiry-Resolved", sourceLabel: "Modeled intrinsic at Yahoo expiry-session close; not a broker fill" });
+  }
   const quote = await provider.getQuote(position.ticker);
-  const underlyingPrice = quote?.regularMarketPrice ?? position.entryUnderlyingPrice;
-  const optionQuote = await provider.getOptionQuote(
-    position.ticker,
-    position.expiry,
-    position.strike,
-    position.optionType,
-  );
-
-  const actualMark =
-    optionQuote?.lastPrice ??
-    (optionQuote?.bid && optionQuote?.ask
-      ? (optionQuote.bid + optionQuote.ask) / 2
-      : null);
+  if (!quote || !Number.isFinite(quote.regularMarketPrice) || quote.regularMarketPrice <= 0) throw new Error(`No underlying quote for ${position.ticker}; retry later`);
+  const underlyingPrice = quote.regularMarketPrice;
+  const optionQuote = await provider.getOptionQuote(position.ticker, position.expiry, position.strike, position.optionType);
+  // Last trade may be hours or days old. Use a valid two-sided market only.
+  const bid = optionQuote?.bid, ask = optionQuote?.ask;
+  const actualMark = bid != null && ask != null && bid >= 0 && ask >= bid && ask > 0 ? (bid + ask) / 2 : null;
 
   if (actualMark !== null && actualMark !== undefined) {
     return buildSnapshot({
@@ -200,11 +204,7 @@ export async function generateLiveSnapshot(
     });
   }
 
-  const daysToExpiry = Math.max(
-    differenceInCalendarDays(new Date(position.expiry), new Date(observedAt)),
-    0,
-  );
-  const timeToExpiryYears = Math.max(daysToExpiry / 365, 1 / 365);
+  const timeToExpiryYears = Math.max((+closeAt - +new Date(observedAt)) / (365 * 86400000), 0);
   const volatility =
     optionQuote?.impliedVolatility ??
     clamp(0.22 + (position.ivRank / 100) * 0.7, 0.2, 1.1);
@@ -223,7 +223,7 @@ export async function generateLiveSnapshot(
     underlyingPrice,
     estimatedOptionValue,
     impliedVolatility: volatility,
-    confidence: daysToExpiry === 0 ? "Expiry-Resolved" : "Estimated",
+    confidence: "Estimated",
     sourceLabel: "Modeled from Yahoo chain IV proxy",
   });
 }
