@@ -1,8 +1,8 @@
-import { desc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { easternTime, marketSession, weeklyExpiry } from "../../../shared/market-calendar.mjs";
-import { schwabSnapshots, syncLogs, trades, userProfiles } from "@/db/schema";
+import { easternTime, marketSession, weeklyExpiry, sessionClose } from "../../../shared/market-calendar.mjs";
+import { syncLogs, userProfiles } from "@/db/schema";
 import { env } from "@/lib/env";
 
 import { getCurrentBasket } from "@/server/repos/baskets";
@@ -11,55 +11,74 @@ import { getPerformanceReport } from "@/server/repos/performance";
 import { alertEmailShell, kvRowsHtml } from "./email";
 import { getNotificationSettings } from "./settings";
 import { getMemberPerformance } from "./member-performance";
+import { getBrokerPortfolio } from "./broker-portfolio";
 import { sendTwilioMessage } from "./twilio";
 
-// Daily briefings: a morning read on the basket right after the open, and an
-// evening scorecard after the close. Day P&L is the change in each position's
-// modeled P&L versus the previous session's last snapshot; week-to-date is
-// the position's latest P&L outright (entries start at zero). Total return
-// combines the settled record with the live week. Actual account numbers
-// come from the trades ledger (net premium) and, when the Mac-side fetcher
-// has posted a fresh snapshot, from Schwab.
-
+// Actual P/L is exclusively the attributed IB portfolio. Recommended-basket
+// snapshots remain a separate modeled record; premium cash flow is not P/L.
 function fmtMoney(v: number) {
   const sign = v < 0 ? "-" : "+";
   return `${sign}$${Math.abs(Math.round(v)).toLocaleString()}`;
 }
 
-async function latestSchwab() {
-  if (!db) return null;
-  const rows = await db
-    .select()
-    .from(schwabSnapshots)
-    .orderBy(desc(schwabSnapshots.takenAt))
-    .limit(1);
-  if (rows.length === 0) return null;
-  const snap = rows[0];
-  const ageH = (Date.now() - snap.takenAt.getTime()) / 3600000;
-  if (ageH > 20) return null; // stale — omit rather than mislead
-  return {
-    liquidationValue: snap.liquidationValue ? Number(snap.liquidationValue) : null,
-    dayPl: snap.dayPl ? Number(snap.dayPl) : null,
-    takenAt: snap.takenAt.toISOString(),
-  };
+type BrokerBriefingState = { snapshot: Record<string, unknown> | null; stale: boolean };
+export function actualBriefingSummary(broker: BrokerBriefingState, now = new Date()) {
+  const snapshot = broker.snapshot;
+  const age = +now - Date.parse(String(snapshot?.observedAt));
+  const unavailable = (reason: string) => ({
+    rows: [["PolyTheta actual P/L", reason]] as Array<[string, string]>,
+    compact: `PolyTheta IB P/L unavailable (${reason})`, unrealizedPnl: null, realizedPnl: null,
+  });
+  if (!snapshot || snapshot.scope !== "PolyTheta only" || !Array.isArray(snapshot.positions)) return unavailable("No attributed IB snapshot available");
+  if (broker.stale || !Number.isFinite(age) || age < -1000 || age > 120000) return unavailable("IB connection or snapshot is stale");
+  const positions = snapshot.positions as Array<Record<string, unknown>>;
+  if (positions.some(p => !p || typeof p !== "object")) return unavailable("IB positions need reconciliation");
+  const open = positions.filter(p => typeof p.quantity === "number" && p.quantity > 0 || p.workingEntry === true);
+  // A historical expiration awaiting its statement must not conceal current
+  // reconciled open P/L. A missing current holding must remain unknown.
+  const unresolvedCurrent = positions.some(p => {
+    if (p.reconciled === true) return false;
+    try { return !(p.quantity === 0 && !p.workingEntry && +sessionClose(String(p.expiry)) <= +now); }
+    catch { return true; }
+  });
+  const unrealizedPnl = !unresolvedCurrent && open.every(p => p.reconciled === true && typeof p.unrealizedPnl === "number" && Number.isFinite(p.unrealizedPnl))
+    ? open.reduce((sum, p) => sum + Number(p.unrealizedPnl), 0) : null;
+  const realizedPnl = positions.every(p => p.reconciled === true && typeof p.realizedPnl === "number" && Number.isFinite(p.realizedPnl))
+    ? positions.reduce((sum, p) => sum + Number(p.realizedPnl), 0) : null;
+  const fees = typeof snapshot.fees === "number" && Number.isFinite(snapshot.fees) ? snapshot.fees : null;
+  const feesComplete = positions.every(p => p.feesComplete === true);
+  const rows: Array<[string, string]> = [
+    ["PolyTheta open P/L (actual, before fees)", unrealizedPnl == null ? "Unavailable — marks or position reconciliation pending" : fmtMoney(unrealizedPnl)],
+    ["PolyTheta realized P/L (actual, before fees)", realizedPnl == null ? "Unavailable — settlement or reconciliation pending" : fmtMoney(realizedPnl)],
+    ["PolyTheta confirmed fees", fees == null ? "Unavailable" : `$${fees.toFixed(2)}${feesComplete ? "" : " (partial; awaiting IB)"}`],
+    ["IB snapshot", `${snapshot.observedAt}${snapshot.complete === true ? "" : " · some figures remain incomplete"}`],
+  ];
+  return { rows, compact: `PolyTheta IB open P/L ${unrealizedPnl == null ? "unavailable (reconciliation pending)" : fmtMoney(unrealizedPnl)} before fees`, unrealizedPnl, realizedPnl };
 }
 
-export async function composeBriefing(slot: "open" | "close") {
-  const basket = await getCurrentBasket();
-  const report = await getPerformanceReport();
-  const schwab = await latestSchwab();
+type BriefingInputs = {
+  basket: Awaited<ReturnType<typeof getCurrentBasket>>;
+  report: Awaited<ReturnType<typeof getPerformanceReport>>;
+  broker: BrokerBriefingState;
+  now?: Date;
+};
 
-  const positions = basket ? [...basket.callPositions, ...basket.putPositions] : [];
-  const today = easternTime().date;
+export function buildBriefing(slot: "open" | "close", { basket, report, broker, now = new Date() }: BriefingInputs) {
+  const allPositions = basket ? [...basket.callPositions, ...basket.putPositions] : [];
+  const positions = allPositions.filter(p => Number.isFinite(Date.parse(p.entryTimestamp)) && Date.parse(p.entryTimestamp) <= +now);
+  const plannedCount = allPositions.length - positions.length;
+  const today = easternTime(now).date;
+  const actual = actualBriefingSummary(broker, now);
 
   let dayPnl = 0;
   let weekPnl = 0;
   const rows: Array<[string, string]> = [];
   for (const p of positions) {
-    const history = [...p.performanceHistory].sort(
+    const history = [...p.performanceHistory].filter(s => Date.parse(s.observedAt) <= +now).sort(
       (a, b) => new Date(a.observedAt).getTime() - new Date(b.observedAt).getTime(),
     );
-    const latest = history[history.length - 1] ?? p.latestPerformance;
+    const fallback = Date.parse(p.latestPerformance.observedAt) <= +now ? p.latestPerformance : null;
+    const latest = history.at(-1) ?? fallback;
     const prevSession = [...history].reverse().find((s) => easternTime(new Date(s.observedAt)).date < today);
     const latestPnl = latest?.pnlAmount ?? 0;
     const prevPnl = prevSession?.pnlAmount ?? 0;
@@ -68,83 +87,58 @@ export async function composeBriefing(slot: "open" | "close") {
     weekPnl += latestPnl;
     rows.push([
       `${p.ticker} ${p.side === "call" ? "C" : "P"} $${p.strike}`,
-      `${fmtMoney(latestPnl)} wk · ${fmtMoney(d)} day · ${latest?.state ?? "no data"}`,
+      latest ? `${fmtMoney(latestPnl)} basket · ${fmtMoney(d)} day · ${latest.state}` : "No modeled snapshot available",
     ]);
   }
 
   const settledTotal = report?.stats.totalPnl ?? 0;
-  // The report already includes settled legs in the current week.
   const currentSettled = report?.weeks.find(w => w.weekOf === basket?.weekOf)?.pnl ?? 0;
   const totalReturn = settledTotal + weekPnl - currentSettled;
-
-  // Actuals from the trades ledger.
-  let actualNetPremium = 0;
-  let fillsThisWeek = 0;
-  if (db) {
-    const weekStart = new Date();
-    weekStart.setUTCDate(weekStart.getUTCDate() - ((weekStart.getUTCDay() + 6) % 7)); // Monday
-    weekStart.setUTCHours(0, 0, 0, 0);
-    const allTrades = await db.select().from(trades);
-    for (const t of allTrades) {
-      const gross = Number(t.price) * 100 * t.quantity;
-      actualNetPremium += (t.action === "sell-to-open" ? gross : -gross) - Number(t.fees);
-      if (t.executedAt >= weekStart) fillsThisWeek += 1;
-    }
-  }
-
   const isFriday = today === weeklyExpiry(today);
-  const title =
-    slot === "open"
-      ? `Open briefing — ${today}`
-      : `Close briefing — ${today}: day ${fmtMoney(dayPnl)}, week ${fmtMoney(weekPnl)}`;
+  const title = slot === "open" ? `Open briefing — ${today}`
+    : `Close briefing — ${today}: modeled day ${fmtMoney(dayPnl)}, basket ${fmtMoney(weekPnl)}`;
 
   const summaryRows: Array<[string, string]> = [
     ["Day P&L (modeled)", fmtMoney(dayPnl)],
-    ["Week to date (modeled)", fmtMoney(weekPnl)],
+    ["Basket to date (modeled)", fmtMoney(weekPnl)],
     ["Total system return (modeled)", fmtMoney(totalReturn)],
-    ["Settled weeks", `${report?.stats.completeWeeks ?? 0} (${report?.stats.winningWeeks ?? 0} wins, leg OTM ${report?.stats.legWinRatePct ?? 0}%)`],
-    ["Actual net premium (your fills)", `${fmtMoney(actualNetPremium)} · ${fillsThisWeek} fills this week`],
+    ["Settled weeks (modeled)", `${report?.stats.completeWeeks ?? 0} (${report?.stats.winningWeeks ?? 0} wins, leg OTM ${report?.stats.legWinRatePct ?? 0}%)`],
   ];
-  if (schwab?.liquidationValue != null) {
-    summaryRows.push([
-      "Schwab account (actual)",
-      `$${Math.round(schwab.liquidationValue).toLocaleString()}${schwab.dayPl != null ? ` · day ${fmtMoney(schwab.dayPl)}` : ""}`,
-    ]);
-  }
   if (basket) summaryRows.push(["GSRS at entry", String(basket.gsrs)]);
 
-  const bodyHtml =
-    kvRowsHtml(summaryRows) +
+  const bodyHtml = kvRowsHtml(summaryRows) +
     (positions.length
-      ? `<h2 style="margin:16px 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:#667085">Positions${basket ? ` — ${basket.title}` : ""}</h2>` +
-        kvRowsHtml(rows)
-      : `<p style="margin:14px 0 0;font-size:14px;color:#b42318;font-weight:600">This week’s basket is not available. No previous week is being presented as current.</p>`) +
+      ? `<h2 style="margin:16px 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:#667085">Modeled basket positions</h2>` + kvRowsHtml(rows)
+      : `<p style="margin:14px 0 0;font-size:14px;color:#b42318;font-weight:600">${basket ? "The published basket has no entries whose planned start has arrived." : "This week’s basket is not available. No previous week is being presented as current."}</p>`) +
+    (plannedCount ? `<p style="margin:14px 0 0;font-size:13px">${plannedCount} planned positions are excluded from modeled P/L until their entry time.</p>` : "") +
     (slot === "close" && isFriday
-      ? `<p style="margin:14px 0 0;font-size:13px;background:#eff8ff;border:1px solid #b2ddff;border-radius:8px;padding:10px 12px">Expiry day: positions settle after today's close — the weekend settlement pass records final results, and Monday's briefing carries the completed week.</p>`
+      ? `<p style="margin:14px 0 0;font-size:13px;background:#eff8ff;border:1px solid #b2ddff;border-radius:8px;padding:10px 12px">Weekly expiry day: modeled settlement results are recorded after the close. Actual IB results remain pending until the broker records and positions reconcile.</p>`
       : "") +
-    `<p style="margin:14px 0 0;font-size:11px;color:#98a2b3">Modeled figures assume recommended entries held to expiry. Verify actuals at the broker.</p>`;
+    `<p style="margin:14px 0 0;font-size:11px;color:#98a2b3">Modeled figures assume recommended entries held to expiry. They are separate from actual PolyTheta fills and holdings.</p>`;
 
-  const buildHtml = (personalRows?: Array<[string, string]>) =>
-    alertEmailShell({
-      banner: slot === "open" ? "OPEN BRIEFING" : "CLOSE BRIEFING",
-      bannerColor: slot === "open" ? "#175cd3" : "#0b1524",
-      title,
-      bodyHtml:
-        (personalRows && personalRows.length
-          ? `<h2 style="margin:0 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:#667085">Your account</h2>` +
-            kvRowsHtml(personalRows) +
-            `<div style="height:14px"></div>`
-          : "") + bodyHtml,
-      footerHtml: `<a href="${env.appUrl}/app/dashboard" style="color:#2f6fed">Open dashboard →</a>`,
-    });
-  const html = buildHtml();
+  // Member emails contain their modeled tracking figures, never the owner's
+  // private IB portfolio. Calling with no personal rows builds the owner email.
+  const buildHtml = (personalRows?: Array<[string, string]>) => alertEmailShell({
+    banner: slot === "open" ? "OPEN BRIEFING" : "CLOSE BRIEFING",
+    bannerColor: slot === "open" ? "#175cd3" : "#0b1524",
+    title,
+    bodyHtml: (personalRows !== undefined
+      ? (personalRows.length ? `<h2 style="margin:0 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:#667085">Your modeled tracking</h2>${kvRowsHtml(personalRows)}<div style="height:14px"></div>` : "")
+      : `<h2 style="margin:0 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:#667085">PolyTheta only · IB actuals</h2>${kvRowsHtml(actual.rows)}<div style="height:14px"></div>`) + bodyHtml,
+    footerHtml: `<a href="${env.appUrl}/app/dashboard" style="color:#2f6fed">Open dashboard →</a>`,
+  });
+  const modeledCompact = `${slot === "open" ? "☀️ Open" : "🌙 Close"}: modeled day ${fmtMoney(dayPnl)} | basket ${fmtMoney(weekPnl)} | total ${fmtMoney(totalReturn)}` +
+    (positions.length ? ` | ${positions.map(p => p.ticker).join(" ")}` : " | no started modeled positions");
+  const compact = `${modeledCompact} | ${actual.compact}`;
+  return { title, html: buildHtml(), buildHtml, compact, modeledCompact, dayPnl, weekPnl, totalReturn };
+}
 
-  const compact =
-    `${slot === "open" ? "☀️" : "🌙"} ${slot === "open" ? "Open" : "Close"}: day ${fmtMoney(dayPnl)} | wk ${fmtMoney(weekPnl)} | total ${fmtMoney(totalReturn)}` +
-    (schwab?.liquidationValue != null ? ` | Schwab $${Math.round(schwab.liquidationValue).toLocaleString()}` : "") +
-    (positions.length ? ` | ${positions.map((p) => p.ticker).join(" ")}` : " | no positions");
-
-  return { title, html, buildHtml, compact, dayPnl, weekPnl, totalReturn };
+export async function composeBriefing(slot: "open" | "close") {
+  const [basket, report, broker] = await Promise.all([
+    getCurrentBasket(), getPerformanceReport(),
+    getBrokerPortfolio().catch(() => ({ snapshot: null, stale: true })),
+  ]);
+  return buildBriefing(slot, { basket, report, broker });
 }
 
 export async function sendBriefing(slot: "open" | "close") {
@@ -202,9 +196,9 @@ export async function sendBriefing(slot: "open" | "close") {
         });
         const personalRows: Array<[string, string]> = mine
           ? [
-              ["Your tracked value", `$${Math.round(mine.currentValue).toLocaleString()}`],
+              ["Your tracked value (modeled)", `$${Math.round(mine.currentValue).toLocaleString()}`],
               [
-                "Your total return",
+                "Your total return (modeled)",
                 `${mine.totalReturn >= 0 ? "+" : "-"}$${Math.abs(Math.round(mine.totalReturn)).toLocaleString()} (${mine.totalReturnPct >= 0 ? "+" : ""}${mine.totalReturnPct}%)`,
               ],
               ...(mine.liveWeekPnl != null
@@ -216,8 +210,8 @@ export async function sendBriefing(slot: "open" | "close") {
             ]
           : [];
         const compactLine = mine
-          ? `${briefing.compact} | you $${Math.round(mine.currentValue).toLocaleString()}`
-          : briefing.compact;
+          ? `${briefing.modeledCompact} | your modeled value $${Math.round(mine.currentValue).toLocaleString()}`
+          : briefing.modeledCompact;
         const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
           method: "POST",
           headers: {

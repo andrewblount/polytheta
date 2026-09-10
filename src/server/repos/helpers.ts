@@ -1,5 +1,6 @@
 import type {
   BrokerOrderBlockData,
+  EntryPricingData,
   MarketConditionsData,
   PerformanceSnapshotData,
   PositionAlertData,
@@ -160,7 +161,14 @@ export function normalizePosition(row: {
   actualExitCredit: string | number | null;
   latestPerformance: PerformanceSnapshotData;
   performanceHistory: PerformanceSnapshotData[];
+  sourceMetadata?: Record<string, unknown> | null;
 }): PositionData {
+  const pricing = row.sourceMetadata?.entry_pricing as EntryPricingData | undefined;
+  const entryPricing = pricing && [pricing.credit, pricing.referenceCredit, pricing.elapsedCalendarDays,
+    pricing.referenceSpot, pricing.spot, pricing.iv, pricing.timeEffect, pricing.underlyingEffect,
+    pricing.ivEffect].every(Number.isFinite) && typeof pricing.ivSource === "string"
+    && Number.isFinite(Date.parse(pricing.observedAt)) && Number.isFinite(Date.parse(pricing.estimatedAt))
+    ? pricing : null;
   return {
     id: row.id,
     basketId: row.basketId,
@@ -198,5 +206,6 @@ export function normalizePosition(row: {
     actualExitCredit: asNullableNumber(row.actualExitCredit),
     latestPerformance: row.latestPerformance,
     performanceHistory: row.performanceHistory,
+    entryPricing,
   };
 }

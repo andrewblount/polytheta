@@ -90,7 +90,7 @@ export class WebApiBroker {
     return { conid: Number(d.conid), symbol: pick.ticker, expiry, side: pick.side, strike: pick.K, multiplier: 100, tick: Math.min(...priceIncrements.map(r => r.increment)), priceIncrements, underlyingConid: Number(stocks[0].conid) };
   }
   async quote(contract, { entry = true } = {}) {
-    const path = `iserver/marketdata/snapshot?conids=${contract.conid}${entry ? `,${contract.underlyingConid}` : ''}&fields=84,86,88,85,6509,7308`;
+    const path = `iserver/marketdata/snapshot?conids=${contract.conid}${entry ? `,${contract.underlyingConid}` : ''}&fields=84,86,88,85,6509,7308,7633`;
     await this.request('GET', path); // pre-flight subscribes; first response may be empty
     let row, underlying;
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -103,7 +103,7 @@ export class WebApiBroker {
     const number = v => typeof v === 'number' ? v : typeof v === 'string' && /^-?(?:\d[\d,]*(?:\.\d+)?|\.\d+)$/.test(v) ? Number(v.replaceAll(',', '')) : NaN;
     const ub = number(underlying?.['84']), ua = number(underlying?.['86']);
     const validUnderlying = String(underlying?.['6509'] ?? '').startsWith('R') && ub > 0 && ua >= ub;
-    return { conid: contract.conid, bid: number(row?.['84']), ask: number(row?.['86']), bidSize: number(row?.['88']), askSize: number(row?.['85']), observedAt: entry ? Math.min(Number(row?._updated), Number(underlying?._updated)) : Number(row?._updated), realtime: String(row?.['6509'] ?? '').startsWith('R'), delta: number(row?.['7308']), underlyingPrice: validUnderlying ? (ub + ua) / 2 : NaN, source: 'IB Web API' };
+    return { conid: contract.conid, bid: number(row?.['84']), ask: number(row?.['86']), bidSize: number(row?.['88']), askSize: number(row?.['85']), observedAt: entry ? Math.min(Number(row?._updated), Number(underlying?._updated)) : Number(row?._updated), realtime: String(row?.['6509'] ?? '').startsWith('R'), delta: number(row?.['7308']), optionIv: number(String(row?.['7633'] ?? '').replace(/%$/, '').trim()) / 100, underlyingPrice: validUnderlying ? (ub + ua) / 2 : NaN, source: 'IB Web API' };
   }
   orderPayload(order) {
     assertValidLimit(order);

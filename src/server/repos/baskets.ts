@@ -2,7 +2,7 @@ import { and, desc, eq, gte, lt, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import { env } from "@/lib/env";
-import { currentWeek, addDays, sessionClose } from "../../../shared/market-calendar.mjs";
+import { currentWeek, addDays, sessionClose, weeklyExpiry, easternTime } from "../../../shared/market-calendar.mjs";
 import {
   accessRequests,
   basketMetrics,
@@ -209,11 +209,17 @@ export async function getBasketBySlug(slug: string) {
   return db ? buildBasketFromDb(slug) : env.useDemoData ? buildBasketFromDemo(slug) : null;
 }
 
-export async function getCurrentBasket(now = new Date()) {
+export function currentBasketWeekRange(now = new Date()) {
   const week = currentWeek(now);
+  const nextFridayBasket = easternTime(now).date >= weeklyExpiry(week);
+  return { start: week, end: addDays(week, nextFridayBasket ? 14 : 7) };
+}
+
+export async function getCurrentBasket(now = new Date()) {
+  const range = currentBasketWeekRange(now);
   if (db) {
     const current = await db.query.baskets.findFirst({
-      where: and(eq(baskets.status, "published"), gte(baskets.weekOf, week), lt(baskets.weekOf, addDays(week, 7))),
+      where: and(eq(baskets.status, "published"), gte(baskets.weekOf, range.start), lt(baskets.weekOf, range.end)),
       orderBy: desc(baskets.weekOf),
     });
     if (current) {

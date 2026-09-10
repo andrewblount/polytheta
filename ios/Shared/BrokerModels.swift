@@ -36,6 +36,31 @@ struct BrokerPosition: Codable, Identifiable {
     let status: String
     let canExit: Bool
     let workingEntry: Bool
+    let entryPricing: BrokerEntryPricing?
+    let lossStop: BrokerLossStop?
+}
+struct BrokerLossStop: Codable {
+    let status: String?
+    let baselineEquity: Double?
+    let thresholdAmount: Double?
+    let lossAmount: Double?
+    let lossPct: Double?
+    let triggeredAt: String?
+    let message: String?
+}
+struct BrokerEntryPricing: Codable {
+    let credit: Double
+    let referenceCredit: Double
+    let elapsedCalendarDays: Double
+    let referenceSpot: Double
+    let spot: Double
+    let iv: Double
+    let ivSource: String
+    let timeEffect: Double
+    let underlyingEffect: Double
+    let ivEffect: Double
+    let observedAt: String
+    let estimatedAt: String
 }
 struct BrokerExitRequest: Codable, Identifiable {
     var id: String { requestId }

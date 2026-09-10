@@ -5,11 +5,11 @@ import { entryBudget, planEntry, planExit, validateMargin, exitSignal } from '..
 import { executionCycle } from '../scripts/broker/execution-engine.mjs';
 const now = new Date('2026-09-08T14:00:00Z');
 const settings = validateBrokerSettings({pauseEntries:false});
-const pick={ticker:'ABC',name:'Acme',side:'call',K:25,px:20,atr:2,cr:0.5,doubles_allowed:false,rule_checks:{earnings_clear:'pass',thesis_signals:{radar:'pass'}}};
+const pick={ticker:'ABC',name:'Acme',side:'call',K:25,px:20,atr:2,cr:0.5,iv:1,pricing_reference:{observedAt:now.toISOString(),spot:20,iv:1,vix:20,credit:.5,strike:25,side:'call',expiry:'2026-09-11'},doubles_allowed:false,rule_checks:{earnings_clear:'pass',thesis_signals:{radar:'pass'}}};
 const proposal={basket_date:'2026-09-07',expiry:'2026-09-11',generated_ts:now.toISOString(),data_observed_at:now.toISOString(),picks:[pick]};
 const account={grossPositionValue:0,netLiquidation:10000,availableFunds:10000,excessLiquidity:10000,cash:10000};
 const contract={conid:123,symbol:'ABC',side:'call',strike:25,expiry:proposal.expiry,multiplier:100,tick:0.01};
-const quote={conid:123,bid:0.45,ask:0.55,bidSize:10,askSize:10,delta:0.18,underlyingPrice:20,observedAt:+now,realtime:true};
+const quote={conid:123,bid:0.45,ask:0.55,bidSize:10,askSize:10,delta:0.18,optionIv:1,underlyingPrice:20,observedAt:+now,realtime:true};
 function mock() {
   return {account:'U_TEST',connect:async()=>({mode:'live'}),positions:async()=>[],orders:async()=>[],executions:async()=>[],accountSummary:async()=>account,resolve:async()=>contract,quote:async()=>quote,preview:async()=>({initialMarginChange:500,maintenanceMarginChange:500}),submissions:[],submit:async function(o){this.submissions.push(o);return{orderId:'1',status:'Submitted'}},cancel:async()=>{},modify:async()=>{}};
 }

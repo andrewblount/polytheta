@@ -1,4 +1,4 @@
-import { eq, desc, asc, and, isNull, gte } from "drizzle-orm";
+import { eq, desc, asc, and, isNull, gte, lte } from "drizzle-orm";
 
 import { db } from "@/db";
 import { sessionClose, currentWeek } from "../../../shared/market-calendar.mjs";
@@ -29,6 +29,11 @@ async function pushUrgent(category: "radar_alerts" | "adverse_move", text: strin
 // position is held to expiry; only a radar signal forces an exit).
 const STOP_LOSS_FRACTION = 0.25;
 
+export function entrySnapshotIsDue(entryTimestamp: Date | string, now = new Date()) {
+  const at = +new Date(entryTimestamp);
+  return Number.isFinite(at) && at <= +now;
+}
+
 export async function captureEntrySnapshotsForBasket(basketId: string) {
   if (!db) {
     return { inserted: 0 };
@@ -38,6 +43,7 @@ export async function captureEntrySnapshotsForBasket(basketId: string) {
   let inserted = 0;
 
   for (const row of positionRows) {
+    if (!entrySnapshotIsDue(row.entryTimestamp)) continue;
     const position = normalizePosition({
       ...row,
       latestPerformance: demoBaskets[0].callPositions[0].latestPerformance,
@@ -67,7 +73,7 @@ export async function captureEntrySnapshotsForBasket(basketId: string) {
     inserted += 1;
   }
 
-  await db!
+  if (inserted) await db!
     .update(baskets)
     .set({ lastRefreshAt: new Date(), updatedAt: new Date() })
     .where(eq(baskets.id, basketId));
@@ -122,7 +128,7 @@ export async function runMarketSync(triggeredBy = "manual") {
   try {
     const allRows = await db!.select({ position: positions, basket: baskets }).from(positions)
       .innerJoin(baskets, eq(positions.basketId, baskets.id))
-      .where(and(eq(baskets.status, "published"), isNull(positions.manualCloseDate)))
+      .where(and(eq(baskets.status, "published"), isNull(positions.manualCloseDate), lte(positions.entryTimestamp, new Date())))
       .orderBy(desc(baskets.weekOf), asc(positions.sortOrder), asc(positions.id));
     const [saved] = await db!.select().from(appSettings).where(eq(appSettings.key, "market_sync_cursor"));
     const batch = selectSyncBatch(allRows, (saved?.value ?? {}) as { active?: number; history?: number });
@@ -140,6 +146,7 @@ export async function runMarketSync(triggeredBy = "manual") {
 
       await Promise.all(positionRows.map(async row => {
         if (row.manualCloseDate) return;
+        if (!entrySnapshotIsDue(row.entryTimestamp)) return; // finalized basket awaiting its planned entry window
         let expiryPassed: boolean;
         try { expiryPassed = sessionClose(row.expiry).getTime() <= Date.now(); }
         catch (error) {

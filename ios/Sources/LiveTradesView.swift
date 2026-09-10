@@ -6,7 +6,7 @@ struct LiveTradesView: View {
     @State private var message: String?
     @State private var busy = false
     @State private var exitTarget: BrokerExitInput?
-    private var active: [BrokerPosition] { state?.snapshot?.positions.filter { $0.quantity > 0 || $0.workingEntry || $0.status == "Reconciliation required" } ?? [] }
+    private var active: [BrokerPosition] { state?.snapshot?.positions.filter { $0.quantity > 0 || $0.workingEntry || $0.status == "Reconciliation required" || $0.lossStop?.triggeredAt != nil } ?? [] }
     private var canAct: Bool { state?.isFresh == true && state?.snapshot?.activated == true && error == nil && !busy }
     var body: some View {
         NavigationStack {
@@ -34,6 +34,27 @@ struct LiveTradesView: View {
                         LabeledContent("Average entry fill", value: brokerMoney(p.averageFill))
                         LabeledContent("IB mark", value: brokerMoney(p.mark))
                         LabeledContent("Unrealized P/L", value: brokerMoney(p.unrealizedPnl))
+                        if let stop = p.lossStop {
+                            Text("Ticker loss stop").font(.headline)
+                            Text(stop.message ?? stop.status ?? "Awaiting worker monitoring").font(.caption)
+                            LabeledContent("Ticker loss / limit", value: "\(brokerMoney(stop.lossAmount)) / \(brokerMoney(stop.thresholdAmount))")
+                            LabeledContent("Account equity before entry", value: brokerMoney(stop.baselineEquity))
+                            if let at = stop.triggeredAt, let date = BrokerPortfolioResponse.date(at) {
+                                Text("Triggered: \(date.formatted(date: .abbreviated, time: .shortened))").font(.caption)
+                            }
+                        }
+                        if let pricing = p.entryPricing {
+                            DisclosureGroup("Entry price calculation") {
+                                LabeledContent("Reference premium", value: brokerMoney(pricing.referenceCredit))
+                                LabeledContent("Calendar days elapsed", value: pricing.elapsedCalendarDays.formatted(.number.precision(.fractionLength(2))))
+                                LabeledContent("Time effect", value: brokerMoney(pricing.timeEffect))
+                                LabeledContent("Underlying effect", value: brokerMoney(pricing.underlyingEffect))
+                                LabeledContent("IV effect", value: brokerMoney(pricing.ivEffect))
+                                LabeledContent("Adjusted estimate", value: brokerMoney(pricing.credit))
+                                Text("\(pricing.ivSource) · IV \((pricing.iv * 100).formatted())%").font(.caption)
+                                Text("Reference: \(pricing.observedAt). Estimated: \(pricing.estimatedAt). Actual fill is shown separately.").font(.caption)
+                            }
+                        }
                         Text(p.status).font(.caption)
                         Button("Exit NOW", role: .destructive) { prepareExit(conid: p.conid) }.disabled(!canAct || !p.canExit && !p.workingEntry)
                     }

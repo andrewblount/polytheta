@@ -87,14 +87,17 @@ export function sessionClose(iso) {
   return new Date(+parseDate(date) + (s.closeMinute + offset) * 60000);
 }
 export function assertCurrentDelivery(proposal, now = new Date()) {
+  if (proposal.phase === 'prepared') throw new Error('Preparation basket is not finalized for delivery or entry');
   const today = easternTime(now).date;
-  if (proposal.basket_date !== currentWeek(now)) throw new Error('Basket is for a different trading week');
+  const friday = proposal.allocation_settings?.entryTiming === 'friday-close';
+  const firstEntry = friday ? weeklyExpiry(addDays(proposal.basket_date, -7)) : firstSessionOfWeek(proposal.basket_date);
+  if (proposal.basket_date !== currentWeek(now) && !(friday && proposal.basket_date === addDays(currentWeek(now), 7) && today >= firstEntry)) throw new Error('Basket is for a different trading week');
   if (proposal.expiry !== weeklyExpiry(proposal.basket_date)) throw new Error('Basket expiry does not match the exchange calendar');
-  if (today < firstSessionOfWeek(proposal.basket_date) || +now >= +sessionClose(proposal.expiry)) throw new Error('Basket is outside its entry/expiry window');
+  if (today < firstEntry || +now >= +sessionClose(proposal.expiry)) throw new Error('Basket is outside its entry/expiry window');
   for (const field of ['generated_ts', 'data_observed_at']) {
     const at = new Date(proposal[field]);
     const age = +now - +at;
-    if (!Number.isFinite(age) || age < -60000 || easternTime(at).date < firstSessionOfWeek(proposal.basket_date)) throw new Error(`Basket ${field} is missing or stale`);
+    if (!Number.isFinite(age) || age < -60000 || easternTime(at).date < firstEntry) throw new Error(`Basket ${field} is missing or stale`);
   }
   if (!Array.isArray(proposal.picks) || !proposal.picks.length) throw new Error('Basket has no entries');
 }

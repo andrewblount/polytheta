@@ -8,6 +8,11 @@ import { assertCurrentProposal, assertCurrentDelivery } from '../../shared/marke
 
 const esc = (s) => String(s ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 const money = (n) => `$${Math.round(n).toLocaleString()}`;
+const premium = (n) => Number.isFinite(n) ? `$${n.toFixed(2)}` : 'Unavailable';
+const pricingText = (pick) => {
+  const p = pick.entry_pricing;
+  return p ? `Reference ${premium(p.referenceCredit)} + time ${premium(p.timeEffect)} + stock move ${premium(p.underlyingEffect)} + IV ${premium(p.ivEffect)} = adjusted ${premium(p.credit)} per share. IV source: ${p.ivSource}. Reference ${p.observedAt}; calculated ${p.estimatedAt}.` : '';
+};
 
 function chip(text, bg, fg) {
   return `<span style="background:${bg};color:${fg};font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;white-space:nowrap">${esc(text)}</span>`;
@@ -76,6 +81,7 @@ export function buildBasketEmailHtml(proposal, { deliveryRetry = false } = {}) {
     ${marketHtml}
     ${sideTable('Calls (short)', calls, '#b42318')}
     ${sideTable('Puts (short)', puts, '#175cd3')}
+    ${p.picks.some(x => x.entry_pricing) ? `<h2 style="margin:18px 0 8px;font-size:14px">Entry price calculations</h2>${p.picks.filter(x => x.entry_pricing).map(x => `<p style="font-size:12px;color:#475467"><strong>${esc(x.ticker)} ${esc(x.side)}</strong><br>${esc(pricingText(x))}</p>`).join('')}` : ''}
     <table style="width:100%;border-collapse:collapse;font-size:13px;margin:16px 0 0;background:#f9fafb;border:1px solid #e4e7ec;border-radius:8px">
       <tr>
         <td style="padding:10px 12px"><div style="font-size:10px;text-transform:uppercase;color:#98a2b3">Total margin</div><div style="font-weight:700">${money(totalMargin)}</div></td>
@@ -87,7 +93,7 @@ export function buildBasketEmailHtml(proposal, { deliveryRetry = false } = {}) {
     <h2 style="margin:20px 0 4px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;color:#101828">Copy-paste orders</h2>
     <p style="margin:0 0 4px;font-size:12px;color:#667085">Verify every strike, credit, and margin figure against a fresh IB quote before submitting.</p>
     ${blocksHtml}
-    <p style="margin:16px 0 0;font-size:13px;color:#475467">Published basket. Automated entry requires fresh market data and all current execution checks.</p>
+    <p style="margin:16px 0 0;font-size:13px;color:#475467">Planned entry: ${esc(p.entry_timestamp ?? p.entry_date ?? p.basket_date)}. Automated entry requires fresh IB quotes within the configured entry window and all current execution checks. Estimated premiums are not fill prices.</p>
   </div>
   <div style="padding:12px 20px;border-top:1px solid #e4e7ec;font-size:12px;color:#667085">
     <a href="https://polytheta.com/app/baskets/current" style="color:#2f6fed">Open in Polytheta →</a>
@@ -108,7 +114,7 @@ export async function sendBasketEmail(proposal, { subjectPrefix = '', deliveryRe
   const subject = `${subjectPrefix}${deliveryRetry ? '[Delayed delivery] ' : ''}Weekly Basket ${proposal.basket_date} — ${proposal.picks.length} names, ~$${Math.round(totalCredit).toLocaleString()} credit, GSRS ${proposal.gsrs}`;
   const provenance = `${deliveryRetry ? 'DELAYED DELIVERY: original published basket; prices have not been refreshed.\n' : ''}Original basket generated: ${proposal.generated_ts}\nOriginal market-data snapshot: ${proposal.data_observed_at}`;
   const text = proposal.picks
-    .map((x) => `${x.side.toUpperCase()} ${x.ticker} $${x.K} ${proposal.expiry} — ${x.contracts}x @ ${x.cr} (margin $${x.margin.toLocaleString()})`)
+    .map((x) => `${x.side.toUpperCase()} ${x.ticker} $${x.K} ${proposal.expiry} — ${x.contracts}x @ ${x.cr} (margin $${x.margin.toLocaleString()})${x.entry_pricing ? `\n${pricingText(x)}` : ''}`)
     .join('\n');
 
   const res = await fetchImpl('https://api.sendgrid.com/v3/mail/send', {
@@ -119,7 +125,7 @@ export async function sendBasketEmail(proposal, { subjectPrefix = '', deliveryRe
       personalizations: [{ to: [{ email: to }], subject }],
       from: { email: from },
       content: [
-        { type: 'text/plain', value: `${subject}\n\n${provenance}\n\n${text}\n\nPrices are modeled midpoints, not fills. Bid-side credit can be lower; use verified IB quotes and actual fills.` },
+        { type: 'text/plain', value: `${subject}\n\n${provenance}\nPlanned entry: ${proposal.entry_timestamp ?? proposal.entry_date ?? proposal.basket_date}\n\n${text}\n\nEstimated premiums are not fills. Automated entry requires fresh IB quotes inside the configured entry window; actual credit and commissions come from IB fills.` },
         { type: 'text/html', value: buildBasketEmailHtml(proposal, { deliveryRetry }) },
       ],
     }),

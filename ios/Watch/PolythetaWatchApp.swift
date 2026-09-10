@@ -38,7 +38,7 @@ final class WatchBrokerConnection: NSObject, ObservableObject, WCSessionDelegate
 struct WatchTradesView: View {
     @EnvironmentObject var connection: WatchBrokerConnection
     @State private var target: BrokerExitInput?
-    private var active: [BrokerPosition] { connection.state?.snapshot?.positions.filter { $0.quantity > 0 || $0.workingEntry || $0.status == "Reconciliation required" } ?? [] }
+    private var active: [BrokerPosition] { connection.state?.snapshot?.positions.filter { $0.quantity > 0 || $0.workingEntry || $0.status == "Reconciliation required" || $0.lossStop?.triggeredAt != nil } ?? [] }
     private var canAct: Bool { connection.reachable && !connection.busy && connection.state?.isFresh == true && connection.state?.snapshot?.activated == true }
     var body: some View {
         NavigationStack {
@@ -57,6 +57,11 @@ struct WatchTradesView: View {
                         Text("\(p.strike.formatted()) \(p.side) · \(p.expiry)").font(.caption)
                         Text("\(p.quantity) contracts · \(brokerMoney(p.unrealizedPnl))")
                         Text(p.status).font(.caption)
+                        if let stop = p.lossStop {
+                            Text("Ticker loss stop").font(.caption.bold())
+                            Text(stop.message ?? stop.status ?? "Awaiting monitoring").font(.caption)
+                            Text("Loss \(brokerMoney(stop.lossAmount)) / limit \(brokerMoney(stop.thresholdAmount))").font(.caption)
+                        }
                         Button("Exit NOW", role: .destructive) { prepareExit(conid: p.conid) }.disabled(!canAct || !p.canExit && !p.workingEntry)
                     }
                 }

@@ -1,21 +1,53 @@
-import { and, desc, eq, like, sql } from "drizzle-orm";
+import { desc, eq, like } from "drizzle-orm";
+import postgres from "postgres";
 import { db } from "@/db";
 import { appSettings } from "@/db/schema";
 import { env } from "@/lib/env";
 import { validateExitRequest } from "../../../shared/broker-portfolio.mjs";
 import { planExitRequestQueue } from "../../../shared/exit-request-policy.mjs";
 
+type StoredState = Record<string, unknown>;
+export function brokerPortfolioIsStale({ snapshot, status, settings, settingsUpdatedAt }: {
+  snapshot: StoredState | null; status: StoredState | null; settings: StoredState | null; settingsUpdatedAt?: Date | string;
+}, now = new Date()) {
+  const observedAt = Date.parse(String(snapshot?.observedAt));
+  const age = +now - observedAt;
+  const settingsAt = settingsUpdatedAt == null ? NaN : +new Date(settingsUpdatedAt);
+  return !Number.isFinite(age) || age < -1000 || age > 120000 ||
+    !Number.isFinite(settingsAt) || observedAt < settingsAt || !settings?.executionHostId ||
+    snapshot?.hostId !== settings.executionHostId || status?.hostId !== settings.executionHostId ||
+    snapshot?.connection !== settings.connection || status?.connection !== settings.connection || status?.connected !== true;
+}
+
 export async function getBrokerPortfolio() {
   if (!db) return { snapshot: null, requests: [], stale: true };
-  const [snapshots, requests, statuses] = await Promise.all([
+  const [snapshots, requests, statuses, settings] = await Promise.all([
     db.select().from(appSettings).where(eq(appSettings.key, "broker_portfolio")),
     db.select().from(appSettings).where(like(appSettings.key, "ib_exit:%")).orderBy(desc(appSettings.updatedAt)).limit(30),
     db.select().from(appSettings).where(eq(appSettings.key, "broker_status")),
+    db.select().from(appSettings).where(eq(appSettings.key, "broker")),
   ]);
   const snapshot = snapshots[0]?.value ?? null;
-  const age = Date.now() - Date.parse(String(snapshot?.observedAt));
-  const stale = !Number.isFinite(age) || age < -1000 || age > 120000 || statuses[0]?.value.connected !== true;
-  return { snapshot, requests: requests.map(r => r.value), stale };
+  const stale = brokerPortfolioIsStale({ snapshot, status: statuses[0]?.value ?? null, settings: settings[0]?.value ?? null, settingsUpdatedAt: settings[0]?.updatedAt });
+  return { snapshot, requests: requests.map(r => r.value).filter(request => request.accountKey === snapshot?.accountKey), stale };
+}
+
+type ExitQueueQuery = (text: string, parameters?: string[]) => Promise<{ value: StoredState }[]>;
+// The caller supplies an interactive transaction. neon-http's transaction()
+// cannot run this read/decide/write flow, so production uses postgres.js below.
+export async function queueBrokerExit(command: StoredState, query: ExitQueueQuery) {
+  await query("select pg_advisory_xact_lock(72762413)");
+  const key = `ib_exit:${command.requestId}`;
+  const existing = await query("select value from app_settings where key=$1", [key]);
+  const pending = await query("select value from app_settings where key like 'ib_exit:%' and value->>'status' in ('queued','monitoring')");
+  const queued = planExitRequestQueue(command, { existing: existing[0]?.value, pending: pending.map(row => row.value) });
+  if (!queued.create) return queued.request;
+  await query("insert into app_settings (key,value,updated_at) values ($1,$2::jsonb,now())", [key, JSON.stringify(queued.request)]);
+  if (command.scope === "all") {
+    await query(`insert into app_settings (key,value,updated_at) values ('broker','{"pauseEntries":true}'::jsonb,now())
+      on conflict(key) do update set value=app_settings.value || '{"pauseEntries":true}'::jsonb,updated_at=now()`);
+  }
+  return queued.request;
 }
 
 export async function requestBrokerExit(input: unknown, actor: string) {
@@ -23,20 +55,9 @@ export async function requestBrokerExit(input: unknown, actor: string) {
   const state = await getBrokerPortfolio();
   if (state.stale) throw new Error("IB position data is stale. Restore the connection before requesting an exit.");
   const command = { ...validateExitRequest(input, state.snapshot), actor };
-  const database = db;
-  return database.transaction(async tx => {
-    // Serializes button double-taps across web, phone and watch.
-    await tx.execute(sql`select pg_advisory_xact_lock(72762413)`);
-    const existing = await tx.select().from(appSettings).where(eq(appSettings.key, `ib_exit:${command.requestId}`));
-    const pending = await tx.select().from(appSettings).where(and(like(appSettings.key, "ib_exit:%"), sql`${appSettings.value}->>'status' in ('queued','monitoring')`));
-    const queued = planExitRequestQueue(command, { existing: existing[0]?.value, pending: pending.map(row => row.value) });
-    if (!queued.create) return queued.request;
-    await tx.insert(appSettings).values({ key: `ib_exit:${command.requestId}`, value: queued.request });
-    if (command.scope === "all") {
-      // Preserve concurrent settings changes while pausing new entries.
-      await tx.insert(appSettings).values({ key: "broker", value: { pauseEntries: true } })
-        .onConflictDoUpdate({ target: appSettings.key, set: { value: sql`${appSettings.value} || '{"pauseEntries":true}'::jsonb`, updatedAt: new Date() } });
-    }
-    return queued.request;
-  });
+  const sql = postgres(env.databaseUrl!, { max: 1, prepare: false, connect_timeout: 10 });
+  try {
+    return await sql.begin(async tx => queueBrokerExit(command, async (text, parameters = []) =>
+      Array.from(await tx.unsafe<{ value: StoredState }[]>(text, parameters))));
+  } finally { await sql.end({ timeout: 5 }); }
 }

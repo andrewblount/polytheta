@@ -14,7 +14,8 @@
     "db:seed": "tsx scripts/seed.ts",
     "test": "node --import tsx --test tests/*.test.mjs",
     "ib:check": "node scripts/broker/worker.mjs --check",
-    "ib:run": "node scripts/broker/worker.mjs"
+    "ib:run": "node scripts/broker/worker.mjs",
+    "ib:install": "node scripts/broker/install-worker.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

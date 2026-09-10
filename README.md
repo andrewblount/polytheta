@@ -125,6 +125,9 @@ npm run build
 
 - [Entry, exit, allocation and exact GSRS formula](docs/trading_rules.md), also visible at `/trading-rules`.
 - [IB configuration, execution and reconciliation guide](docs/ib_operations.md).
+- [Friday/Monday timing and the entry-price calculation](docs/entry_timing_and_pricing.md). Friday holidays use the preceding session and actual early close. Preparation and final publication are separate; final checks run before the configured entry window.
+- Settings selects the execution computer, IB connection, entry window and maximum loss per ticker (default 20% of account equity recorded before entry). The running worker monitors the loss; it does not place a standing stop at entry.
 - `/app/live` and the iOS / paired Watch app show only attributable PolyTheta positions, actual entry fills and IB marks. Owner-confirmed exits are queued for the broker worker; a queued request is not a confirmed fill.
 - `npm test` exercises the exchange calendar, source recovery, allocation, strike minimums, news relevance, broker adapters and order-state safety with synthetic data. It never connects to a broker or sends email.
 - `npm run ib:check` is a read-only broker check. Settings changes and deployment do not activate orders.
+- `npm run ib:check -- --select-this-host` registers this computer and selects it only if no host is selected. `npm run ib:install` installs the local schedules using this computer's paths. The private database journal and direct PostgreSQL execution lock preserve ownership and prevent overlapping workers when moving computers.

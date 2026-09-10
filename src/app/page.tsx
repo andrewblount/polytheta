@@ -43,7 +43,7 @@ export default async function HomePage() {
             {[
               {
                 label: "Weekly cadence",
-                value: "Fresh baskets each Monday",
+                value: "Fresh baskets before entry",
               },
               {
                 label: "Tracking confidence",

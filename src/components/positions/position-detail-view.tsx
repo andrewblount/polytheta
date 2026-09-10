@@ -3,6 +3,7 @@ import { PositionStateBadge } from "@/components/baskets/position-state-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency, formatDateTimeLabel, formatPercent } from "@/lib/format";
 import type { PositionDetailData } from "@/lib/types";
+import { EntryPricingDetails } from "@/components/broker/entry-pricing-details";
 
 export function PositionDetailView({ position }: { position: PositionDetailData }) {
   return (
@@ -54,6 +55,7 @@ export function PositionDetailView({ position }: { position: PositionDetailData 
           </CardContent>
         </Card>
       </section>
+      {position.entryPricing && <EntryPricingDetails pricing={position.entryPricing} />}
       <section className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>

@@ -11,13 +11,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createYahooClient } from './lib/yahoo_client.mjs';
-import { deriveBasketDate } from './lib/basket_date.mjs';
-import { currentWeek, isMarketOpen, easternTime, weeklyExpiry } from '../shared/market-calendar.mjs';
+import { isMarketOpen, easternTime, weeklyExpiry } from '../shared/market-calendar.mjs';
+import { entryWeek, isEntryWindow } from '../shared/entry-schedule.mjs';
+import { loadBrokerSettings } from './lib/broker_settings.mjs';
+import { localWorkerIdentity } from './broker/host-runtime.mjs';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '..');
 try { process.loadEnvFile(path.join(REPO_ROOT, '.env.local')); } catch { /* optional */ }
 
 const yf = createYahooClient();
+const settings = await loadBrokerSettings();
+if (settings.executionHostId && settings.executionHostId !== localWorkerIdentity().id) {
+  console.log('Skipped: another execution computer is selected'); process.exit(0);
+}
 
 // Flag thresholds: price moved >4% or >0.5 ATR against the entry assumption,
 // or the remaining buffer to strike dropped below the side's floor.
@@ -26,10 +32,11 @@ const MAX_DRIFT_ATR = 0.5;
 
 const dateArg = process.argv.includes('--date')
   ? process.argv[process.argv.indexOf('--date') + 1]
-  : deriveBasketDate();
+  : entryWeek(settings);
 
 if (!isMarketOpen()) { console.log('Skipped: exchange closed'); process.exit(0); }
-if (dateArg !== currentWeek()) throw new Error('Refusing stale-week revalidation');
+if (dateArg !== entryWeek(settings)) throw new Error('Refusing stale-week revalidation');
+if (!isEntryWindow(dateArg, settings)) { console.log('Skipped: outside the configured entry window'); process.exit(0); }
 const proposalFile = path.join(REPO_ROOT, 'baskets', dateArg, 'data', 'basket_proposal.json');
 if (!fs.existsSync(proposalFile)) {
   console.error(`No proposal at ${proposalFile}`);
@@ -37,6 +44,7 @@ if (!fs.existsSync(proposalFile)) {
 }
 const proposal = JSON.parse(fs.readFileSync(proposalFile, 'utf8'));
 if (proposal.basket_date !== dateArg || proposal.expiry !== weeklyExpiry(dateArg)) throw new Error('Proposal is for another trading week or expiry');
+if (proposal.phase !== 'final') { console.log('Skipped: basket has not passed final checks'); process.exit(0); }
 
 const rows = [];
 let flagged = 0;

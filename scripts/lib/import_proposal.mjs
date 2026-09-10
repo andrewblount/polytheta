@@ -11,6 +11,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import postgres from 'postgres';
+import { entrySchedule } from '../../shared/entry-schedule.mjs';
+import { sessionClose } from '../../shared/market-calendar.mjs';
+import { pricingReference } from '../../shared/entry-pricing.mjs';
 
 const DISCLAIMER =
   'I am not a financial advisor, registered broker, or investment professional. ' +
@@ -170,9 +173,53 @@ const RULES = [
 
 export async function importProposal(proposalPath, { publish = false, connectionFactory = () => postgres(requireUrl(), { max: 1 }) } = {}) {
   const proposal = JSON.parse(fs.readFileSync(proposalPath, 'utf8'));
+  if (proposal.phase === 'prepared') throw new Error('A preparation basket cannot be imported; finalization is required');
+  if (proposal.phase === 'final') {
+    const schedule = entrySchedule(proposal.basket_date, proposal.allocation_settings);
+    const entry = Date.parse(proposal.entry_timestamp);
+    if (!Number.isFinite(entry) || entry < +schedule.start || entry >= +schedule.end || proposal.entry_date !== schedule.date || proposal.expiry !== schedule.expiry || schedule.skipped) throw new Error('Final basket entry timestamp/expiry does not match its exchange window');
+    if (!Array.isArray(proposal.picks) || !proposal.picks.length) throw new Error('Final basket has no entries');
+    const identities = proposal.picks.map(p => `${p.ticker}:${p.side}:${p.K}`);
+    if (new Set(identities).size !== identities.length) throw new Error('Final basket contains duplicate option contracts');
+    for (const p of proposal.picks) {
+      pricingReference(p, proposal);
+      if (!p.entry_pricing || p.entry_pricing.estimatedAt !== proposal.entry_timestamp) throw new Error('Final basket is missing its entry-pricing audit');
+    }
+  }
   const connection = connectionFactory();
   try {
     return await connection.begin(tx => importInTransaction(proposal, publish, { query: (text, params) => tx.unsafe(text, params) }));
+  } finally { await connection.end(); }
+}
+
+const canonical = value => JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item);
+function verifyStoredProposal(proposal, stored, publishedAt) {
+  const identity = rows => JSON.stringify(rows.map(p => [p.ticker, p.side, Number(p.K ?? p.strike), (p.expiry instanceof Date ? p.expiry.toISOString().slice(0,10) : String(p.expiry ?? proposal.expiry).slice(0,10)), Number(p.contracts), Number(p.cr ?? p.estimated_entry_credit)]).sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
+  if (identity(stored) !== identity(proposal.picks ?? [])) throw new Error(`Published basket ${proposal.basket_date} is immutable; create an explicit revision instead of overwriting its trade history`);
+  if (proposal.phase === 'final') {
+    if (publishedAt != null && +new Date(publishedAt) !== +new Date(proposal.generated_ts)) throw new Error('Published basket has a different original publication timestamp');
+    for (const p of proposal.picks) {
+      const previous = stored.find(row => row.ticker === p.ticker && row.side === p.side && Number(row.strike) === p.K);
+      if (+new Date(previous.entry_timestamp) !== +new Date(proposal.entry_timestamp) || canonical(previous.source_metadata?.pricing_reference) !== canonical(p.pricing_reference) || canonical(previous.source_metadata?.entry_pricing) !== canonical(p.entry_pricing)) throw new Error(`Published basket ${proposal.basket_date} has a different pricing audit; refusing to relabel the original entry`);
+    }
+  }
+}
+// Resolve an uncertain import using readback only. This function cannot insert,
+// publish, change status or extend an entry window, even when the basket is late.
+export async function findPublishedProposal(proposal, { connectionFactory = () => postgres(requireUrl(), { max: 1 }) } = {}) {
+  if (proposal.phase !== 'final') throw new Error('Only a frozen final proposal can be reconciled');
+  const slug = `weekly-basket-${proposal.basket_date}`;
+  const connection = connectionFactory();
+  try {
+    return await connection.begin(async tx => {
+      const baskets = await tx.unsafe('select id, status, publication_date from baskets where slug=$1', [slug]);
+      const basket = baskets[0];
+      if (!basket || basket.status !== 'published') return null;
+      if (+new Date(basket.publication_date) !== +new Date(proposal.generated_ts)) throw new Error('Published basket has a different original publication timestamp');
+      const stored = await tx.unsafe('select ticker, side, strike, expiry, contracts, estimated_entry_credit, entry_timestamp, source_metadata from positions where basket_id=$1 order by sort_order', [basket.id]);
+      verifyStoredProposal(proposal, stored, basket.publication_date);
+      return { slug, basketId: basket.id, publishedAt: new Date(basket.publication_date).toISOString() };
+    });
   } finally { await connection.end(); }
 }
 
@@ -183,7 +230,7 @@ async function importInTransaction(proposal, publish, sql) {
   const picks = proposal.picks ?? [];
   const totals = proposal.totals ?? {};
   const slug = `weekly-basket-${basketDate}`;
-  const prettyDate = new Date(`${basketDate}T00:00:00Z`).toLocaleDateString('en-US', {
+  const prettyDate = new Date(`${proposal.entry_date ?? basketDate}T00:00:00Z`).toLocaleDateString('en-US', {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
@@ -200,7 +247,7 @@ async function importInTransaction(proposal, publish, sql) {
   const holdDays = Math.max(
     1,
     Math.round(
-      (new Date(`${expiry}T00:00:00Z`) - new Date(`${basketDate}T00:00:00Z`)) / 86400000,
+      ((proposal.entry_timestamp ? sessionClose(expiry) : new Date(`${expiry}T00:00:00Z`)) - new Date(proposal.entry_timestamp ?? `${basketDate}T00:00:00Z`)) / 86400000,
     ),
   );
   const dailyTheta = Math.round(totalCredit / holdDays);
@@ -232,16 +279,15 @@ async function importInTransaction(proposal, publish, sql) {
 
   // ---- baskets (upsert on slug) ----
   await sql.query('select pg_advisory_xact_lock(hashtext($1))', [slug]);
-  const existing = await sql.query('select id, status from baskets where slug = $1', [slug]);
+  const existing = await sql.query('select id, status, publication_date from baskets where slug = $1', [slug]);
   const status = publish ? 'published' : 'archived';
   let basketId;
 
   if (existing.length) {
     basketId = existing[0].id;
     // A retry must not delete positions, fills, alert deduplication or performance.
-    const stored = await sql.query('select ticker, side, strike, expiry, contracts, estimated_entry_credit from positions where basket_id=$1 order by sort_order', [basketId]);
-    const identity = rows => JSON.stringify(rows.map(p => [p.ticker, p.side, Number(p.K ?? p.strike), (p.expiry instanceof Date ? p.expiry.toISOString().slice(0,10) : String(p.expiry ?? expiry).slice(0,10)), Number(p.contracts), Number(p.cr ?? p.estimated_entry_credit)]).sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
-    if (identity(stored) !== identity(picks)) throw new Error(`Published basket ${basketDate} is immutable; create an explicit revision instead of overwriting its trade history`);
+    const stored = await sql.query('select ticker, side, strike, expiry, contracts, estimated_entry_credit, entry_timestamp, source_metadata from positions where basket_id=$1 order by sort_order', [basketId]);
+    verifyStoredProposal(proposal, stored, existing[0].publication_date);
     if (existing[0].status !== status) await sql.query('update baskets set status=$2, updated_at=now() where id=$1', [basketId, status]);
     return { slug, basketId, basketDate, expiry, status, positions: stored.length, totalMargin, totalCredit, unchanged: true };
   } else {
@@ -316,7 +362,7 @@ async function importInTransaction(proposal, publish, sql) {
   );
 
   // ---- positions ----
-  const entryTs = proposal.generated_ts;
+  const entryTs = proposal.entry_timestamp ?? proposal.generated_ts;
   let sortOrder = 0;
   const positionIds = [];
   for (const p of picks) {

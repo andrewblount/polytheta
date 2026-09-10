@@ -228,6 +228,11 @@ export async function runUniverseQuotes(OUT, { client = yf, now = new Date(), sl
 }
 
 // Step 3: option chains + IV summary (resumable via _chains_state.json).
+export function chainUnderlying(quote, receivedAt) {
+  const observed = new Date(quote?.regularMarketTime), age = +receivedAt - +observed;
+  if (!Number.isFinite(quote?.regularMarketPrice) || quote.regularMarketPrice <= 0 || !Number.isFinite(age) || age < -60000 || age > 20 * 60000 || easternTime(observed).date !== easternTime(receivedAt).date) throw new Error('Current-session underlying quote unavailable for the option snapshot');
+  return { price: quote.regularMarketPrice, underlyingObservedAt: observed.toISOString() };
+}
 async function runChains(OUT, EXPIRY_ISO, { chunkLimit = 999999 } = {}) {
   const universeFile = path.join(OUT, 'universe_8to40.csv');
   if (!fs.existsSync(universeFile)) throw new Error(`missing ${universeFile}`);
@@ -252,21 +257,20 @@ async function runChains(OUT, EXPIRY_ISO, { chunkLimit = 999999 } = {}) {
 
   const chainsFile = path.join(OUT, `chains_${EXPIRY_ISO}_v2.csv`);
   const summaryFile = path.join(OUT, 'chain_summary_v2.csv');
-  const CHAIN_HEADER = 'ticker,strike,type,bid,ask,last,iv,volume,oi,delta_est,distance_pct';
-  const SUMMARY_HEADER = 'ticker,price,atm_iv,atm_iv_pct,hv20_now,hv20_min,hv20_max,hv_rank,atr14,call_otm_vol_total,put_otm_vol_total,best_call_strike_d18,best_call_credit,best_call_iv,best_put_strike_d18,best_put_credit,best_put_iv,mom1d_pct,mom3d_pct,mom10d_pct';
+  const CHAIN_HEADER = 'ticker,strike,type,bid,ask,last,iv,volume,oi,delta_est,distance_pct,chain_received_at,underlying_observed_at';
+  const SUMMARY_HEADER = 'ticker,price,atm_iv,atm_iv_pct,hv20_now,hv20_min,hv20_max,hv_rank,atr14,call_otm_vol_total,put_otm_vol_total,best_call_strike_d18,best_call_credit,best_call_iv,best_put_strike_d18,best_put_credit,best_put_iv,mom1d_pct,mom3d_pct,mom10d_pct,chain_received_at,underlying_observed_at';
   if (!fs.existsSync(chainsFile)) fs.writeFileSync(chainsFile, CHAIN_HEADER + '\n');
   if (!fs.existsSync(summaryFile)) fs.writeFileSync(summaryFile, SUMMARY_HEADER + '\n');
 
   const now = new Date();
   const histStart = new Date(now.getTime() - 365 * 86400 * 1000);
   const expiryDate = new Date(EXPIRY_ISO + 'T00:00:00Z');
-  const T = Math.max((sessionClose(EXPIRY_ISO).getTime() - now.getTime()) / (365 * 86400 * 1000), 1 / (365 * 24));
   const r = 0.043;
 
   const remaining = allTickers.filter((t) => !doneSet.has(t.ticker));
   const work = remaining.slice(0, chunkLimit);
   let processed = 0;
-  for (const { ticker, price } of work) {
+  for (const { ticker } of work) {
     try {
       const hist = await yf.chart(ticker, { period1: histStart, period2: now, interval: '1d' });
       const closes = hist.quotes.map((q) => q.close).filter((c) => c != null && c > 0);
@@ -287,6 +291,12 @@ async function runChains(OUT, EXPIRY_ISO, { chunkLimit = 999999 } = {}) {
       const mom1d = momPct(1), mom3d = momPct(3), mom10d = momPct(10);
 
       const chain = await yf.options(ticker, { date: expiryDate });
+      const receivedAt = new Date();
+      let underlying;
+      try { underlying = chainUnderlying(chain?.quote, receivedAt); }
+      catch { underlying = chainUnderlying(await yf.quote(ticker), new Date()); }
+      const { price, underlyingObservedAt } = underlying;
+      const T = Math.max((sessionClose(EXPIRY_ISO).getTime() - receivedAt.getTime()) / (365 * 86400 * 1000), 1 / (365 * 24));
       const expiryChain = chain?.options?.find(o => new Date(o.expirationDate).toISOString().slice(0, 10) === EXPIRY_ISO);
       if (!expiryChain) throw new Error('Requested expiry unavailable; refusing a different contract date');
       const calls = expiryChain.calls ?? [];
@@ -299,7 +309,7 @@ async function runChains(OUT, EXPIRY_ISO, { chunkLimit = 999999 } = {}) {
         const delta = iv ? bsDelta(price, c.strike, T, r, iv, 'call') : null;
         const dist = ((c.strike - price) / price) * 100;
         const mid = c.bid != null && c.ask != null ? (c.bid + c.ask) / 2 : c.lastPrice ?? null;
-        chainOut.push(csvRow([ticker, c.strike, 'call', c.bid, c.ask, c.lastPrice, iv, c.volume, c.openInterest, delta?.toFixed(3), dist.toFixed(2)]));
+        chainOut.push(csvRow([ticker, c.strike, 'call', c.bid, c.ask, c.lastPrice, iv, c.volume, c.openInterest, delta?.toFixed(3), dist.toFixed(2), receivedAt.toISOString(), underlyingObservedAt]));
         if (Math.abs(c.strike - price) / price < 0.03 && iv) { atmSum += iv; atmN++; }
         if (c.strike > price) cVol += c.volume ?? 0;
         if (delta != null && delta >= 0.13 && delta <= 0.22 && mid != null && mid > 0.01 && c.bid != null && c.bid > 0) {
@@ -311,7 +321,7 @@ async function runChains(OUT, EXPIRY_ISO, { chunkLimit = 999999 } = {}) {
         const delta = iv ? bsDelta(price, p.strike, T, r, iv, 'put') : null;
         const dist = ((p.strike - price) / price) * 100;
         const mid = p.bid != null && p.ask != null ? (p.bid + p.ask) / 2 : p.lastPrice ?? null;
-        chainOut.push(csvRow([ticker, p.strike, 'put', p.bid, p.ask, p.lastPrice, iv, p.volume, p.openInterest, delta?.toFixed(3), dist.toFixed(2)]));
+        chainOut.push(csvRow([ticker, p.strike, 'put', p.bid, p.ask, p.lastPrice, iv, p.volume, p.openInterest, delta?.toFixed(3), dist.toFixed(2), receivedAt.toISOString(), underlyingObservedAt]));
         if (Math.abs(p.strike - price) / price < 0.03 && iv) { atmSum += iv; atmN++; }
         if (p.strike < price) pVol += p.volume ?? 0;
         if (delta != null && delta <= -0.13 && delta >= -0.22 && mid != null && mid > 0.01 && p.bid != null && p.bid > 0) {
@@ -329,6 +339,7 @@ async function runChains(OUT, EXPIRY_ISO, { chunkLimit = 999999 } = {}) {
         bestCall?.strike, bestCall?.mid?.toFixed(3), bestCall?.iv?.toFixed(4),
         bestPut?.strike, bestPut?.mid?.toFixed(3), bestPut?.iv?.toFixed(4),
         mom1d?.toFixed(1), mom3d?.toFixed(1), mom10d?.toFixed(1),
+        receivedAt.toISOString(), underlyingObservedAt,
       ]) + '\n');
       state.done.push(ticker);
       doneSet.add(ticker);
@@ -348,7 +359,7 @@ export async function runRefresh({ OUT, EXPIRY_ISO, chunkLimit, force = false })
   let manifest = {};
   try { manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8')); } catch { /* first run */ }
   const age = Date.now() - new Date(manifest.started_at).getTime();
-  if (force || !Number.isFinite(age) || age < 0 || age > 2 * 3600000 || manifest.expiry !== EXPIRY_ISO) {
+  if (force || !Number.isFinite(age) || age < 0 || age > 2 * 3600000 || manifest.expiry !== EXPIRY_ISO || manifest.snapshot_schema !== 2) {
     // Preserve previous source artifacts before creating a coherent fresh run.
     const archive = path.join(OUT, 'refresh_history', new Date().toISOString().replaceAll(':', '-'));
     fs.mkdirSync(archive, { recursive: true });
@@ -356,7 +367,7 @@ export async function runRefresh({ OUT, EXPIRY_ISO, chunkLimit, force = false })
       const old = path.join(OUT, file);
       if (fs.existsSync(old)) fs.renameSync(old, path.join(archive, file));
     }
-    manifest = { started_at: new Date().toISOString(), expiry: EXPIRY_ISO };
+    manifest = { started_at: new Date().toISOString(), expiry: EXPIRY_ISO, snapshot_schema: 2 };
     fs.writeFileSync(manifestFile, JSON.stringify(manifest));
   }
   const stepMacro = await runMacro(OUT);

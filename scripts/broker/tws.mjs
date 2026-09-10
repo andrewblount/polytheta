@@ -103,7 +103,7 @@ export class TwsBroker {
         [EventName.tickPrice, (req, field, value) => { if (req !== id) return; if (field === 1) { q.bid = value; bidAt = Date.now(); } if (field === 2) { q.ask = value; askAt = Date.now(); } ready(); }],
         [EventName.tickSize, (req, field, value) => { if (req !== id) return; if (field === 0) q.bidSize = Number(value); if (field === 3) q.askSize = Number(value); ready(); }],
         [EventName.marketDataType, (req, type) => { if (req !== id) return; q.realtime = type === 1; if (type !== 1) finish(new Error('IB option data is delayed or frozen')); else ready(); }],
-        [EventName.tickOptionComputation, (req, field, ...values) => { if (req !== id || field !== 13) return; /* signature includes tickAttrib */ q.delta = values[2]; q.underlyingPrice = values[8]; ready(); }],
+        [EventName.tickOptionComputation, (req, field, ...values) => { if (req !== id || field !== 13) return; /* signature includes tickAttrib */ q.optionIv = values[1]; q.delta = values[2]; q.underlyingPrice = values[8]; ready(); }],
         [EventName.error, (error, code, req) => { if (req === id) finish(new Error(`IB market data unavailable (${code})`)); }],
       ];
       const timer = setTimeout(() => finish(new Error('IB live bid/ask/greeks unavailable')), 15000);

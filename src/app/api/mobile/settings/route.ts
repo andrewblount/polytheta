@@ -1,4 +1,4 @@
-import { getBrokerSettings, saveBrokerSettings, getBrokerStatus } from "@/server/services/broker-settings";
+import { getBrokerSettings, saveBrokerSettings, getBrokerStatus, getExecutionHosts, mergeBrokerSettingsUpdate } from "@/server/services/broker-settings";
 import {
   DEFAULT_NOTIFICATIONS,
   NOTIFICATION_CATEGORIES,
@@ -13,7 +13,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   if (!mobileAuthOk(request)) return unauthorized();
-  return Response.json({ notifications: await getNotificationSettings(), broker: await getBrokerSettings(), brokerStatus: await getBrokerStatus() });
+  const [notifications, broker, brokerStatus, executionHosts] = await Promise.all([getNotificationSettings(), getBrokerSettings(), getBrokerStatus(), getExecutionHosts()]);
+  return Response.json({ notifications, broker, brokerStatus, executionHosts }, { headers: { "Cache-Control": "no-store" } });
 }
 
 // Body: { notifications: { briefing_close: { email: false }, ... } } — partial
@@ -24,12 +25,14 @@ export async function POST(request: Request) {
   let body: { broker?: Record<string, unknown>; notifications?: Record<string, Record<string, unknown>> };
   try {
     body = await request.json();
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("Invalid settings payload");
+    if (body.notifications != null && (typeof body.notifications !== "object" || Array.isArray(body.notifications))) throw new Error("Invalid notification settings");
   } catch {
     return Response.json({ error: "invalid JSON" }, { status: 400 });
   }
   let broker;
-  if (body.broker) {
-    try { broker = await saveBrokerSettings({ ...await getBrokerSettings(), ...body.broker }); }
+  if (body.broker !== undefined) {
+    try { broker = await saveBrokerSettings(mergeBrokerSettingsUpdate(await getBrokerSettings(), body.broker)); }
     catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Invalid trading settings" }, { status: 400 }); }
   }
   const incoming = body.notifications ?? {};

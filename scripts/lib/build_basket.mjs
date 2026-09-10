@@ -21,6 +21,8 @@ import { calculateGsrs } from '../../shared/gsrs.mjs';
 import { DEFAULT_BROKER_SETTINGS, validateBrokerSettings, basketCounts, isExcluded } from '../../shared/broker-settings.mjs';
 import { minimumOtmFor, otmPercent } from '../../shared/strike-settings.mjs';
 import { firstSessionOfWeek, easternTime } from '../../shared/market-calendar.mjs';
+import { entrySchedule } from '../../shared/entry-schedule.mjs';
+import { preparationPolicy } from './finalize_basket.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), '..', '..');
 
@@ -71,9 +73,11 @@ export function selectAffordableBasket({ settings, modelEquity, gsrs, select }) 
   return { auto: { picks: [], skipped: { calls: [], puts: [] }, pool_counts: { calls: 0, puts: 0 } }, picks: [], allocationScale: 1, backingPerTrade: 0 };
 }
 
-export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget = 55000, nPerSide = 4, brokerSettings = DEFAULT_BROKER_SETTINGS }) {
+export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget = 55000, nPerSide = 4, brokerSettings = DEFAULT_BROKER_SETTINGS, outFileName = 'basket_proposal.json' }) {
   const settings = validateBrokerSettings(brokerSettings);
-  const HOLD_START = firstSessionOfWeek(BASKET_DATE);
+  const schedule = entrySchedule(BASKET_DATE, settings);
+  if (EXPIRY_ISO !== schedule.expiry) throw new Error('Basket expiry does not match the selected exchange week');
+  const HOLD_START = schedule.date;
   const HOLD_END = EXPIRY_ISO;
 
   const { all } = runFilterAndRefine(OUT);
@@ -85,11 +89,13 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
 
   const tv = JSON.parse(fs.readFileSync(path.join(OUT, 'tv_macros.json'), 'utf8'));
   const HY_OAS = tv.hy_oas?.value, PC = tv.pc_ratio?.total;
+  const tvAge = Date.now() - Date.parse(tv.fetched_ts);
   if (!Number.isFinite(HY_OAS) || HY_OAS <= 0 || !Number.isFinite(PC) || PC <= 0 || tv.error ||
-      Date.now() - Date.parse(tv.fetched_ts) > 2 * 3600000) throw new Error('Macro inputs are unavailable or stale; retry data import');
+      !Number.isFinite(tvAge) || tvAge < -60000 || tvAge > 2 * 3600000) throw new Error('Macro inputs are unavailable or stale; retry data import');
   const tv_macros_source = { hy_oas: `FRED:BAMLH0A0HYM2 ${tv.hy_oas.date}`, pc: `CBOE ${tv.pc_ratio.as_of}` };
   const refresh = JSON.parse(fs.readFileSync(path.join(OUT, 'data_refresh.json'), 'utf8'));
-  if (refresh.expiry !== EXPIRY_ISO || Date.now() - Date.parse(refresh.started_at) > 2 * 3600000) throw new Error('Yahoo source snapshot is stale');
+  const refreshAge = Date.now() - Date.parse(refresh.started_at);
+  if (refresh.expiry !== EXPIRY_ISO || !Number.isFinite(refreshAge) || refreshAge < -60000 || refreshAge > 2 * 3600000) throw new Error('Yahoo source snapshot is stale');
 
   // ---- GSRS first: it gates put-side participation and sizing ----
   const macro = (t) => parseFloat(macroByT[t]?.price);
@@ -221,6 +227,9 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
       // as a news query ("SLS" is also the Space Launch System).
       name: sm.name && sm.name !== p.ticker ? sm.name : null,
       px: +px.toFixed(2), K: p.K, bid, ask, cr: mid,
+      pricing_reference: { observedAt: row.chain_received_at ?? sm.chain_received_at ?? refresh.started_at, underlyingObservedAt: row.underlying_observed_at ?? sm.underlying_observed_at ?? null,
+        observationBasis: row.chain_received_at ? 'Yahoo chain response received' : 'legacy refresh start; exact quote time unavailable', ticker: p.ticker,
+        spot: px, iv, vix: VIX, vixObservedAt: macroByT['^VIX']?.market_time ?? null, credit: mid, strike: p.K, side: p.side, expiry: EXPIRY_ISO },
       minimum_otm_pct: minimumOtmFor(settings, p.ticker, p.side, EXPIRY_ISO),
       entry_otm_pct: +otmPercent(p.side, p.K, px).toFixed(3),
       iv: +iv.toFixed(3), delta: +delta.toFixed(3),
@@ -262,7 +271,9 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
   }, { callCredit: 0, putCredit: 0, callMargin: 0, putMargin: 0 });
 
   const proposal = {
-    basket_date: BASKET_DATE, entry_date: easternTime().date, first_session: HOLD_START, expiry: EXPIRY_ISO,
+    basket_date: BASKET_DATE, entry_date: schedule.date, first_session: firstSessionOfWeek(BASKET_DATE), expiry: EXPIRY_ISO,
+    phase: 'prepared', preparation_policy: preparationPolicy(settings),
+    entry_window: { start: schedule.start.toISOString(), end: schedule.end.toISOString() },
     data_observed_at: refresh.started_at,
     policy: 'v3-news-only-no-doubling',
     allocation_settings: settings, allocation_scale: allocationScale, model_equity: modelEquity,
@@ -311,7 +322,7 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
     totals,
   };
 
-  const outFile = path.join(OUT, 'basket_proposal.json');
+  const outFile = path.join(OUT, outFileName);
   fs.writeFileSync(outFile, JSON.stringify(proposal, null, 2));
   return { outFile, gsrs, totals, picks: enriched };
 }

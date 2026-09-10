@@ -1,7 +1,9 @@
-import { assertCurrentProposal, isMarketOpen, easternTime } from './market-calendar.mjs';
+import { assertCurrentProposal, isMarketOpen } from './market-calendar.mjs';
 import { basketCounts, isExcluded } from './broker-settings.mjs';
 import { minimumOtmFor, otmPercent } from './strike-settings.mjs';
 import { roundPrice } from './price-increments.mjs';
+import { isEntryWindow } from './entry-schedule.mjs';
+import { repriceEntry } from './entry-pricing.mjs';
 export function validateQuote(q, contract, settings, now = new Date(), entry = true) {
   if (!q || q.conid !== contract.conid || !q.realtime) throw new Error('IB quote is unavailable, delayed, or for another contract');
   const age = +now - Number(q.observedAt);
@@ -11,7 +13,9 @@ export function validateQuote(q, contract, settings, now = new Date(), entry = t
 }
 export function entryBudget(proposal, account, settings, now = new Date()) {
   assertCurrentProposal(proposal, now);
-  if (!isMarketOpen(now) || easternTime(now).minutes < 585) throw new Error('Outside the entry session');
+  if (proposal.phase && proposal.phase !== 'final') throw new Error('Basket is still being prepared; finalized entry prices are required');
+  if (!isMarketOpen(now) || !isEntryWindow(proposal.basket_date, settings, now)) throw new Error('Outside the configured entry window');
+  if (proposal.allocation_settings?.entryTiming && proposal.allocation_settings.entryTiming !== settings.entryTiming) throw new Error('Basket entry timing changed; rebuild before entry');
   if (settings.pauseEntries) throw new Error('New entries are paused');
   if (![account.netLiquidation, account.availableFunds, account.excessLiquidity, account.cash].every(x => Number.isFinite(x) && x > 0)) throw new Error('IB account funds unavailable or insufficient');
   const reserve = marginReserveStatus(account, settings);
@@ -49,14 +53,15 @@ export function planEntry(pick, contract, q, budget, settings, now = new Date())
   if (buffer < (pick.side === 'put' ? 2 : 1)) throw new Error('Live strike buffer no longer qualifies');
   const adverse = (spot - pick.px) * (pick.side === 'call' ? 1 : -1);
   if (adverse / pick.px >= 0.04 || adverse / pick.atr >= 0.5) throw new Error('Underlying has drifted against the basket');
-  const minimum = ceilTick(Math.max(0.10, pick.cr * settings.minimumCreditRatio), contract);
+  const pricing = repriceEntry({ reference: pick.pricing_reference, spot, optionIv: q.optionIv, vix: q.vix, now, settings });
+  const minimum = ceilTick(Math.max(0.10, pricing.credit * settings.minimumCreditRatio), contract);
   const limit = floorTick((q.bid + q.ask) / 2, contract);
   if (limit < minimum || limit < q.bid) throw new Error('Available credit is below the configured minimum');
   // Equally allocated backing capital, rounded down to whole contracts.
   // A short call still has unbounded upside risk; this is a sizing rule.
   const quantity = Math.floor(budget.perTrade / (Math.max(spot, pick.K) * contract.multiplier));
   if (quantity < 1) throw new Error('Allocation cannot support one whole contract');
-  return { action: 'entry', contract, pick, quantity, limit: +limit.toFixed(4), minimum, budget: budget.perTrade };
+  return { action: 'entry', contract, pick, quantity, limit: +limit.toFixed(4), minimum, budget: budget.perTrade, pricing };
 }
 export function validateMargin(preview, account, order) {
   if (preview.warning || ![preview.initialMarginChange, preview.maintenanceMarginChange].every(Number.isFinite)) throw new Error('IB margin preview unavailable or requires review');

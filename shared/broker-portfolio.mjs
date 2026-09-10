@@ -26,8 +26,9 @@ export function portfolioSnapshot({ journal, positions, account, connection, act
       ? quantity === 0 ? 0 : (averageFill - mark) * quantity * c.multiplier : null;
     const realizedPnl = averageFill == null ? 0 : buys.reduce((n, f) => n + (averageFill - f.price) * f.quantity * c.multiplier, 0);
     const activeOrders = Object.values(journal.intents ?? {}).filter(i => i.contract.conid === c.conid && !isTerminalOrder(i.status));
+    const entryPricing = entries.find(i => i.contract.conid === c.conid)?.pricing ?? null;
     return { conid: c.conid, ticker: c.symbol, side: c.side, strike: c.strike, expiry: c.expiry,
-      quantity, entered, closed, averageFill, mark, unrealizedPnl, realizedPnl, fees, feesComplete,
+      quantity, entered, closed, averageFill, mark, unrealizedPnl, realizedPnl, fees, feesComplete, entryPricing,
       reconciled, status: !reconciled ? 'Reconciliation required' : activeOrders.map(i => i.intervention ?? `${i.action}: ${i.status}`).join('; ') || (quantity ? 'Open' : 'Closed'),
       canExit: quantity > 0 && reconciled, workingEntry: activeOrders.some(i => i.action === 'entry'),
     };

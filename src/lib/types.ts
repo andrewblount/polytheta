@@ -73,6 +73,10 @@ export interface PerformanceSnapshotData {
   sourceLabel: string;
 }
 
+export interface EntryPricingData {
+  credit: number; referenceCredit: number; elapsedCalendarDays: number; referenceSpot: number; spot: number;
+  iv: number; ivSource: string; timeEffect: number; underlyingEffect: number; ivEffect: number; observedAt: string; estimatedAt: string;
+}
 export interface PositionData {
   id: string;
   basketId: string;
@@ -91,6 +95,7 @@ export interface PositionData {
   expiry: string;
   delta: number;
   estimatedEntryCredit: number;
+  entryPricing?: EntryPricingData | null;
   contracts: number;
   margin: number;
   breakAlert1?: number | null;

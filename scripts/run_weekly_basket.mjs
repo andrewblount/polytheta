@@ -1,246 +1,120 @@
 #!/usr/bin/env node
-// One-shot orchestrator: derive basket_date/expiry, refresh Yahoo, fetch
-// TradingView macros, pull earnings, filter+refine, auto-pick, build basket,
-// write run summary. Idempotent — safe to re-run; expensive steps skip if
-// their outputs already exist.
-//
-//   node scripts/run_weekly_basket.mjs                    # auto-derive week
-//   node scripts/run_weekly_basket.mjs --date 2026-07-13  # force basket date
-//   node scripts/run_weekly_basket.mjs --chain-chunk 60   # smaller chain chunk
-//   node scripts/run_weekly_basket.mjs --force            # ignore existing outputs
-
+// Build ahead of the selected entry window, finalize shortly before it, and
+// publish once. No weekend run or late-session order is implied by a retry.
 import fs from 'node:fs';
 import path from 'node:path';
-import url from 'node:url';
-import { deriveBasketDate, expiryFromBasketDate } from './lib/basket_date.mjs';
 import { runRefresh, refreshWeeklyUniverse } from './lib/refresh.mjs';
 import { fetchTvMacros } from './lib/tv_macros.mjs';
 import { runEarnings } from './lib/earnings.mjs';
 import { runFilterAndRefine } from './lib/shortlist.mjs';
 import { runBuildBasket } from './lib/build_basket.mjs';
-import { importProposal } from './lib/import_proposal.mjs';
+import { finalizeBasket, preparationPolicy, preparationMatches, freezeFinalProposal, requireCurrentBasketAuthority } from './lib/finalize_basket.mjs';
+import { importProposal, findPublishedProposal } from './lib/import_proposal.mjs';
 import { sendBasketEmail } from './lib/basket_email.mjs';
 import { buildAlertPlan } from './lib/google_alerts.mjs';
 import { loadBrokerSettings } from './lib/broker_settings.mjs';
 import { acquireLock } from './lib/file_lock.mjs';
-import { assertCurrentProposal, currentWeek, isMarketOpen, easternTime } from '../shared/market-calendar.mjs';
-
-const __filename = url.fileURLToPath(import.meta.url);
-const REPO_ROOT = path.resolve(path.dirname(__filename), '..');
-
-// Load .env.local (gitignored) so the launchd job picks up NETLIFY_DATABASE_URL
-// without the credential living in the plist. Absent file is fine.
-try {
-  process.loadEnvFile(path.join(REPO_ROOT, '.env.local'));
-} catch {
-  // no .env.local — publish step will detect the missing URL and skip
-}
-
-function parseArgs(argv) {
-  const out = { force: false, chainChunk: 999999 };
-  for (let i = 2; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === '--date') out.date = argv[++i];
-    else if (a === '--force') out.force = true;
-    else if (a === '--chain-chunk') out.chainChunk = parseInt(argv[++i], 10);
-    else if (a === '--help' || a === '-h') { printHelp(); process.exit(0); }
+import { localWorkerIdentity } from './broker/host-runtime.mjs';
+import { assertCurrentProposal, assertCurrentDelivery, currentWeek, addDays } from '../shared/market-calendar.mjs';
+import { buildContext, entrySchedule } from '../shared/entry-schedule.mjs';
+const root = path.resolve(import.meta.dirname, '..');
+try { process.loadEnvFile(path.join(root, '.env.local')); } catch { /* environment may supply values */ }
+if (process.argv.includes('--help')) { console.log('Usage: node scripts/run_weekly_basket.mjs [--force] [--date YYYY-MM-DD] [--chain-chunk N]'); process.exit(0); }
+const settings = await loadBrokerSettings();
+const host = localWorkerIdentity();
+if (settings.executionHostId && settings.executionHostId !== host.id) { console.log('Skipped: another execution computer is selected'); process.exit(0); }
+const read = file => fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
+let context = buildContext(settings);
+// A delivery retry can run after the entry window. It only sends the original
+// published basket and must never prepare, reprice or publish a late entry.
+for (const candidate of [currentWeek(), addDays(currentWeek(), 7)]) {
+  const folder = path.join(root, 'baskets', candidate), receipt = read(path.join(folder, 'delivery.json'));
+  if (receipt?.published && receipt.emailed) continue;
+  const proposal = read(path.join(folder, 'data', 'basket_proposal.json'));
+  if (!receipt?.published && proposal?.phase !== 'final') continue;
+  if (!proposal || receipt?.published && proposal.generated_ts !== receipt.generated_ts || proposal.basket_date !== candidate) throw new Error('Published basket/delivery identity mismatch');
+  try { assertCurrentDelivery(proposal); } catch { continue; }
+  let recoveredReceipt;
+  if (!receipt?.published) {
+    const stored = await findPublishedProposal(proposal);
+    if (!stored) continue;
+    recoveredReceipt = { basket_date: candidate, generated_ts: proposal.generated_ts, published: stored.publishedAt, slug: stored.slug, reconciled_at: new Date().toISOString() };
   }
-  return out;
+  context = { week: candidate, prepare: false, deliveryOnly: true, recoveredReceipt, schedule: entrySchedule(candidate, proposal.allocation_settings ?? settings) };
+  break;
 }
-function printHelp() {
-  console.log(`Usage: node scripts/run_weekly_basket.mjs [--date YYYY-MM-DD] [--force] [--chain-chunk N]`);
-}
-
-const args = parseArgs(process.argv);
-if (!isMarketOpen() || easternTime().minutes < 585) { console.log('Skipped: outside exchange session after 09:45 ET'); process.exit(0); }
-if (args.date && args.date !== currentWeek()) throw new Error('Weekly publication can only target the current trading week');
-const BASKET_DATE = args.date ?? deriveBasketDate();
-const EXPIRY_ISO = expiryFromBasketDate(BASKET_DATE);
-const BASKET_DIR = path.join(REPO_ROOT, 'baskets', BASKET_DATE);
-const OUT = path.join(BASKET_DIR, 'data');
+if (!context) { console.log('Skipped: outside the configured preparation/finalization session'); process.exit(0); }
+const arg = key => process.argv.includes(key) ? process.argv[process.argv.indexOf(key) + 1] : undefined;
+if (arg('--date') && arg('--date') !== context.week) throw new Error('Requested date does not match the configured basket entry window');
+const week = context.week, expiry = context.schedule.expiry, directory = path.join(root, 'baskets', week), OUT = path.join(directory, 'data');
 fs.mkdirSync(OUT, { recursive: true });
-const release = acquireLock(path.join(BASKET_DIR, '.build.lock'));
-process.once('exit', release);
-const deliveryFile = path.join(BASKET_DIR, 'delivery.json');
-let delivery = {};
-try { delivery = JSON.parse(fs.readFileSync(deliveryFile, 'utf8')); } catch { /* first run */ }
-if (delivery.published && delivery.emailed) { console.log(`Week ${BASKET_DATE} already published and emailed`); process.exit(0); }
-if (delivery.published && !delivery.emailed) {
-  const saved = JSON.parse(fs.readFileSync(path.join(OUT, 'basket_proposal.json'), 'utf8'));
-  if (delivery.basket_date !== saved.basket_date || delivery.generated_ts !== saved.generated_ts || delivery.slug !== `weekly-basket-${saved.basket_date}`) throw new Error('Published delivery record does not match the saved proposal; reconciliation required');
-  const mail = await sendBasketEmail(saved, { deliveryRetry: true });
-  if (!mail.sent) throw new Error(`Basket delivery incomplete: ${mail.reason ?? mail.status}`);
-  fs.writeFileSync(deliveryFile, JSON.stringify({ ...delivery, emailed: new Date().toISOString() }, null, 2));
-  process.exit(0);
+const release = acquireLock(path.join(directory, '.build.lock')); process.once('exit', release);
+const finalFile = path.join(OUT, 'basket_proposal.json'), preparedFile = path.join(OUT, 'prepared_basket.json'), deliveryFile = path.join(directory, 'delivery.json');
+const write = (file, value) => { fs.writeFileSync(`${file}.tmp`, JSON.stringify(value, null, 2)); fs.renameSync(`${file}.tmp`, file); };
+const status = (phase, details = {}) => write(path.join(directory, 'entry_preparation.json'), { week, phase, hostId: host.id, checkedAt: new Date().toISOString(), entryWindow: { start: context.schedule.start.toISOString(), end: context.schedule.end.toISOString() }, ...details });
+let delivery = read(deliveryFile);
+if (!delivery?.published && context.recoveredReceipt) { delivery = context.recoveredReceipt; write(deliveryFile, delivery); }
+if (delivery?.published && delivery?.emailed) { console.log(`Week ${week} already published and delivered`); process.exit(0); }
+if (delivery?.published) {
+  const proposal = read(finalFile);
+  if (proposal?.generated_ts !== delivery.generated_ts || proposal?.basket_date !== week) throw new Error('Published basket/delivery identity mismatch');
+  await requireCurrentBasketAuthority(proposal, host.id, { loadSettings: loadBrokerSettings, deliveryOnly: true });
+  const mail = await sendBasketEmail(proposal, { deliveryRetry: true });
+  if (!mail.sent) throw new Error(`Delivery incomplete: ${mail.reason ?? mail.status}`);
+  write(deliveryFile, { ...delivery, emailed: new Date().toISOString() }); process.exit(0);
 }
-
-const log = (msg) => console.log(`[orch ${BASKET_DATE}] ${msg}`);
-log(`start expiry=${EXPIRY_ISO} out=${OUT} force=${args.force}`);
-
-// Use Cboe's current equity weekly-options directory. A successful source
-// snapshot is reusable for six hours; an old unsourced seed cannot qualify.
-const universe = await refreshWeeklyUniverse(OUT, { force: args.force });
-log(`Cboe weekly universe: ${JSON.stringify(universe)}`);
-
-// Refresh has a source timestamp, resumes partial downloads and retries failed
-// tickers. Force invalidates all derived source artifacts, not just the outer skip.
-const rr = await runRefresh({ OUT, EXPIRY_ISO, chunkLimit: args.chainChunk, force: args.force });
-log(`refresh: ${JSON.stringify(rr)}`);
-
-// TradingView macros — always refresh (cheap, and market changes daily).
-const tv = await fetchTvMacros({ OUT, BASKET_DATE });
-log(`tv_macros: HY_OAS=${tv.hy_oas?.value ?? tv.hy_oas?.error} PC=${tv.pc_ratio?.total ?? tv.pc_ratio?.error} tv_desktop=${tv.tv_desktop_opened?.opened}`);
-
-// Shortlist (produces refined CSVs earnings step needs).
-const sl = runFilterAndRefine(OUT);
-log(`shortlist: refined_calls=${sl.calls_refined} refined_puts=${sl.puts_refined}`);
-
-// Each record has its own freshness/error state. Failed or newly shortlisted
-// tickers retry on every scheduled run, retaining successful fresh results.
-const er = await runEarnings({ OUT, force: args.force });
-log(`earnings: ${JSON.stringify(er)}`);
-
-// Build basket (async: fetches short interest for the candidate pool).
-const brokerSettings = await loadBrokerSettings();
-const bb = await runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, brokerSettings });
-log(`build: gsrs=${bb.gsrs} totals=${JSON.stringify(bb.totals)}`);
-
-// Write concise RUN_SUMMARY.md.
-const proposal = JSON.parse(fs.readFileSync(bb.outFile, 'utf8'));
-const picksMd = proposal.picks.map((p) =>
-  `| ${p.side} | ${p.ticker} | ${p.family} | ${p.px} | ${p.K} | ${p.cr.toFixed(2)} | ${p.delta.toFixed(2)} | ${p.buf}x | ${p.contracts} | $${p.margin.toLocaleString()} | $${p.credit.toLocaleString()} | ${p.earnings_date ?? '-'} |`
-).join('\n');
-const summaryPath = path.join(BASKET_DIR, 'RUN_SUMMARY.md');
-const totalMargin = proposal.totals.callMargin + proposal.totals.putMargin;
-const totalCredit = proposal.totals.callCredit + proposal.totals.putCredit;
-const rom = totalMargin ? (totalCredit / totalMargin * 100).toFixed(2) : 'n/a';
-const cons = proposal.constraints ?? {};
-const constraintsMd = [
-  `- **GSRS band ${cons.gsrs_band}** — put budget $${(cons.put_budget ?? 0).toLocaleString()} per name` +
-    (cons.put_doubles_allowed === false ? ', **put doubles PROHIBITED**' : '') +
-    (cons.puts_allowed === false ? ', **new puts PROHIBITED**' : '') +
-    (cons.hedge_recommended ? ', **hedge recommended (SPX puts / VIX calls)**' : ''),
-  `- Strike compliance: delta ${cons.delta_band?.join('–')}, spread ≤ $${cons.max_spread}, put buffer ≥ ${cons.min_put_atr_buffer}x ATR, OTM vol ≥ ${cons.min_otm_volume}`,
-  `- Strike re-selection: ${JSON.stringify(cons.strike_reselection ?? {})}`,
-  `- Thesis signals: SI live from Yahoo; overrides file has ${cons.signal_sources?.overrides_tickers ?? 0} ticker(s)`,
-].join('\n');
-const signalsMd = proposal.picks.map((p) => {
-  const rc = p.rule_checks ?? {};
-  const ts = rc.thesis_signals ?? {};
-  return `| ${p.ticker} | ${p.side} | ${p.si_pct != null ? p.si_pct + '%' : '—'} | ${ts.short_interest ?? '—'} | ${ts.buyback ?? '—'} | ${ts.radar ?? '—'} | ${rc.thesis_coverage ?? '0/5'} | ${rc.pot_proxy_pct ?? '—'}% |`;
-}).join('\n');
-const summary = `# Weekly Basket — ${BASKET_DATE} (expiry ${EXPIRY_ISO})
-
-Auto-generated by \`scripts/run_weekly_basket.mjs\` at ${proposal.generated_ts}.
-
-## Data pulls
-
-- Yahoo macro + SPY/GSPC/VIX history (\`macro_quotes.csv\`, \`SPY_history.csv\`, \`GSPC_history.csv\`, \`VIX_history.csv\`)
-- Yahoo universe quotes (\`universe_quotes.csv\`, \`universe_8to40.csv\`)
-- Yahoo option chains for ${EXPIRY_ISO} (\`chains_${EXPIRY_ISO}_v2.csv\`, \`chain_summary_v2.csv\`)
-- Yahoo earnings dates (\`earnings_dates.json\`)
-- TradingView macros (\`tv_macros.json\`) — HY_OAS from FRED (${proposal.tv_macros_source.hy_oas}), P/C from CBOE (${proposal.tv_macros_source.pc})
-
-## Macro / GSRS
-
-- SPX ${proposal.macro.SPX}, SPY ${proposal.macro.SPY}, VIX ${proposal.macro.VIX} (prev ${proposal.macro.VIX_prev})
-- SKEW ${proposal.macro.SKEW}, MOVE ${proposal.macro.MOVE}
-- HY_OAS ${proposal.macro.HY_OAS}, P/C ${proposal.macro.PC}
-- **GSRS ${proposal.gsrs}** — vix ${proposal.gsrs_components.vix}, skew ${proposal.gsrs_components.skew}, hyoas ${proposal.gsrs_components.hyoas}, move ${proposal.gsrs_components.move}, pc ${proposal.gsrs_components.pc}
-
-## Basket picks
-
-Pool sizes after earnings filter and family cap: ${proposal.pool_counts.calls} call candidates, ${proposal.pool_counts.puts} put candidates. Selection: top by IV per side, per-family cap of 2 names, no name repeated across sides.
-
-| side | ticker | family | px | K | credit | Δ | ATR buf | contracts | margin | credit$ | earnings |
-|------|--------|--------|---:|--:|------:|--:|--------:|---------:|-------:|--------:|----------|
-${picksMd}
-
-## Rule enforcement (docs/options_trading_system.md)
-
-${constraintsMd}
-
-## Thesis signals
-
-| ticker | side | SI % float | SI check | buyback | radar | coverage | POT (~2Δ) |
-|--------|------|-----------:|----------|---------|-------|----------|-----------|
-${signalsMd}
-
-Signals marked — are not evaluated. Maintain \`baskets/thesis_overrides.json\`
-(buyback, fan, glassdoor, radars per ticker) to raise coverage; the 3-of-5
-thesis rule is only enforceable when at least 3 signals are known.
-
-## Totals
-
-Credit **$${totalCredit.toLocaleString()}** on margin **$${totalMargin.toLocaleString()}** — RoM at max profit **${rom}%**.
-`;
-fs.writeFileSync(summaryPath, summary);
-log(`wrote ${summaryPath}`);
-
-// Zero picks = something is wrong (data outage, over-filtering, or a genuine
-// no-trade week). Never silently publish an empty basket over last week's —
-// alarm loudly on every channel and stop.
-if (proposal.picks.length === 0) {
-  log('ALARM: 0 picks — NOT publishing, NOT emailing instructions.');
-  const msg = `🚨 Polytheta: Monday build produced ZERO picks (pools ${JSON.stringify(proposal.pool_counts)}). No basket published — investigate before trading.`;
-  try {
-    const { execFileSync } = await import('node:child_process');
-    if (process.env.ALERT_IMESSAGE_TO) {
-      execFileSync('osascript', ['-e',
-        `tell application "Messages" to send ${JSON.stringify(msg)} to participant ${JSON.stringify(process.env.ALERT_IMESSAGE_TO)} of (1st account whose service type = iMessage)`,
-      ]);
-    }
-    if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_FROM_EMAIL) {
-      await fetch('https://api.sendgrid.com/v3/mail/send', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          personalizations: [{ to: [{ email: process.env.STOP_ALERT_EMAIL || 'ablount@bluecielo.com' }], subject: `FAILED: weekly basket ${BASKET_DATE} — zero picks` }],
-          from: { email: process.env.SENDGRID_FROM_EMAIL },
-          content: [{ type: 'text/plain', value: msg + `\n\nSee ${summaryPath} and scripts/launchd logs.` }],
-        }),
-      });
-    }
-  } catch (err) { log(`alarm delivery failed: ${err.message}`); }
-  log('done (failed)');
-  process.exit(1);
+async function publish(proposal) {
+  if (context.deliveryOnly || proposal.phase !== 'final' || proposal.basket_date !== week || proposal.expiry !== expiry || proposal.preparation_policy !== preparationPolicy(settings)) throw new Error('Final basket does not match the current publication policy');
+  await requireCurrentBasketAuthority(proposal, host.id, { loadSettings: loadBrokerSettings });
+  assertCurrentProposal(proposal);
+  if (Date.now() >= +context.schedule.end) throw new Error('Entry window ended; no late basket published');
+  freezeFinalProposal(finalFile, proposal);
+  const imported = await importProposal(finalFile, { publish: true });
+  const receipt = { basket_date: week, generated_ts: proposal.generated_ts, published: new Date().toISOString(), slug: imported.slug };
+  write(deliveryFile, receipt);
+  fs.writeFileSync(path.join(directory, 'RUN_SUMMARY.md'), `# Basket ${week}\n\nEntry window: ${proposal.entry_window.start} to ${proposal.entry_window.end}. Expiry: ${expiry}.\n\nFinalized: ${proposal.finalized_at}. GSRS: ${proposal.gsrs}.\n\n|Ticker|Side|Strike|Adjusted modeled credit|IV source|\n|---|---|---:|---:|---|\n${proposal.picks.map(p => `|${p.ticker}|${p.side}|${p.K}|${p.cr}|${p.entry_pricing.ivSource}|`).join('\n')}\n\nModeled premiums are estimates; actual IB fills and fees determine live results.\n`);
+  status('published', { generatedAt: proposal.generated_ts });
+  await requireCurrentBasketAuthority(proposal, host.id, { loadSettings: loadBrokerSettings });
+  const mail = await sendBasketEmail(proposal);
+  if (!mail.sent) throw new Error(`Delivery incomplete: ${mail.reason ?? mail.status}`);
+  write(deliveryFile, { ...receipt, emailed: new Date().toISOString() });
+  console.log(`Published and delivered finalized basket ${week}`);
 }
-
-// TradingView artifacts: an importable watchlist and the alert levels.
-// (TradingView has no public write API — the watchlist file drag-imports in
-// one step, and the Monday scheduled assistant task sets alerts via the
-// browser from these levels.)
-const tvWatchlist = proposal.picks.map((p) => p.ticker).join(',');
-fs.writeFileSync(path.join(BASKET_DIR, 'tradingview_watchlist.txt'), tvWatchlist + '\n');
-const tvAlerts = [
-  '# TradingView alerts — ' + BASKET_DATE,
-  '',
-  '| ticker | side | alert | level | meaning |',
-  '|--------|------|-------|------:|---------|',
-  ...proposal.picks.map((p) =>
-    `| ${p.ticker} | ${p.side} | crossing ${p.side === 'call' ? 'up' : 'down'} | ${p.K} | short strike — attention only, policy is hold to expiry; exits on radar signals |`),
-].join('\n');
-fs.writeFileSync(path.join(BASKET_DIR, 'tradingview_alerts.md'), tvAlerts + '\n');
-log(`tradingview artifacts: watchlist (${proposal.picks.length} symbols) + alert levels`);
-
-// Google Alerts plan — created Monday and deleted after settlement by the
-// scheduled assistant tasks (Google retired the Alerts API).
-const alertPlan = buildAlertPlan(proposal);
-fs.writeFileSync(
-  path.join(BASKET_DIR, 'google_alerts.json'),
-  JSON.stringify(alertPlan, null, 2) + '\n',
-);
-log(`google alerts plan: ${alertPlan.alerts.length} queries, remove after ${alertPlan.remove_after}`);
-
-// Publish atomically before emailing, so the inbox and site refer to the same
-// immutable basket. Persist delivery status so scheduled retries are idempotent.
-assertCurrentProposal(proposal);
-if (!process.env.NETLIFY_DATABASE_URL && !process.env.DATABASE_URL) throw new Error('Database unavailable; cannot publish this week');
-const imported = await importProposal(bb.outFile, { publish: true });
-delivery = { basket_date: BASKET_DATE, generated_ts: proposal.generated_ts, published: new Date().toISOString(), slug: imported.slug };
-fs.writeFileSync(deliveryFile, JSON.stringify(delivery, null, 2));
-const mail = await sendBasketEmail(proposal);
-if (!mail.sent) throw new Error(`Basket delivery failed: ${mail.reason ?? mail.status}`);
-delivery.emailed = new Date().toISOString();
-fs.writeFileSync(deliveryFile, JSON.stringify(delivery, null, 2));
-log('published and emailed current-week basket');
+try {
+  // The import might have committed before a process/network failure. Retry
+  // that exact artifact; never replace its contracts or pricing reference.
+  const frozen = read(finalFile);
+  if (frozen?.phase === 'final') { await publish(frozen); process.exit(0); }
+  let prepared = read(preparedFile);
+  const force = process.argv.includes('--force');
+  let rebuild = false;
+  const matching = preparationMatches(prepared, settings, week);
+  if (!force && matching && context.prepare) { status('prepared'); console.log('Dated preparation retained; awaiting the final refresh window'); process.exit(0); }
+  if (!force && matching && !context.prepare) {
+    try { await publish(await finalizeBasket(prepared, settings, { OUT })); process.exit(0); }
+    catch (error) {
+      if (error.code === 'BASKET_AUTHORITY_CHANGED' || read(deliveryFile)?.published || read(finalFile)?.phase === 'final') throw error;
+      rebuild = true;
+      status('rebuilding', { message: error.message }); console.warn(`Final checks require a fresh selection: ${error.message}`);
+    }
+  }
+  status('preparing');
+  await refreshWeeklyUniverse(OUT, { force: force || rebuild });
+  await runRefresh({ OUT, EXPIRY_ISO: expiry, chunkLimit: Number(arg('--chain-chunk') ?? 999999), force: force || rebuild });
+  await fetchTvMacros({ OUT, BASKET_DATE: week });
+  runFilterAndRefine(OUT);
+  await runEarnings({ OUT, force: force || rebuild });
+  const result = await runBuildBasket({ BASKET_DATE: week, EXPIRY_ISO: expiry, OUT, brokerSettings: settings, outFileName: 'prepared_basket.json' });
+  prepared = read(result.outFile);
+  if (!prepared?.picks?.length) throw new Error('No complete qualifying basket; no entries or instructions published');
+  write(preparedFile, prepared);
+  write(path.join(OUT, 'google_alert_plan.json'), buildAlertPlan(prepared));
+  // Re-evaluate after slow reads; never publish beyond the actual window.
+  const current = buildContext(settings);
+  if (!current || current.week !== week) throw new Error('Preparation finished after its allowed session; no basket published');
+  if (current.prepare) { status('prepared'); console.log(`Prepared ${week}; final refresh is scheduled before entry`); }
+  else await publish(await finalizeBasket(prepared, settings, { OUT }));
+} catch (error) {
+  status('retry-needed', { message: String(error.message) });
+  console.error(error.message); process.exitCode = 1;
+}
