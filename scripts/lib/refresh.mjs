@@ -354,6 +354,34 @@ async function runChains(OUT, EXPIRY_ISO, { chunkLimit = 999999 } = {}) {
   return { total: allTickers.length, done: state.done.length, errors: state.errors.length, processed };
 }
 
+// Option quotes on Yahoo are often unpopulated for the first minutes after the
+// open (bid/ask 0, placeholder IV). A snapshot like that passes the coverage
+// check but yields no compliant strikes, and reusing it for the rest of the
+// entry window burns the whole session (2026-09-14: 5.5% of rows had a bid).
+// Measure the share of near-the-money rows carrying a real bid and refuse the
+// snapshot when it is below CHAIN_MIN_QUOTED_SHARE, discarding the chain
+// artifacts so the next run refetches instead of reusing them.
+// Calibration: healthy mid-session snapshots that produced baskets scored
+// 0.25 (2026-08-31) and 0.29 (2026-08-24); the dead 09:36 ET snapshot of
+// 2026-09-14 scored 0.007. Thin far strikes never quote, so 0.10 is the gate.
+export const CHAIN_MIN_QUOTED_SHARE = 0.10;
+export const CHAIN_NEAR_MONEY_PCT = 25;
+export function chainQuoteQuality(chainsFile) {
+  if (!fs.existsSync(chainsFile)) return { near: 0, quoted: 0, share: 0 };
+  const lines = fs.readFileSync(chainsFile, 'utf8').trim().split(/\r?\n/);
+  const header = lines[0].split(',');
+  const bid = header.indexOf('bid'), dist = header.indexOf('distance_pct');
+  let near = 0, quoted = 0;
+  for (const line of lines.slice(1)) {
+    const c = line.split(',');
+    const d = Math.abs(parseFloat(c[dist]));
+    if (!Number.isFinite(d) || d > CHAIN_NEAR_MONEY_PCT) continue;
+    near++;
+    if (parseFloat(c[bid]) > 0) quoted++;
+  }
+  return { near, quoted, share: near ? quoted / near : 0 };
+}
+
 export async function runRefresh({ OUT, EXPIRY_ISO, chunkLimit, force = false }) {
   const manifestFile = path.join(OUT, 'data_refresh.json');
   let manifest = {};
@@ -377,5 +405,21 @@ export async function runRefresh({ OUT, EXPIRY_ISO, chunkLimit, force = false })
   manifest.chains = stepChains;
   fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 2));
   if (!stepChains.total || stepChains.done < stepChains.total * 0.95 || stepChains.processed >= (chunkLimit ?? Infinity) && stepChains.done < stepChains.total) throw new Error('Incomplete chain coverage; saved progress for retry');
-  return { macro: stepMacro, universe: stepQ, chains: stepChains };
+  const quality = chainQuoteQuality(path.join(OUT, `chains_${EXPIRY_ISO}_v2.csv`));
+  manifest.chain_quality = { ...quality, checked_at: new Date().toISOString() };
+  fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 2));
+  if (quality.share < CHAIN_MIN_QUOTED_SHARE) {
+    // Keep the rejected snapshot for forensics, then clear the chain artifacts
+    // so the next run refetches rather than reusing dead quotes.
+    const rejected = path.join(OUT, 'refresh_history', `${new Date().toISOString().replaceAll(':', '-')}-rejected-chains`);
+    fs.mkdirSync(rejected, { recursive: true });
+    for (const file of ['_chains_state.json', `chains_${EXPIRY_ISO}_v2.csv`, 'chain_summary_v2.csv']) {
+      const old = path.join(OUT, file);
+      if (fs.existsSync(old)) fs.renameSync(old, path.join(rejected, file));
+    }
+    delete manifest.completed_at;
+    fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 2));
+    throw new Error(`Option quotes not populated: ${(quality.share * 100).toFixed(1)}% of near-the-money rows have a bid (${quality.quoted}/${quality.near}); chains discarded for refetch`);
+  }
+  return { macro: stepMacro, universe: stepQ, chains: stepChains, quality };
 }

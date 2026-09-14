@@ -104,7 +104,9 @@ try {
   await fetchTvMacros({ OUT, BASKET_DATE: week });
   runFilterAndRefine(OUT);
   await runEarnings({ OUT, force: force || rebuild });
-  const result = await runBuildBasket({ BASKET_DATE: week, EXPIRY_ISO: expiry, OUT, brokerSettings: settings, brokerEquity: await loadBrokerEquity(), outFileName: 'prepared_basket.json' });
+  const result = await runBuildBasket({ BASKET_DATE: week, EXPIRY_ISO: expiry, OUT, brokerSettings: settings, brokerEquity: await loadBrokerEquity(), outFileName: 'prepared_candidate.json' });
+  // The candidate lands in prepared_basket.json only after it proves to have picks;
+  // a failed rebuild must not destroy the dated preparation already on disk.
   prepared = read(result.outFile);
   if (!prepared?.picks?.length) throw new Error('No complete qualifying basket; no entries or instructions published');
   write(preparedFile, prepared);
