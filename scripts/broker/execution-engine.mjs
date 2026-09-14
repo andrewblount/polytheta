@@ -19,14 +19,16 @@ export function orderRef(account, week, conid, action) {
 }
 // Broker mutations are reached only after the operator activates the local
 // service. No language model is involved in submitting or managing orders.
-export async function executionCycle({ broker, proposal, settings, journal, save, scanNews, enabled = false, now = new Date(), commands = [], publish = async () => {}, beforeWrite = async () => {}, getVix = async () => null }) {
+export async function executionCycle({ broker, proposal, settings, journal, save, scanNews, enabled = false, allowPaper = false, now = new Date(), commands = [], publish = async () => {}, beforeWrite = async () => {}, getVix = async () => null }) {
   const cycleStarted = Date.now();
   const decisionTime = () => new Date(+now + Date.now() - cycleStarted);
   const entryCanWork = (intent, at = decisionTime()) => isEntryWindow(intent.week, settings, at)
     && (!intent.entryWindowEnd || +at < Date.parse(intent.entryWindowEnd));
   const readNews = pick => boundedRead(signal => scanNews(pick, { signal }), 10000, 'News scan timed out; retrying next cycle');
   const health = await broker.connect();
-  if (health.mode !== 'live') throw new Error('This service is configured for the live account only');
+  if (health.mode !== 'live' && !(health.mode === 'paper' && allowPaper)) throw new Error('This service is configured for the live account only; set IBKR_ALLOW_PAPER=true locally to run a paper account');
+  if (journal.mode && journal.mode !== health.mode) throw new Error('Execution journal belongs to a different account mode');
+  journal.mode = health.mode;
   const [positions, orders, executions, account] = await Promise.all([broker.positions(), broker.orders(), broker.executions(), broker.accountSummary()]);
   journal.intents ??= {}; journal.fills ??= {}; journal.signals ??= {};
   if (journal.account && journal.account !== broker.account) throw new Error('Execution journal belongs to another account');

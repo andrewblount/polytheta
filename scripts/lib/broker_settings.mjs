@@ -7,3 +7,10 @@ export async function loadBrokerSettings() {
   try { const rows = await sql`select value from app_settings where key='broker'`; return validateBrokerSettings(rows[0]?.value ?? {}); }
   finally { await sql.end(); }
 }
+export async function loadBrokerEquity() {
+  const url = process.env.NETLIFY_DATABASE_URL ?? process.env.DATABASE_URL;
+  if (!url) throw new Error('Database unavailable; cannot read the published IB account equity');
+  const sql = postgres(url, { max: 1 });
+  try { const rows = await sql`select value from app_settings where key='broker_equity'`; return rows[0]?.value ?? null; }
+  finally { await sql.end(); }
+}

@@ -23,6 +23,7 @@ import { minimumOtmFor, otmPercent } from '../../shared/strike-settings.mjs';
 import { firstSessionOfWeek, easternTime } from '../../shared/market-calendar.mjs';
 import { entrySchedule } from '../../shared/entry-schedule.mjs';
 import { preparationPolicy } from './finalize_basket.mjs';
+import { resolveModelEquity } from '../../shared/model-equity.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), '..', '..');
 
@@ -73,7 +74,7 @@ export function selectAffordableBasket({ settings, modelEquity, gsrs, select }) 
   return { auto: { picks: [], skipped: { calls: [], puts: [] }, pool_counts: { calls: 0, puts: 0 } }, picks: [], allocationScale: 1, backingPerTrade: 0 };
 }
 
-export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget = 55000, nPerSide = 4, brokerSettings = DEFAULT_BROKER_SETTINGS, outFileName = 'basket_proposal.json' }) {
+export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget = 55000, nPerSide = 4, brokerSettings = DEFAULT_BROKER_SETTINGS, brokerEquity = null, outFileName = 'basket_proposal.json' }) {
   const settings = validateBrokerSettings(brokerSettings);
   const schedule = entrySchedule(BASKET_DATE, settings);
   if (EXPIRY_ISO !== schedule.expiry) throw new Error('Basket expiry does not match the selected exchange week');
@@ -167,8 +168,10 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
     }
   }
 
-  const modelEquity = Number(process.env.POLYTHETA_MODEL_EQUITY ?? 1000000);
-  if (!Number.isFinite(modelEquity) || modelEquity <= 0) throw new Error('Invalid model equity');
+  // Select against the same equity the execution service sizes entries with.
+  const equity = resolveModelEquity({ brokerEquity, settings });
+  const modelEquity = equity.modelEquity;
+  console.log(`[basket ${BASKET_DATE}] model equity ${modelEquity.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} (${equity.source}${equity.observedAt ? ` as of ${equity.observedAt}` : ''})`);
   const { auto, picks, allocationScale, backingPerTrade } = selectAffordableBasket({ settings, modelEquity, gsrs,
     select: (counts, perTrade) => autoPick({
       refined_summary: enrichedSummary.map(row => ({ ...row,
@@ -277,6 +280,7 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
     data_observed_at: refresh.started_at,
     policy: 'v3-news-only-no-doubling',
     allocation_settings: settings, allocation_scale: allocationScale, model_equity: modelEquity,
+    model_equity_source: equity.source, model_equity_observed_at: equity.observedAt,
     total_backing_capital: picks.length * backingPerTrade,
     gsrs_calculation: score,
     generated_ts: new Date().toISOString(),

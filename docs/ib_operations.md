@@ -8,7 +8,10 @@ Store values on the trading computer in `.env.local`, never in Git, the website,
 
 | Variable | Purpose |
 |---|---|
-| `IBKR_ACCOUNT_ID` | Exact live account to access; no paper account |
+| `IBKR_ACCOUNT_ID` | Exact account to access. A `DU…` paper account is refused unless `IBKR_ALLOW_PAPER=true` |
+| `IBKR_ALLOW_PAPER` | `true` permits a paper (`DU…`) account. Paper fills enter the ledger as broker `IBKR paper`, and the journal records its mode so a paper journal can never drive the live account |
+| `IBKR_TWS_PORT` | Overrides the Settings socket port locally; paper defaults are Gateway 4002 / TWS 7497 (live 4001 / 7496) |
+| `POLYTHETA_MODEL_EQUITY` | Optional modeling override for basket selection. Ignored whenever the worker has published IB equity |
 | `IBKR_TWS_TIME_ZONE` | Set UTC only when TWS API execution timestamps are configured as UTC |
 | `IBKR_ACCESS_TOKEN` | Corporate service token, if its approved authentication flow uses a bearer token |
 | `IBKR_LOCAL_GATEWAY_INSECURE` | Optional true only for a local gateway's self-signed certificate; remote TLS is always verified |
@@ -23,6 +26,12 @@ A corporate account does not by itself establish an approved unattended Web API 
 4. Review allocation, maximum trades, calls/puts, exclusions, OTM minimums, quote/credit thresholds and the entry pause setting. Use [the rules](trading_rules.md).
 5. Install the local schedules with `npm run ib:install`. This generates paths for the current computer, backs up older launchd files and installs the broker cycle every 30 seconds plus the preparation/finalization scheduler every 60 seconds. It does not change activation. An already running cycle is protected from overlap, so slow reads can lengthen the actual monitoring interval.
 6. Live order activation is an owner action on the trading computer. The review did not activate execution or submit any order. When active, `npm run ib:run` performs one cycle. The computer must stay awake with IB authenticated. Saving Settings alone does not activate trading.
+
+## Account equity drives sizing
+
+Every worker cycle, including `npm run ib:check`, publishes IB NetLiquidation (plus available funds, excess liquidity and cash) to the `broker_equity` setting and to `runtime/ib-equity.json`. The weekly basket selects and sizes against that value (`model_equity`, with `model_equity_source` and `model_equity_observed_at` recorded in the proposal); the execution service then budgets entries from a fresh NetLiquidation read at entry time. There is no separate "account size" setting: fund the account and both the model and the orders follow it.
+
+Once an execution computer is selected, the basket refuses to build without an equity snapshot newer than seven days — sign in to IB and run `npm run ib:check` before Monday. With no execution computer selected the historical $1,000,000 modeling basis (or `POLYTHETA_MODEL_EQUITY`) is used so the website track record keeps its scale.
 
 ## Reliability and reconciliation
 

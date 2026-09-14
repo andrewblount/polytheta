@@ -12,7 +12,7 @@ import { finalizeBasket, preparationPolicy, preparationMatches, freezeFinalPropo
 import { importProposal, findPublishedProposal } from './lib/import_proposal.mjs';
 import { sendBasketEmail } from './lib/basket_email.mjs';
 import { buildAlertPlan } from './lib/google_alerts.mjs';
-import { loadBrokerSettings } from './lib/broker_settings.mjs';
+import { loadBrokerSettings, loadBrokerEquity } from './lib/broker_settings.mjs';
 import { acquireLock } from './lib/file_lock.mjs';
 import { localWorkerIdentity } from './broker/host-runtime.mjs';
 import { assertCurrentProposal, assertCurrentDelivery, currentWeek, addDays } from '../shared/market-calendar.mjs';
@@ -104,7 +104,7 @@ try {
   await fetchTvMacros({ OUT, BASKET_DATE: week });
   runFilterAndRefine(OUT);
   await runEarnings({ OUT, force: force || rebuild });
-  const result = await runBuildBasket({ BASKET_DATE: week, EXPIRY_ISO: expiry, OUT, brokerSettings: settings, outFileName: 'prepared_basket.json' });
+  const result = await runBuildBasket({ BASKET_DATE: week, EXPIRY_ISO: expiry, OUT, brokerSettings: settings, brokerEquity: await loadBrokerEquity(), outFileName: 'prepared_basket.json' });
   prepared = read(result.outFile);
   if (!prepared?.picks?.length) throw new Error('No complete qualifying basket; no entries or instructions published');
   write(preparedFile, prepared);
