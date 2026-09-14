@@ -16,8 +16,8 @@
 	<key>RunAtLoad</key>
 	<false/>
 	<key>StandardOutPath</key>
-	<string>/Users/andrewblount/Library/CloudStorage/Dropbox/development/polytheta/scripts/launchd/ib-execution.out.log</string>
+	<string>/Users/andrewblount/Library/Logs/polytheta/ib-execution.out.log</string>
 	<key>StandardErrorPath</key>
-	<string>/Users/andrewblount/Library/CloudStorage/Dropbox/development/polytheta/scripts/launchd/ib-execution.err.log</string>
+	<string>/Users/andrewblount/Library/Logs/polytheta/ib-execution.err.log</string>
 </dict>
 </plist>

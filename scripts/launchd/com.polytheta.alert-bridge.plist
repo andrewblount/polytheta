@@ -14,11 +14,11 @@
   <key>ProgramArguments</key>
   <array>
     <string>/opt/homebrew/bin/node</string>
-    <string>/Users/andrewblount/Local/development/polytheta/scripts/alert_bridge.mjs</string>
+    <string>/Users/andrewblount/Library/CloudStorage/Dropbox/development/polytheta/scripts/alert_bridge.mjs</string>
   </array>
 
   <key>WorkingDirectory</key>
-  <string>/Users/andrewblount/Local/development/polytheta</string>
+  <string>/Users/andrewblount/Library/CloudStorage/Dropbox/development/polytheta</string>
 
   <key>EnvironmentVariables</key>
   <dict>
@@ -28,8 +28,8 @@
 
   <key>RunAtLoad</key><false/>
   <key>StandardOutPath</key>
-  <string>/Users/andrewblount/Local/development/polytheta/scripts/launchd/alert-bridge.out.log</string>
+  <string>/Users/andrewblount/Library/Logs/polytheta/alert-bridge.out.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/andrewblount/Local/development/polytheta/scripts/launchd/alert-bridge.err.log</string>
+  <string>/Users/andrewblount/Library/Logs/polytheta/alert-bridge.err.log</string>
 </dict>
 </plist>

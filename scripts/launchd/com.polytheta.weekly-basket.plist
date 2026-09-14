@@ -19,9 +19,9 @@
 	<key>RunAtLoad</key>
 	<false/>
 	<key>StandardOutPath</key>
-	<string>/Users/andrewblount/Library/CloudStorage/Dropbox/development/polytheta/scripts/launchd/weekly-basket.out.log</string>
+	<string>/Users/andrewblount/Library/Logs/polytheta/weekly-basket.out.log</string>
 	<key>StandardErrorPath</key>
-	<string>/Users/andrewblount/Library/CloudStorage/Dropbox/development/polytheta/scripts/launchd/weekly-basket.err.log</string>
+	<string>/Users/andrewblount/Library/Logs/polytheta/weekly-basket.err.log</string>
 	<key>WakeSystem</key>
 	<true/>
 	<key>StartInterval</key>

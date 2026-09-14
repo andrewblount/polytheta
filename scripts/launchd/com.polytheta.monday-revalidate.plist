@@ -28,9 +28,9 @@
 	<key>RunAtLoad</key>
 	<false/>
 	<key>StandardOutPath</key>
-	<string>/Users/andrewblount/Library/CloudStorage/Dropbox/development/polytheta/scripts/launchd/monday-revalidate.out.log</string>
+	<string>/Users/andrewblount/Library/Logs/polytheta/monday-revalidate.out.log</string>
 	<key>StandardErrorPath</key>
-	<string>/Users/andrewblount/Library/CloudStorage/Dropbox/development/polytheta/scripts/launchd/monday-revalidate.err.log</string>
+	<string>/Users/andrewblount/Library/Logs/polytheta/monday-revalidate.err.log</string>
 	<key>WakeSystem</key>
 	<true/>
 </dict>
