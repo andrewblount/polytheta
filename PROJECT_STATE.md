@@ -14,9 +14,9 @@ Connected basket finalization now requires exact IB option/underlying quotes, IV
 
 ## Verification and remaining work
 
-155 tests pass, including native settings round trips; targeted lint passes. Gateway is open with Paper Trading selected and awaiting login. Both account and data probes return IB error 502; paper account/equity, subscription sharing, real-time quotes and margin remain unverified. No orders were submitted. No September 21 basket is finalized; the last research refresh completed but produced no qualifying basket. Source release/deployment verification is in progress. Prior native changes compile but are not distributed to TestFlight. Preserve unrelated news-radar edits, AGENTS.md, launchd state and untracked baskets.
+155 tests pass in the working and clean release trees, including native settings round trips. Full lint has zero errors (21 existing warnings). Gateway is open with Paper Trading selected and awaiting login. Both account and data probes return IB error 502; paper account/equity, subscription sharing, real-time quotes and margin remain unverified. No orders were submitted. No September 21 basket is finalized; the last research refresh completed but produced no qualifying basket. Code `9aa21b6` is pushed; GitHub checks/deployment succeeded. [Verified production release](https://app.netlify.com/projects/polytheta/deploys/6aac5fae26d8e69fc4ea5960) is ready; the live guide matches exactly and authenticated settings confirm the configuration above. Prior native changes compile but are not distributed to TestFlight. Preserve unrelated news-radar edits, AGENTS.md, launchd state and untracked baskets.
 
-Configuration backup and receipt: `/Users/andrewblount/.local/state/polytheta/paper-2026-09-21/`. Latest data probe: private `runtime/ib-market-data-check.json`.
+Configuration backup, release receipt and verification logs: `/Users/andrewblount/.local/state/polytheta/paper-2026-09-21/`. Latest data probe: private `runtime/ib-market-data-check.json`.
 
 ## Access moderation, September 17
 
