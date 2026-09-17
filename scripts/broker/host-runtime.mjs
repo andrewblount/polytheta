@@ -90,3 +90,14 @@ export function chooseJournal(remote, local) {
   if (remote && Object.keys(local.intents ?? {}).some(ref => !Object.hasOwn(remote.intents, ref))) throw new Error('Hosted journal is missing locally recorded orders; reconcile before changing execution computers');
   return chosen;
 }
+
+export function chooseModeJournal(mode, { remote, local, legacyRemote, legacyLocal } = {}) {
+  const empty = () => ({ intents: {}, fills: {}, signals: {} });
+  const matches = value => value && (value.mode ?? (/^DU/.test(value.account ?? '') ? 'paper' : 'live')) === mode;
+  for (const value of [remote, local]) {
+    if (value && (value.mode || value.account) && !matches(value)) throw new Error('Execution journal belongs to a different account mode');
+  }
+  const hosted = remote ?? (matches(legacyRemote) ? legacyRemote : undefined);
+  const backup = local ?? (matches(legacyLocal) ? legacyLocal : empty());
+  return chooseJournal(hosted, backup);
+}

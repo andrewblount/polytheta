@@ -1,11 +1,11 @@
 import https from 'node:https';
 import { retryRead } from '../../shared/retry.mjs';
-import { assertValidLimit, normalizeOrderStatus, normalizePriceIncrements } from './adapter-utils.mjs';
+import { assertValidLimit, normalizeOrderStatus, normalizePriceIncrements, selectBrokerAccount } from './adapter-utils.mjs';
 export class WebApiBroker {
-  constructor({ baseUrl = process.env.IBKR_WEB_API_URL ?? 'https://localhost:5000/v1/api', account = process.env.IBKR_ACCOUNT_ID, token = process.env.IBKR_ACCESS_TOKEN, requestImpl, ordersPreflightDelayMs = requestImpl ? 0 : 5100 } = {}) {
+  constructor({ baseUrl = process.env.IBKR_WEB_API_URL ?? 'https://localhost:5000/v1/api', account = process.env.IBKR_ACCOUNT_ID, accountMode = 'live', token = process.env.IBKR_ACCESS_TOKEN, requestImpl, ordersPreflightDelayMs = requestImpl ? 0 : 5100 } = {}) {
     this.base = new URL(baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`);
     if (this.base.protocol !== 'https:' || this.base.username || this.base.password) throw new Error('IB Web API requires HTTPS without embedded credentials');
-    this.account = account; this.token = token; this.requestImpl = requestImpl;
+    this.account = account; this.accountMode = accountMode; this.token = token; this.requestImpl = requestImpl;
     this.kind = 'web-api'; this.ordersPreflightDelayMs = ordersPreflightDelayMs;
     this.requestTurn = Promise.resolve(); this.lastRequestAt = 0;
   }
@@ -43,11 +43,12 @@ export class WebApiBroker {
     return method === 'GET' ? retryRead(run, { attempts: 3 }) : run();
   }
   async connect() {
-    if (!this.account) throw new Error('IBKR_ACCOUNT_ID is not configured on this Mac');
+    if (!this.account && this.accountMode !== 'paper') throw new Error('IBKR_ACCOUNT_ID is not configured on this Mac');
     const status = await this.request('GET', 'iserver/auth/status');
     if (!status.authenticated || !status.connected || status.competing) throw new Error('IB brokerage session is unavailable or competing; sign in to the selected connection');
     const accounts = await this.request('GET', 'portfolio/accounts');
-    if (!Array.isArray(accounts) || !accounts.some(a => a.id === this.account)) throw new Error('Configured IB account is not authorized');
+    if (!Array.isArray(accounts)) throw new Error('IB account list is unavailable');
+    this.account = selectBrokerAccount(accounts.map(a => a.id), this.account, this.accountMode);
     const session = await this.request('GET', 'iserver/accounts');
     // The orders/trades endpoints use the session's selected account, unlike
     // the explicit portfolio endpoint. Never report another selection as ours.

@@ -26,7 +26,8 @@ export async function executionCycle({ broker, proposal, settings, journal, save
     && (!intent.entryWindowEnd || +at < Date.parse(intent.entryWindowEnd));
   const readNews = pick => boundedRead(signal => scanNews(pick, { signal }), 10000, 'News scan timed out; retrying next cycle');
   const health = await broker.connect();
-  if (health.mode !== 'live' && !(health.mode === 'paper' && allowPaper)) throw new Error('This service is configured for the live account only; set IBKR_ALLOW_PAPER=true locally to run a paper account');
+  if (settings.accountMode && health.mode !== settings.accountMode) throw new Error('IB account mode does not match Settings; sign in to the selected live or paper session');
+  if (!settings.accountMode && health.mode !== 'live' && !(health.mode === 'paper' && allowPaper)) throw new Error('This service is configured for the live account only; select Paper trading in Settings');
   if (journal.mode && journal.mode !== health.mode) throw new Error('Execution journal belongs to a different account mode');
   journal.mode = health.mode;
   const [positions, orders, executions, account] = await Promise.all([broker.positions(), broker.orders(), broker.executions(), broker.accountSummary()]);
@@ -97,7 +98,7 @@ export async function executionCycle({ broker, proposal, settings, journal, save
     return { ...value, lossStopProblems: riskProblems };
   };
   await publish(snapshot());
-  if (!enabled) return { connected: true, message: `IB connected; execution is not activated${riskMessage ? `. ${riskMessage}` : ''}`, health, account, reserve: journal.reserve, positions: snapshot().positions.length };
+  if (!enabled) return { connected: true, message: `IB ${health.mode} account connected; execution is not activated${riskMessage ? `. ${riskMessage}` : ''}`, health, account, reserve: journal.reserve, positions: snapshot().positions.length };
   const submit = async (order, quote) => {
     if (!isMarketOpen(decisionTime())) throw new Error('Exchange session closed before submission; no order sent');
     // Persist intent before any network write. A timeout stays uncertain and
@@ -132,7 +133,7 @@ export async function executionCycle({ broker, proposal, settings, journal, save
   };
   const entries = Object.values(journal.intents).filter(i => i.action === 'entry');
   journal.commands ??= {};
-  for (const command of commands) {
+  for (const command of typeof commands === 'function' ? commands() : commands) {
     if (journal.commands[command.requestId]) continue;
     if (command.accountKey !== accountFingerprint(broker.account)) throw new Error('Exit request belongs to a different IB account');
     const known = command.targets.every(t => entries.some(i => i.contract.conid === t.conid));

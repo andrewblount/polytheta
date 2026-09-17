@@ -35,11 +35,11 @@ test('host selection and configuration changes invalidate otherwise recent exit 
 });
 
 test('older installed iOS settings updates preserve new host, endpoint and timing controls', () => {
-  const current = validateBrokerSettings({ executionHostId: hostA, entryTiming: 'friday-close', twsPort: 7496,
+  const current = validateBrokerSettings({ accountMode: 'paper', executionHostId: hostA, entryTiming: 'friday-close', twsPort: 7497,
     preparationLeadMinutes: 120, finalizeLeadMinutes: 15, vixIvSensitivity: 1.2, modelRiskFreeRatePct: 3.75, maxAccountLossPct: 37.5 });
   const updated = mergeBrokerSettingsUpdate(current, { entryCapitalPct: 40, excludedTickers: ['TSLA', 'SPCX', 'ABC'] });
   assert.equal(updated.entryCapitalPct, 40);
-  for (const key of ['executionHostId', 'entryTiming', 'twsPort', 'webApiUrl', 'preparationLeadMinutes', 'finalizeLeadMinutes', 'vixIvSensitivity', 'modelRiskFreeRatePct', 'maxAccountLossPct']) {
+  for (const key of ['accountMode', 'executionHostId', 'entryTiming', 'twsPort', 'webApiUrl', 'preparationLeadMinutes', 'finalizeLeadMinutes', 'vixIvSensitivity', 'modelRiskFreeRatePct', 'maxAccountLossPct']) {
     assert.equal(updated[key], current[key], key);
   }
   assert.throws(() => mergeBrokerSettingsUpdate(current, null), /object/);
@@ -98,7 +98,7 @@ test('native settings decode prior responses and round-trip every new timing and
   const modelSource = fs.readFileSync(new URL('../ios/Sources/BrokerSettingsView.swift', import.meta.url), 'utf8')
     .split('struct BrokerSettingsSection: View')[0].replace('import SwiftUI', 'import Foundation');
   const portfolioSource = fs.readFileSync(new URL('../ios/Shared/BrokerModels.swift', import.meta.url), 'utf8');
-  const current = validateBrokerSettings({ executionHostId: hostA, entryTiming: 'friday-close', twsPort: 7496,
+  const current = validateBrokerSettings({ accountMode: 'paper', executionHostId: hostA, entryTiming: 'friday-close', twsPort: 7497,
     preparationLeadMinutes: 120, finalizeLeadMinutes: 15, vixIvSensitivity: 1.2, modelRiskFreeRatePct: 3.75, maxAccountLossPct: 37.5 });
   const oldKeys = ['connection','pauseEntries','entryCapitalPct','callAllocationPct','putAllocationPct','maxTrades','reserveLeverageCeiling','minimumCreditRatio','entryTimeoutSeconds','excludedTickers','strikeOverrides'];
   const old = Object.fromEntries(oldKeys.map(key => [key, current[key]]));
@@ -115,11 +115,12 @@ ${portfolioSource}
 let legacy = try JSONDecoder().decode(BrokerSettings.self, from: Data(base64Encoded: "${encoded(old)}")!)
 precondition(legacy.entryTiming == "monday-morning" && legacy.executionHostId == "")
 precondition(legacy.preparationLeadMinutes == 90 && legacy.finalizeLeadMinutes == 10)
-precondition(legacy.maxAccountLossPct == 20)
+precondition(legacy.maxAccountLossPct == 20 && legacy.accountMode == "live")
 let current = try JSONDecoder().decode(BrokerSettings.self, from: Data(base64Encoded: "${encoded(current)}")!)
 let roundTrip = try JSONDecoder().decode(BrokerSettings.self, from: JSONEncoder().encode(current))
 precondition(roundTrip.executionHostId == "${hostA}" && roundTrip.entryTiming == "friday-close")
-precondition(roundTrip.twsPort == 7496 && roundTrip.preparationLeadMinutes == 120 && roundTrip.finalizeLeadMinutes == 15)
+precondition(roundTrip.accountMode == "paper")
+precondition(roundTrip.twsPort == 7497 && roundTrip.preparationLeadMinutes == 120 && roundTrip.finalizeLeadMinutes == 15)
 precondition(roundTrip.vixIvSensitivity == 1.2 && roundTrip.modelRiskFreeRatePct == 3.75)
 precondition(roundTrip.maxAccountLossPct == 37.5)
 let oldPosition = try JSONDecoder().decode(BrokerPosition.self, from: Data(base64Encoded: "${encoded(position)}")!)

@@ -13,6 +13,7 @@ struct BrokerPortfolioResponse: Codable {
     }
 }
 struct BrokerPortfolioSnapshot: Codable {
+    let mode: String?
     let accountKey: String
     let observedAt: String
     let activated: Bool

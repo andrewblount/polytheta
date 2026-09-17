@@ -64,7 +64,7 @@ struct LiveTradesView: View {
                 }
                 Text("NOW requests prompt processing. Fills require liquidity and an open exchange session; pending requests remain visible until confirmed by IB.").font(.caption).foregroundStyle(.secondary)
             }
-            .navigationTitle("Live IB trades")
+            .navigationTitle(state?.snapshot?.mode == "paper" ? "Paper IB trades" : "IB trades")
             .toolbar { Button("Refresh") { Task { await refresh() } } }
             .refreshable { await refresh() }
             .confirmationDialog("Exit PolyTheta trade(s) now?", isPresented: Binding(get: { exitTarget != nil }, set: { if !$0 { exitTarget = nil } }), titleVisibility: .visible) {

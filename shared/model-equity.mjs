@@ -23,6 +23,8 @@ export function resolveModelEquity({ brokerEquity, settings, env = process.env, 
   const override = env.POLYTHETA_MODEL_EQUITY;
   const hostSelected = Boolean(settings?.executionHostId);
   if (brokerEquity) {
+    if (settings?.accountMode && brokerEquity.mode !== settings.accountMode) throw new Error('Broker equity belongs to a different account mode; run npm run ib:check for the selected account');
+    if (hostSelected && brokerEquity.hostId && brokerEquity.hostId !== settings.executionHostId) throw new Error('Broker equity belongs to a different execution computer; run npm run ib:check');
     const age = +now - Date.parse(brokerEquity.observedAt);
     if (!Number.isFinite(age) || age < -60000) throw new Error('Broker equity snapshot has an invalid timestamp');
     if (age > MAX_BROKER_EQUITY_AGE_MS) {

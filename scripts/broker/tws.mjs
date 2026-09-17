@@ -1,8 +1,8 @@
 import { IBApi, EventName } from '@stoqey/ib';
-import { assertValidLimit, normalizeOrderStatus, normalizePriceIncrements } from './adapter-utils.mjs';
+import { assertValidLimit, normalizeOrderStatus, normalizePriceIncrements, selectBrokerAccount } from './adapter-utils.mjs';
 export class TwsBroker {
-  constructor({ account = process.env.IBKR_ACCOUNT_ID, host = process.env.IBKR_TWS_HOST ?? '127.0.0.1', port = Number(process.env.IBKR_TWS_PORT ?? 4001), clientId = Number(process.env.IBKR_TWS_CLIENT_ID ?? 96), client, commissionWaitMs = 2000 } = {}) {
-    this.account = account; this.kind = 'tws'; this.id = 100000; this.nextOrderId = null;
+  constructor({ account = process.env.IBKR_ACCOUNT_ID, accountMode = 'live', host = process.env.IBKR_TWS_HOST ?? '127.0.0.1', port = Number(process.env.IBKR_TWS_PORT ?? 4001), clientId = Number(process.env.IBKR_TWS_CLIENT_ID ?? 96), client, commissionWaitMs = 2000 } = {}) {
+    this.account = account; this.accountMode = accountMode; this.kind = 'tws'; this.id = 100000; this.nextOrderId = null;
     this.clientId = clientId; this.commissionWaitMs = commissionWaitMs;
     this.ib = client ?? new IBApi({ host, port, clientId });
     this.ib.on(EventName.error, () => {}); // request-specific errors handled below
@@ -46,11 +46,11 @@ export class TwsBroker {
     });
   }
   async connect() {
-    if (!this.account) throw new Error('IBKR_ACCOUNT_ID is not configured on this Mac');
+    if (!this.account && this.accountMode !== 'paper') throw new Error('IBKR_ACCOUNT_ID is not configured on this Mac');
     await this.collect(EventName.nextValidId, EventName.nextValidId, () => this.ib.connect());
     const rows = await this.collect(EventName.managedAccounts, EventName.managedAccounts, () => this.ib.reqManagedAccts());
     const accounts = String(rows[0]?.[0] ?? '').split(',');
-    if (!accounts.includes(this.account)) throw new Error('Configured IB account is not authorized by this TWS session');
+    this.account = selectBrokerAccount(accounts, this.account, this.accountMode);
     return { connected: true, mode: /^DU/.test(this.account) ? 'paper' : 'live', connection: this.kind };
   }
   async positions() {

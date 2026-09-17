@@ -34,7 +34,7 @@ export function portfolioSnapshot({ journal, positions, account, connection, act
     };
   }).filter(p => p.entered || p.workingEntry);
   const complete = rows.every(p => p.reconciled && p.unrealizedPnl != null && p.feesComplete);
-  return { scope: 'PolyTheta only', accountKey: accountFingerprint(account), connection, activated,
+  return { scope: 'PolyTheta only', accountKey: accountFingerprint(account), mode: journal.mode, connection, activated,
     observedAt: now.toISOString(), positions: rows,
     // A past expiry awaiting an activity statement must not conceal marks for
     // current holdings. Realized totals stay explicitly incomplete meanwhile.

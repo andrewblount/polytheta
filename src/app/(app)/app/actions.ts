@@ -54,7 +54,7 @@ export async function updateBrokerSettingsAction(formData: FormData) {
   const updates: Record<string, unknown> = { ...current, connection: String(formData.get("connection")), pauseEntries: formData.get("pauseEntries") === "on" };
   updates.excludedTickers = String(formData.get("excludedTickers") ?? "");
   updates.strikeOverrides = JSON.parse(String(formData.get("strikeOverrides") ?? "[]"));
-  for (const key of ["executionHostId", "twsHost", "webApiUrl", "twsRestartTime", "twsRestartTimezone", "entryTiming", "mondayEntryStart", "mondayEntryEnd"]) updates[key] = String(formData.get(key) ?? current[key as keyof typeof current]);
+  for (const key of ["accountMode", "executionHostId", "twsHost", "webApiUrl", "twsRestartTime", "twsRestartTimezone", "entryTiming", "mondayEntryStart", "mondayEntryEnd"]) updates[key] = String(formData.get(key) ?? current[key as keyof typeof current]);
   for (const key of ["entryCapitalPct", "maxAccountLossPct", "maxTrades", "callAllocationPct", "putAllocationPct", "reserveLeverageCeiling", "minimumCreditRatio", "entryTimeoutSeconds", "maxExitPremiumMultiple", "twsPort", "twsClientId", "twsRestartGraceMinutes", "preparationLeadMinutes", "finalizeLeadMinutes", "vixIvSensitivity", "modelRiskFreeRatePct"]) updates[key] = Number(formData.get(key) ?? current[key as keyof typeof current]);
   await saveBrokerSettings(updates);
   revalidatePath("/app/settings");

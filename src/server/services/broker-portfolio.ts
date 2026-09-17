@@ -16,6 +16,7 @@ export function brokerPortfolioIsStale({ snapshot, status, settings, settingsUpd
   return !Number.isFinite(age) || age < -1000 || age > 120000 ||
     !Number.isFinite(settingsAt) || observedAt < settingsAt || !settings?.executionHostId ||
     snapshot?.hostId !== settings.executionHostId || status?.hostId !== settings.executionHostId ||
+    (settings.accountMode != null && (snapshot?.mode !== settings.accountMode || status?.mode !== settings.accountMode)) ||
     snapshot?.connection !== settings.connection || status?.connection !== settings.connection || status?.connected !== true;
 }
 
@@ -27,7 +28,9 @@ export async function getBrokerPortfolio() {
     db.select().from(appSettings).where(eq(appSettings.key, "broker_status")),
     db.select().from(appSettings).where(eq(appSettings.key, "broker")),
   ]);
-  const snapshot = snapshots[0]?.value ?? null;
+  const stored = snapshots[0]?.value ?? null;
+  const mode = settings[0]?.value.accountMode ?? 'live';
+  const snapshot = stored && (stored.mode ?? 'live') === mode ? stored : null;
   const stale = brokerPortfolioIsStale({ snapshot, status: statuses[0]?.value ?? null, settings: settings[0]?.value ?? null, settingsUpdatedAt: settings[0]?.updatedAt });
   return { snapshot, requests: requests.map(r => r.value).filter(request => request.accountKey === snapshot?.accountKey), stale };
 }

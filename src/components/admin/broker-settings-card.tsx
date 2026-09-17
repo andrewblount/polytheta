@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getBrokerSettings, getBrokerStatus, getExecutionHosts } from "@/server/services/broker-settings";
 import { StrikeSettingsEditor } from "./strike-settings-editor";
+import { BrokerAccountFields } from "./broker-account-fields";
 export async function BrokerSettingsCard() {
   const [s, status, hosts] = await Promise.all([getBrokerSettings(), getBrokerStatus(), getExecutionHosts()]);
   const fields = [
@@ -20,15 +21,15 @@ export async function BrokerSettingsCard() {
     ["finalizeLeadMinutes", "Final refresh before entry window (minutes)", 5, 20, 1],
     ["vixIvSensitivity", "VIX-to-option-IV sensitivity", 0, 3, 0.1],
     ["modelRiskFreeRatePct", "Model annual risk-free rate (%)", 0, 20, 0.1],
-    ["twsPort", "TWS / Gateway API port", 1, 65535, 1],
     ["twsClientId", "Dedicated TWS client ID", 1, 999999, 1],
     ["twsRestartGraceMinutes", "Expected restart recovery window (minutes)", 1, 60, 1],
   ] as const;
-  return <Card><CardHeader><CardTitle>Interactive Brokers · Live account</CardTitle>
+  return <Card><CardHeader><CardTitle>Interactive Brokers · {s.accountMode === 'paper' ? 'Paper account' : 'Live account'}</CardTitle>
     <p className="text-sm text-muted-foreground">Equal allocation per trade. No doubling. Automatic exits follow news and configured ticker-loss rules.</p>
   </CardHeader><CardContent className="space-y-5">
     <p role="status" className="rounded-xl border p-3 text-sm">{status && !status.stale ? String(status.message ?? "Connection status unavailable") : "IB connection has not been verified recently. Sign in to your selected gateway on the trading Mac."}</p>
     <form action={updateBrokerSettingsAction} className="grid gap-4 sm:grid-cols-2">
+      <BrokerAccountFields key={`${s.accountMode}:${s.twsPort}`} accountMode={s.accountMode} twsPort={s.twsPort} />
       <label className="grid gap-2 text-sm">Execution computer<select name="executionHostId" defaultValue={s.executionHostId} className="rounded-lg border bg-background p-3"><option value="">Choose a registered computer</option>{hosts.map(h => <option key={h.id} value={h.id}>{h.label}</option>)}</select><span className="text-xs text-muted-foreground">Register another computer with the IB worker. Selection transfers control on the next reconciled cycle; only one worker runs at a time.</span></label>
       <label className="grid gap-2 text-sm">Entry timing<select name="entryTiming" defaultValue={s.entryTiming} className="rounded-lg border bg-background p-3"><option value="monday-morning">Monday morning</option><option value="friday-close">Friday: final five minutes</option></select><span className="text-xs text-muted-foreground">Friday mode targets next week’s expiry. Friday holidays use the preceding session; Monday holidays use the first session. Early closes are automatic.</span></label>
       <label className="grid gap-2 text-sm">Monday entry starts (New York)<Input name="mondayEntryStart" type="time" required defaultValue={s.mondayEntryStart} /></label>

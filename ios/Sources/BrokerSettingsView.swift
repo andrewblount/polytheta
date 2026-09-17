@@ -2,6 +2,7 @@ import SwiftUI
 
 struct BrokerSettings: Codable {
     var connection = "tws"
+    var accountMode = "live"
     var pauseEntries = true
     var entryCapitalPct = 100.0
     var maxAccountLossPct = 20.0
@@ -32,7 +33,7 @@ struct BrokerSettings: Codable {
 
     init() {}
     enum CodingKeys: String, CodingKey {
-        case connection, pauseEntries, entryCapitalPct, maxAccountLossPct, callAllocationPct, putAllocationPct, maxTrades
+        case connection, accountMode, pauseEntries, entryCapitalPct, maxAccountLossPct, callAllocationPct, putAllocationPct, maxTrades
         case reserveLeverageCeiling, minimumCreditRatio, entryTimeoutSeconds, maxExitPremiumMultiple, excludedTickers, strikeOverrides
         case executionHostId, twsHost, twsPort, twsClientId, webApiUrl, twsRestartTime, twsRestartTimezone, twsRestartGraceMinutes
         case entryTiming, mondayEntryStart, mondayEntryEnd, preparationLeadMinutes, finalizeLeadMinutes, vixIvSensitivity, modelRiskFreeRatePct
@@ -40,6 +41,7 @@ struct BrokerSettings: Codable {
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         connection = try values.decode(String.self, forKey: .connection)
+        accountMode = try values.decodeIfPresent(String.self, forKey: .accountMode) ?? accountMode
         pauseEntries = try values.decode(Bool.self, forKey: .pauseEntries)
         entryCapitalPct = try values.decode(Double.self, forKey: .entryCapitalPct)
         callAllocationPct = try values.decode(Double.self, forKey: .callAllocationPct)
@@ -89,8 +91,24 @@ struct BrokerSettingsSection: View {
     @State private var newExcludedTicker = ""
     @State private var hosts: [BrokerSettingsResponse.ExecutionHost] = []
     var body: some View {
-        Section("Interactive Brokers · Live") {
+        Section(settings.accountMode == "paper" ? "Interactive Brokers · Paper" : "Interactive Brokers · Live") {
             Text(message).font(.footnote).foregroundStyle(.secondary)
+            Picker("Account mode", selection: Binding(get: { settings.accountMode }, set: { newMode in
+                guard settings.accountMode != newMode else { return }
+                let ports = newMode == "paper" ? [4001: 4002, 7496: 7497] : [4002: 4001, 7497: 7496]
+                settings.twsPort = ports[settings.twsPort] ?? settings.twsPort
+                settings.accountMode = newMode
+                settings.pauseEntries = true
+                message = "Save the selected account mode, then check its Gateway connection."
+            })) {
+                Text("Paper trading · simulated money").tag("paper")
+                Text("Live trading · real money").tag("live")
+            }
+            Text("Changing mode pauses new entries. Only the selected account is monitored. Saving settings does not activate orders.").font(.caption).foregroundStyle(.secondary)
+            if settings.accountMode == "paper" {
+                Text("On the execution computer, open IB Gateway and select Paper Trading before signing in with your existing IB login. Store your login in Apple Passwords and enter it directly in Gateway. PolyTheta detects a single paper account automatically.").font(.caption).foregroundStyle(.secondary)
+                Text("Paper ports: IB Gateway 4002 / TWS 7497. Keep the API read-only for the first check. Simulated trades stay separate from actual-trade performance.").font(.caption).foregroundStyle(.secondary)
+            }
             Picker("Execution computer", selection: $settings.executionHostId) {
                 Text("Choose a registered computer").tag("")
                 ForEach(hosts) { host in Text(host.label).tag(host.id) }
@@ -156,7 +174,7 @@ struct BrokerSettingsSection: View {
                 Task {
                     saving = true
                     defer { saving = false }
-                    do { settings = try await api.updateBrokerSettings(settings); error = nil; message = "Trading settings saved. Live execution requires activation on the trading Mac." }
+                    do { settings = try await api.updateBrokerSettings(settings); error = nil; message = "Trading settings saved. Execution requires separate activation for the selected account mode on the trading Mac." }
                     catch { self.error = error.localizedDescription }
                 }
             }.disabled(!loaded || saving)

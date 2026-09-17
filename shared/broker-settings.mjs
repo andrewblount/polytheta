@@ -1,7 +1,7 @@
 import { validateStrikeOverrides } from './strike-settings.mjs';
 import { clockMinute } from './entry-schedule.mjs';
 export const DEFAULT_BROKER_SETTINGS = Object.freeze({
-  connection: 'tws', quoteSource: 'ibkr', pauseEntries: true,
+  connection: 'tws', accountMode: 'live', quoteSource: 'ibkr', pauseEntries: true,
   entryCapitalPct: 100, maxTrades: 8, callAllocationPct: 100, putAllocationPct: 0,
   reserveLeverageCeiling: 4, minimumCreditRatio: 0.9, maxEntrySpread: 0.15,
   maxQuoteAgeSeconds: 15, entryTimeoutSeconds: 300, maxExitPremiumMultiple: 1.5,
@@ -15,6 +15,8 @@ export const DEFAULT_BROKER_SETTINGS = Object.freeze({
 });
 export function validateBrokerSettings(input) {
   const s = { ...DEFAULT_BROKER_SETTINGS, ...input };
+  if (!['live', 'paper'].includes(s.accountMode)) throw new Error('Select a live or paper account mode');
+  if (input?.twsPort === undefined && s.accountMode === 'paper') s.twsPort = 4002;
   if (!['tws', 'web-api'].includes(s.connection) || s.quoteSource !== 'ibkr') throw new Error('Select TWS or Web API; execution quotes must use IB');
   if (typeof s.pauseEntries !== 'boolean') throw new Error('Invalid entry pause setting');
   if (!['monday-morning', 'friday-close'].includes(s.entryTiming) || s.fridayHolidayPolicy !== 'previous-session') throw new Error('Invalid entry timing; Friday holidays use the preceding session');
