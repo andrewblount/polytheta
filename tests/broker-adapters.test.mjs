@@ -11,6 +11,27 @@ const account = 'U_TEST';
 const increments = [{ lowEdge: 0, increment: .01 }, { lowEdge: 3, increment: .05 }];
 const contract = { conid: 123, symbol: 'ABC', strike: 25, expiry: '2026-09-11', side: 'call', multiplier: 100, tick: .01, priceIncrements: increments, raw: { conId: 123, exchange: 'SMART' } };
 
+test('TWS subscribed option quotes wait for valid underlying and Greeks and record their receipt time', async () => {
+  const client = new EventEmitter();
+  let cancelled = 0;
+  client.reqMarketDataType = type => assert.equal(type, 1);
+  client.cancelMktData = () => cancelled++;
+  client.reqMktData = (id, raw, ticks, snapshot, regulatory) => {
+    assert.equal(snapshot, false); assert.equal(regulatory, false);
+    client.emit(EventName.marketDataType, id, 1);
+    client.emit(EventName.tickPrice, id, 1, .45); client.emit(EventName.tickPrice, id, 2, .55);
+    client.emit(EventName.tickSize, id, 0, 10); client.emit(EventName.tickSize, id, 3, 10);
+    client.emit(EventName.tickOptionComputation, id, 13, 0, -1, -2, 0, 0, 0, 0, 0, -1);
+    client.emit(EventName.tickOptionComputation, id, 13, 0, .48, .18, .5, 0, .01, .02, -.1, 20);
+  };
+  const q = await new TwsBroker({ account, client }).quote(contract);
+  assert.equal(q.underlyingPrice, 20); assert.equal(q.delta, .18); assert.equal(q.optionIv, .48);
+  assert.equal(q.realtime, true); assert.equal(cancelled, 1);
+  assert.ok(Number.isFinite(q.underlyingObservedAt), 'Underlying receipt timestamp is required');
+  assert.ok(q.observedAt <= q.underlyingObservedAt, 'Freshness includes underlying data');
+  assert.equal(client.listenerCount(EventName.tickPrice), 0);
+});
+
 test('TWS joins commission callbacks that arrive before or after execDetailsEnd', async () => {
   for (const late of [false, true]) {
     const client = new EventEmitter();

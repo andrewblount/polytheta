@@ -36,6 +36,22 @@ test('exits close only owned shorts and only on actionable news', () => {
 test('disabled execution can read account state but never submits', async()=>{
   const broker=mock();await executionCycle({broker,proposal,settings,journal:{},save:async()=>{},scanNews:async()=>[],now});assert.equal(broker.submissions.length,0);
 });
+test('week-scoped paper activation blocks other baskets but keeps owned exits enabled', async () => {
+  const broker = mock(); broker.account = 'DU_TEST'; broker.connect = async () => ({ mode: 'paper' });
+  const args = { broker, proposal, settings: { ...settings, accountMode: 'paper' }, journal: {}, save: async () => {}, scanNews: async () => [], enabled: true, now, authorizedEntryWeek: '2026-09-21' };
+  const monitoring = await executionCycle(args);
+  assert.equal(monitoring.health?.mode, 'paper');
+  assert.equal(monitoring.account?.netLiquidation, account.netLiquidation);
+  assert.equal(broker.submissions.length, 0);
+  await executionCycle({ ...args, authorizedEntryWeek: proposal.basket_date });
+  assert.equal(broker.submissions.length, 1);
+  const entry = Object.values(args.journal.intents)[0];
+  broker.orders = async () => [{ orderId: '1', ref: entry.ref, conid: 123, status: 'Filled', filled: entry.quantity }];
+  broker.executions = async () => [{ executionId: 'P1', ref: entry.ref, conid: 123, quantity: entry.quantity, price: .5 }];
+  broker.positions = async () => [{ conid: 123, quantity: -entry.quantity }];
+  await executionCycle({ ...args, scanNews: async () => [{ actionable: true, link: 'https://reuters.com/test', publishedAt: now.toISOString() }] });
+  assert.equal(broker.submissions.at(-1).action, 'exit');
+});
 test('intent is durable before submit and reruns do not double an entry',async()=>{
   const broker=mock(),journal={};let beforeWrite=false;
   broker.submit=async function(o){assert.equal(journal.intents[o.ref].status,'uncertain');beforeWrite=true;this.submissions.push(o);return{orderId:'1',status:'Submitted'}};

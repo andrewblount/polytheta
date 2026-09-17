@@ -47,6 +47,45 @@ test('paper runtime ignores live account and live activation and uses isolated s
   assert.notEqual(live.journalKey, paper.journalKey);
   assert.notEqual(live.journalFile, paper.journalFile);
 });
+test('paper entry week is explicit, validated and never restricts the live runtime', () => {
+  const env = { POLYTHETA_PAPER_ENTRY_WEEK: '2026-09-21' };
+  assert.equal(brokerModule.brokerRuntime({ accountMode: 'paper' }, env).authorizedEntryWeek, '2026-09-21');
+  assert.equal(brokerModule.brokerRuntime({ accountMode: 'live' }, env).authorizedEntryWeek, undefined);
+  for (const week of ['2026-09-22', 'invalid', '2026-02-30']) {
+    assert.throws(() => brokerModule.brokerRuntime({ accountMode: 'paper' }, { POLYTHETA_PAPER_ENTRY_WEEK: week }), /Monday/);
+  }
+});
+
+test('IB basket market reads use a separate client, matching account mode, and always disconnect', async () => {
+  assert.equal(typeof brokerModule.readBasketMarketData, 'function');
+  const settings = validateBrokerSettings({ accountMode: 'paper' });
+  let disconnected = 0, mode = 'paper';
+  const contract = { conid: 123 }, quote = { conid: 123, realtime: true };
+  const factory = config => {
+    assert.equal(config.twsClientId, 97); assert.equal(config.accountMode, 'paper');
+    return { connect: async () => ({ mode }), resolve: async () => contract, quote: async () => quote, disconnect: () => disconnected++ };
+  };
+  const picks = [{ ticker: 'ABC', side: 'call', K: 20 }];
+  assert.deepEqual(await brokerModule.readBasketMarketData(picks, '2026-09-25', settings, { factory, env: {} }), [{ contract, quote }]);
+  mode = 'live';
+  await assert.rejects(brokerModule.readBasketMarketData(picks, '2026-09-25', settings, { factory, env: {} }), /account mode/);
+  assert.equal(disconnected, 2);
+  await assert.rejects(brokerModule.readBasketMarketData(picks, '2026-09-25', settings, { factory, env: { IBKR_MARKET_DATA_CLIENT_ID: '96' } }), /different/);
+  await assert.rejects(brokerModule.readBasketMarketData(picks, '2026-09-25', settings, { factory: () => ({ connect: async () => { throw new Error('disconnected'); }, disconnect: () => disconnected++ }), env: {} }), /disconnected/);
+  assert.equal(disconnected, 3);
+});
+
+test('IB market probe reports genuine data readiness without submitting or changing an account', async () => {
+  assert.equal(typeof brokerModule.marketDataReadiness, 'function');
+  const settings = validateBrokerSettings({ accountMode: 'paper' }), now = new Date('2026-09-21T14:00:00Z');
+  const quote = { conid: 123, source: 'IB TWS', realtime: true, observedAt: +now, bid: .4, ask: .5, bidSize: 10, askSize: 10, delta: .18, optionIv: .48, underlyingPrice: 20 };
+  const data = [{ contract: { conid: 123, symbol: 'ABC', side: 'call', strike: 21, expiry: '2026-09-25' }, quote }];
+  assert.equal(brokerModule.marketDataReadiness(data, settings, now).ready, true);
+  for (const bad of [{ realtime: false }, { observedAt: +now - 16000 }, { optionIv: -1 }, { underlyingPrice: -1 }]) {
+    assert.throws(() => brokerModule.marketDataReadiness([{ ...data[0], quote: { ...quote, ...bad } }], settings, now), /IB/);
+  }
+  assert.throws(() => brokerModule.marketDataReadiness([], settings, now), /empty/);
+});
 
 const twsSession = accounts => {
   const client = new EventEmitter();

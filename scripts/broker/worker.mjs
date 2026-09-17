@@ -80,7 +80,7 @@ try {
   const file = path.join(root, 'baskets', entryWeek(settings), 'data', 'basket_proposal.json');
   const proposal = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
   const commands = enabled ? await sql`select value from app_settings where key like 'ib_exit:%' and value->>'status' in ('queued','monitoring') order by updated_at` : [];
-  const result = await executionCycle({ broker, proposal, settings, journal, enabled, beforeWrite,
+  const result = await executionCycle({ broker, proposal, settings, journal, enabled, beforeWrite, authorizedEntryWeek: profile.authorizedEntryWeek,
     // A paper account may be discovered during connect(). Resolve queued
     // commands afterward, and never feed the other account's exits to it.
     commands: () => commands.map(r => r.value).filter(command => command.accountKey === accountFingerprint(broker.account)),
@@ -112,8 +112,8 @@ try {
       return result[pick.ticker][pick.side];
     },
   });
-  const mode = result.health?.mode ?? 'live';
-  const status = { ...result, account: undefined, mode, hostId: host.id, hostLabel: host.label, connection: settings.connection, activated: enabled, checkedAt: new Date().toISOString(), fills: Object.keys(journal.fills).length };
+  const mode = profile.mode;
+  const status = { ...result, account: undefined, mode, authorizedEntryWeek: profile.authorizedEntryWeek, hostId: host.id, hostLabel: host.label, connection: settings.connection, activated: enabled, checkedAt: new Date().toISOString(), fills: Object.keys(journal.fills).length };
   // Credentials remain local; only the dedicated worker can read the journal.
   await persistSetting('broker_status', status);
   // Account equity is the sizing basis for both basket selection and entry

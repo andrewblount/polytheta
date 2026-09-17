@@ -19,10 +19,11 @@ export function orderRef(account, week, conid, action) {
 }
 // Broker mutations are reached only after the operator activates the local
 // service. No language model is involved in submitting or managing orders.
-export async function executionCycle({ broker, proposal, settings, journal, save, scanNews, enabled = false, allowPaper = false, now = new Date(), commands = [], publish = async () => {}, beforeWrite = async () => {}, getVix = async () => null }) {
+export async function executionCycle({ broker, proposal, settings, journal, save, scanNews, enabled = false, allowPaper = false, authorizedEntryWeek, now = new Date(), commands = [], publish = async () => {}, beforeWrite = async () => {}, getVix = async () => null }) {
   const cycleStarted = Date.now();
   const decisionTime = () => new Date(+now + Date.now() - cycleStarted);
   const entryCanWork = (intent, at = decisionTime()) => isEntryWindow(intent.week, settings, at)
+    && (!authorizedEntryWeek || intent.week === authorizedEntryWeek)
     && (!intent.entryWindowEnd || +at < Date.parse(intent.entryWindowEnd));
   const readNews = pick => boundedRead(signal => scanNews(pick, { signal }), 10000, 'News scan timed out; retrying next cycle');
   const health = await broker.connect();
@@ -264,8 +265,8 @@ export async function executionCycle({ broker, proposal, settings, journal, save
   await publish(snapshot());
   if (problems.length) throw new Error(problems.join('; '));
   if (Object.values(journal.intents).some(i => i.status === 'uncertain')) throw new Error('An order result is uncertain; new entries are blocked until reconciled');
-  if (riskProblems.length) return { connected: true, message: riskMessage, reserve: journal.reserve, positions: snapshot().positions.length };
-  if (!proposal || settings.pauseEntries || !isMarketOpen(decisionTime()) || !isEntryWindow(proposal.basket_date, settings, decisionTime())) return { connected: true, message: riskMessage ?? (journal.reserve.exceeded ? journal.reserve.message : 'IB connected; monitoring PolyTheta positions'), reserve: journal.reserve, positions: snapshot().positions.length };
+  if (riskProblems.length) return { health, account, connected: true, message: riskMessage, reserve: journal.reserve, positions: snapshot().positions.length };
+  if (!proposal || settings.pauseEntries || !isMarketOpen(decisionTime()) || !entryCanWork({ week: proposal.basket_date })) return { health, account, connected: true, message: riskMessage ?? (journal.reserve.exceeded ? journal.reserve.message : `IB connected; monitoring PolyTheta positions${authorizedEntryWeek ? `; entries authorized only for ${authorizedEntryWeek}` : ''}`), reserve: journal.reserve, positions: snapshot().positions.length };
   const budget = entryBudget(proposal, account, settings, decisionTime());
   const weekEntries = entries.filter(i => i.week === proposal.basket_date);
   journal.budgets ??= {};
@@ -323,5 +324,5 @@ export async function executionCycle({ broker, proposal, settings, journal, save
     await submit(order, fresh);
     reserved += fixed.perTrade;
   }
-  return { connected: true, message: riskMessage ?? journal.urgent ?? (journal.newsOutage ? `News monitoring incomplete: ${journal.newsOutage.message}` : 'IB connected; execution service is monitoring'), positions: snapshot().positions.length };
+  return { health, account, connected: true, message: riskMessage ?? journal.urgent ?? (journal.newsOutage ? `News monitoring incomplete: ${journal.newsOutage.message}` : 'IB connected; execution service is monitoring'), positions: snapshot().positions.length };
 }

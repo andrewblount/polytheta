@@ -96,14 +96,14 @@ export class TwsBroker {
         if (finished) return; finished = true;
         clearTimeout(timer); this.ib.cancelMktData(id);
         for (const [name, fn] of listeners) this.ib.off(name, fn);
-        if (error) reject(error); else resolve({ ...q, observedAt: Math.min(bidAt, askAt) });
+        if (error) reject(error); else resolve({ ...q, observedAt: Math.min(bidAt, askAt, entry ? q.underlyingObservedAt : Infinity) });
       };
-      const ready = () => { if (q.realtime && q.bid >= 0 && q.ask > 0 && q.ask >= q.bid && Number.isFinite(q.bidSize) && q.askSize > 0 && (!entry || q.bid > 0 && q.bidSize > 0 && Number.isFinite(q.delta) && Number.isFinite(q.underlyingPrice))) finish(); };
+      const ready = () => { if (q.realtime && q.bid >= 0 && q.ask > 0 && q.ask >= q.bid && Number.isFinite(q.bidSize) && q.askSize > 0 && (!entry || q.bid > 0 && q.bidSize > 0 && Number.isFinite(q.delta) && Math.abs(q.delta) <= 1 && Number.isFinite(q.underlyingPrice) && q.underlyingPrice > 0 && q.underlyingPrice < 1e100)) finish(); };
       const listeners = [
         [EventName.tickPrice, (req, field, value) => { if (req !== id) return; if (field === 1) { q.bid = value; bidAt = Date.now(); } if (field === 2) { q.ask = value; askAt = Date.now(); } ready(); }],
         [EventName.tickSize, (req, field, value) => { if (req !== id) return; if (field === 0) q.bidSize = Number(value); if (field === 3) q.askSize = Number(value); ready(); }],
         [EventName.marketDataType, (req, type) => { if (req !== id) return; q.realtime = type === 1; if (type !== 1) finish(new Error('IB option data is delayed or frozen')); else ready(); }],
-        [EventName.tickOptionComputation, (req, field, ...values) => { if (req !== id || field !== 13) return; /* signature includes tickAttrib */ q.optionIv = values[1]; q.delta = values[2]; q.underlyingPrice = values[8]; ready(); }],
+        [EventName.tickOptionComputation, (req, field, ...values) => { if (req !== id || field !== 13) return; /* signature includes tickAttrib */ q.optionIv = values[1]; q.delta = values[2]; q.underlyingPrice = values[8]; q.underlyingObservedAt = Date.now(); ready(); }],
         [EventName.error, (error, code, req) => { if (req === id) finish(new Error(`IB market data unavailable (${code})`)); }],
       ];
       const timer = setTimeout(() => finish(new Error('IB live bid/ask/greeks unavailable')), 15000);

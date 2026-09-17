@@ -17,6 +17,8 @@ Store values on the trading computer in `.env.local`, never in Git, the website,
 | `IBKR_LOCAL_GATEWAY_INSECURE` | Optional true only for a local gateway's self-signed certificate; remote TLS is always verified |
 | `POLYTHETA_EXECUTION_ENABLED` | Operator-controlled live activation; ignored in paper mode. Absent/false means broker reads only |
 | `POLYTHETA_PAPER_EXECUTION_ENABLED` | Separate paper-order activation; ignored in live mode. Absent/false means paper reads only |
+| `POLYTHETA_PAPER_ENTRY_WEEK` | Optional Monday date limiting new paper entries to one basket week. Existing paper positions remain monitored and eligible for exits after that week. Ignored in live mode |
+| `IBKR_MARKET_DATA_CLIENT_ID` | Dedicated read client for basket finalization and `ib:data`; defaults to 97 and must differ from the execution client (normally 96) |
 | `IBKR_WORKER_DATABASE_URL` | Optional direct PostgreSQL connection for the singleton worker lock; the default Neon URL is converted to its direct endpoint |
 
 A corporate account does not by itself establish an approved unattended Web API authentication flow. The Web API adapter supports an already authenticated gateway/service; OAuth credentials, token renewal and corporate entitlements must be provisioned with IB for the chosen connection. It does not bypass 2FA. A gateway on this Mac is unavailable to Netlify, so the worker runs locally and synchronizes results to the website database.
@@ -37,6 +39,14 @@ A corporate account does not by itself establish an approved unattended Web API 
 5. To authorize automated paper orders separately, the operator sets `POLYTHETA_PAPER_EXECUTION_ENABLED=true` locally, disables Gateway API read-only and unpauses entries after checking trading rules and the entry schedule. `POLYTHETA_EXECUTION_ENABLED` cannot activate paper orders, and paper activation cannot activate live orders. Market-data, reconciliation and entry-window checks still apply.
 
 Switching back to live requires selecting Live trading, signing into the live Gateway session and checking the exact configured live account. Paper balances cannot size live baskets; run a fresh connection check after switching. The old `IBKR_ALLOW_PAPER` flag does not override the selected account mode.
+
+## Subscribed IB market data
+
+With an execution computer selected, finalization obtains each exact option's real-time bid, ask, IV, Greeks and underlying price from the selected IB session. IB contract IDs, source and receipt timestamps are recorded in the proposal. Invalid, delayed, frozen or stale IB quotes block publication, with no Yahoo option-quote fallback. Execution takes another fresh IB quote and margin preview before each order. Broad universe research, historical volatility, earnings, news and macro inputs retain their existing sources and checks.
+
+The subscriptions belong to the IB username. In Client Portal → Settings → Paper Trading Account, confirm real-time data sharing is enabled for the subscribed live username; API Market Data Acknowledgement must also be complete. Simultaneous sessions can prevent shared data from reaching paper. See [IBKR market-data requirements](https://www.interactivebrokers.com/campus/ibkr-api-page/market-data-subscriptions/) and [paper data sharing](https://www.interactivebrokers.eu/campus/trading-lessons/request-paper-trading-account/).
+
+`npm run ib:check` verifies account connectivity. During US market hours, probe an available exact option using `npm run ib:data -- --ticker SYMBOL --strike PRICE --expiry YYYY-MM-DD --side call`. This command only reads; it never previews or submits an order. It checks the underlying and option data against the entry quote limits, and saves the latest result to private `runtime/ib-market-data-check.json`. A successful account connection alone does not establish subscription readiness. Use a liquid near-the-money contract to check entitlements; this probe does not select a basket trade.
 
 ## Account equity drives sizing
 
@@ -63,6 +73,8 @@ Set the actual daily Auto Restart time in TWS's Lock and Exit settings. PolyThet
 
 IB's current guidance still requires periodic manual authentication; auto-restart tokens are invalidated weekly on Sunday at 01:00 ET. The computer must stay awake and reachable. See [IB auto-restart considerations](https://www.ibkrguides.com/traderworkstation/auto-restart-considerations.htm).
 
-## Connection status, September 17, 2026
+## Paper run, September 21–25, 2026
 
-The standard TWS/Gateway API ports (4001, 4002, 7496, 7497) had no listener on this Mac during the paper-setting implementation. Therefore authentication, quote entitlements and account-level contract/margin read checks remain unverified. No live orders have been submitted. Choose the execution host and complete its IB setup before using live controls.
+The owner requested the September 21 basket use Paper Trading after subscribing to IB market data and API access. This Mac is selected, Gateway port is 4002, paper execution is enabled, and `POLYTHETA_PAPER_ENTRY_WEEK=2026-09-21`; live activation is false. Entries are unpaused but remain subject to connectivity, account-mode, current-basket, data and margin checks. The configured entry window is September 21, 09:45–10:30 ET, with expiry September 25. Research preparation starts September 18 at 14:30 ET; finalization starts September 21 at 09:35 ET.
+
+At setup, Gateway was open with Paper Trading selected and awaiting the owner's login; account connectivity returned IB error 502. Subscription sharing, account equity, live quotes and margin remain unverified. No basket has been finalized for September 21 and no orders were submitted during setup. The installed workers retry automatically; successful authentication and valid data are required before the scheduled run. See the current project brief for subsequent verification.

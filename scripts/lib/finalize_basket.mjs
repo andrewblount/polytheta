@@ -10,6 +10,7 @@ import { basketCounts, isExcluded } from '../../shared/broker-settings.mjs';
 import { calculateGsrs } from '../../shared/gsrs.mjs';
 import { fetchTvMacros } from './tv_macros.mjs';
 import { refreshWeeklyUniverse, WEEKLYS_SOURCE } from './refresh.mjs';
+import { readBasketMarketData, marketDataReadiness } from '../broker/index.mjs';
 
 export function preparationPolicy(settings) {
   const { executionHostId, twsHost, twsPort, twsClientId, webApiUrl, twsRestartTime, twsRestartTimezone, twsRestartGraceMinutes, pauseEntries, ...policy } = settings;
@@ -64,7 +65,7 @@ async function currentUniverse(OUT) {
   const metadata = await refreshWeeklyUniverse(OUT);
   return { ...metadata, tickers: fs.readFileSync(path.join(OUT, 'weeklys_universe.csv'), 'utf8').trim().split(/\r?\n/).slice(1) };
 }
-export async function finalizeBasket(prepared, settings, { OUT, client = createYahooClient(), radar = scanRadar, macros = fetchTvMacros, universe = currentUniverse, now, clock = () => now ?? new Date() } = {}) {
+export async function finalizeBasket(prepared, settings, { OUT, client = createYahooClient(), radar = scanRadar, macros = fetchTvMacros, universe = currentUniverse, marketData = readBasketMarketData, now, clock = () => now ?? new Date() } = {}) {
   const started = clock();
   if (!preparationMatches(prepared, settings, prepared.basket_date, started)) throw new Error('Preparation basket identity, age or trading settings changed; rebuild');
   const schedule = entrySchedule(prepared.basket_date, settings);
@@ -76,12 +77,14 @@ export async function finalizeBasket(prepared, settings, { OUT, client = createY
   if (new Set(identities).size !== identities.length) throw new Error('Prepared basket contains duplicate option contracts');
   for (const pick of prepared.picks) pricingReference(pick, prepared);
   const names = Object.fromEntries(prepared.picks.map(p => [p.ticker, p.name ?? '']));
+  const useIb = Boolean(settings.executionHostId);
   const [macroQuotes, tv, news, weeklys, snapshots] = await Promise.all([
     client.quote(['SPY','^GSPC','^VIX','^SKEW','^MOVE']),
     macros({ OUT, BASKET_DATE: prepared.basket_date }),
     radar(prepared.picks.map(p => p.ticker), null, { names }),
     universe(OUT),
     Promise.all(prepared.picks.map(async p => {
+      if (useIb) return { events: await client.quoteSummary(p.ticker, { modules: ['calendarEvents'] }) };
       const [stock, chain, events] = await Promise.all([
         client.quote(p.ticker),
         client.options(p.ticker, { date: new Date(prepared.expiry) }).then(chain => ({ chain, receivedAt: clock().toISOString() })),
@@ -90,6 +93,13 @@ export async function finalizeBasket(prepared, settings, { OUT, client = createY
       return { stock, chain: chain.chain, receivedAt: chain.receivedAt, events };
     })),
   ]);
+  // Fetch IB last, after slower news/earnings/macro reads, then enforce the same
+  // short quote-age limit used for entry. A failed IB read has no Yahoo fallback.
+  if (useIb) {
+    const markets = await marketData(prepared.picks, prepared.expiry, settings);
+    if (markets.length !== snapshots.length) throw new Error('IB option market snapshot is incomplete');
+    markets.forEach((market, index) => { snapshots[index].ib = market; });
+  }
   const completed = clock();
   checkWindow(completed);
   const asOf = new Date(Math.max(+completed, +schedule.start));
@@ -119,13 +129,15 @@ export async function finalizeBasket(prepared, settings, { OUT, client = createY
   const picks = prepared.picks.map((p, index) => {
     if (isExcluded(p, settings) || news[p.ticker]?.error || !Array.isArray(news[p.ticker]?.[p.side]) || news[p.ticker][p.side].length) throw new Error(`${p.ticker}: exclusions/news changed; rebuild basket`);
     requireAge(news[p.ticker].checked_at, completed, 15 * 60000, `${p.ticker} news`);
-    const { stock, chain, receivedAt, events } = snapshots[index];
-    requireAge(receivedAt, completed, 20 * 60000, `${p.ticker} option chain`);
-    const spot = requireFreshStock(stock, completed);
+    const { stock, chain, events, ib } = snapshots[index];
+    if (useIb) marketDataReadiness([ib], settings, completed);
+    const receivedAt = useIb ? new Date(ib.quote.observedAt).toISOString() : snapshots[index].receivedAt;
+    requireAge(receivedAt, completed, useIb ? settings.maxQuoteAgeSeconds * 1000 : 20 * 60000, `${p.ticker} option market`);
+    const spot = useIb ? ib.quote.underlyingPrice : requireFreshStock(stock, completed);
     const earnings = events.calendarEvents?.earnings?.earningsDate;
     if (!Array.isArray(earnings) || !earnings.length || earnings.some(d => !Number.isFinite(+new Date(d)) || new Date(d).toISOString().slice(0,10) <= prepared.expiry)) throw new Error(`${p.ticker}: earnings are unknown or conflict with the holding period`);
-    const series = chain.options?.find(o => new Date(o.expirationDate).toISOString().slice(0,10) === prepared.expiry);
-    const option = series?.[p.side === 'call' ? 'calls' : 'puts']?.find(o => o.strike === p.K);
+    const series = chain?.options?.find(o => new Date(o.expirationDate).toISOString().slice(0,10) === prepared.expiry);
+    const option = useIb ? { ...ib.quote, impliedVolatility: ib.quote.optionIv } : series?.[p.side === 'call' ? 'calls' : 'puts']?.find(o => o.strike === p.K);
     if (!Number.isFinite(option?.bid) || !Number.isFinite(option?.ask) || !(option.bid > 0) || !(option.ask >= option.bid) || option.ask - option.bid > settings.maxEntrySpread) throw new Error(`${p.ticker}: exact option market unavailable or too wide`);
     const reference = pricingReference(p, prepared);
     const pricing = repriceEntry({ reference, spot, optionIv: option.impliedVolatility, vix: VIX, now: asOf, settings });
@@ -141,7 +153,10 @@ export async function finalizeBasket(prepared, settings, { OUT, client = createY
       credit: Math.round(contracts * pricing.credit * 100), margin: Math.round(contracts * marginPer),
       bid: option.bid, ask: option.ask, spread: option.ask - option.bid, entry_otm_pct: otmPercent(p.side, p.K, spot),
       pricing_reference: reference, entry_pricing: pricing, pricing_basis: 'dated model adjusted for time, current underlying and IV; actual entry requires an IB fill',
-      quote_observed_at: receivedAt, quote_timestamp_basis: 'Yahoo chain response received; exchange bid/ask timestamp unavailable', underlying_observed_at: new Date(stock.regularMarketTime).toISOString(),
+      quote_observed_at: receivedAt, quote_source: useIb ? ib.quote.source : 'Yahoo Finance',
+      ...(useIb ? { ib_conid: ib.contract.conid } : {}),
+      quote_timestamp_basis: useIb ? 'IB real-time option and underlying data received; exchange bid/ask timestamp unavailable' : 'Yahoo chain response received; exchange bid/ask timestamp unavailable',
+      underlying_observed_at: useIb ? receivedAt : new Date(stock.regularMarketTime).toISOString(),
       news_checked_at: news[p.ticker].checked_at,
       allocated_capital: capital, capital_backing: contracts * Math.max(spot, p.K) * 100,
       credit_at_bid: Math.round(contracts * option.bid * 100), midpoint_to_bid_cost: Math.round(contracts * ((option.bid + option.ask) / 2 - option.bid) * 100),

@@ -37,6 +37,26 @@ function fixture(mode = 'monday-morning') {
 }
 const temporary = t => { const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'polytheta-finalization-')); t.after(() => fs.rmSync(directory, { recursive: true, force: true })); return directory; };
 
+test('connected basket finalization uses subscribed IB options and underlying without a Yahoo chain fallback', async () => {
+  const f = fixture();
+  f.settings.executionHostId = 'selected-host';
+  f.dependencies.client.options = async () => assert.fail('IB finalization must not request Yahoo option chains');
+  f.dependencies.client.quote = async symbols => { assert.ok(Array.isArray(symbols), 'Individual underlying must come from IB'); return f.macroQuotes; };
+  const market = { contract: { conid: 123 }, quote: { conid: 123, source: 'IB TWS', realtime: true, observedAt: +f.now,
+    bid: .81, ask: .90, bidSize: 10, askSize: 10, underlyingPrice: 20, optionIv: .48, delta: .18 } };
+  const marketData = async () => [market];
+  const result = await finalizeBasket(f.prepared, f.settings, { ...f.dependencies, marketData });
+  assert.equal(result.picks[0].bid, .81);
+  assert.equal(result.picks[0].quote_source, 'IB TWS');
+  assert.equal(result.picks[0].ib_conid, 123);
+  assert.equal(result.picks[0].underlying_observed_at, f.now.toISOString());
+  assert.match(result.picks[0].quote_timestamp_basis, /IB.*received/);
+  for (const bad of [{ realtime: false }, { observedAt: +f.now - 16000 }, { underlyingPrice: NaN }, { optionIv: -1 }]) {
+    await assert.rejects(finalizeBasket(f.prepared, f.settings, { ...f.dependencies, marketData: async () => [{ ...market, quote: { ...market.quote, ...bad } }] }), /IB/);
+  }
+  await assert.rejects(finalizeBasket(f.prepared, f.settings, { ...f.dependencies, marketData: async () => { throw new Error('IB subscription missing'); } }), /subscription missing/);
+});
+
 test('publication and delivery re-read selected host and settings at every side-effect boundary', async () => {
   const f = fixture(), hostId = 'selected-host';
   let settings = { ...f.settings, executionHostId: hostId }, reads = 0;
