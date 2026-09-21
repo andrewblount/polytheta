@@ -102,19 +102,38 @@ test('TWS cancellation waits through PendingCancel and cannot cancel another cli
   await assert.rejects(broker.cancel('2'), /not controllable/);
 });
 
-test('TWS resolves the SMART price rule, rather than the minimum tick alone', async () => {
+test('TWS resolves the SMART price rule and normalizes dated contract metadata for reuse', async () => {
   const client = new EventEmitter();
   client.reqContractDetails = id => {
-    client.emit(EventName.contractDetails, id, { contract: { conId: 123, symbol: 'ABC', right: 'C', currency: 'USD', multiplier: '100', strike: 25, lastTradeDateOrContractMonth: '20260911' }, validExchanges: 'CBOE,SMART', marketRuleIds: '7,8', minTick: .01, underConId: 456 });
+    client.emit(EventName.contractDetails, id, { contract: { conId: 123, symbol: 'ABC', right: 'C', currency: 'USD', multiplier: '100', strike: 25, lastTradeDateOrContractMonth: '20260911 16:00:00 US/Eastern' }, validExchanges: 'CBOE,SMART', marketRuleIds: '7,8', minTick: .01, underConId: 456 });
     client.emit(EventName.contractDetailsEnd, id);
   };
   client.reqMarketRule = id => { assert.equal(id, 8); client.emit(EventName.marketRule, id, increments); };
   const broker = new TwsBroker({ account, client });
   const resolved = await broker.resolve({ ticker: 'ABC', side: 'call', K: 25 }, '2026-09-11');
+  assert.equal(resolved.raw.lastTradeDateOrContractMonth, '20260911');
+  assert.equal(resolved.raw.conId, 123);
   assert.deepEqual(resolved.priceIncrements, increments);
   assert.equal(resolved.tick, .01);
   assert.equal(broker.payload({ action: 'entry', contract: resolved, limit: .15, quantity: 1, ref: 'pt-test' }).lmtPrice, .15);
   assert.throws(() => broker.payload({ action: 'entry', contract: resolved, limit: 3.01, quantity: 1 }), /price increment/);
+});
+
+test('TWS what-if preview waits past preliminary and unavailable margin responses', async () => {
+  const client = new EventEmitter();
+  client.placeOrder = (id, raw, order) => {
+    assert.equal(order.whatIf, true);
+    client.emit(EventName.openOrder, id, raw, order, { status: 'PreSubmitted', warningText: 'Preliminary warning' });
+    client.emit(EventName.openOrder, id, raw, order, { initMarginChange: Number.MAX_VALUE, maintMarginChange: Number.MAX_VALUE });
+    queueMicrotask(() => client.emit(EventName.openOrder, id, raw, order, { initMarginChange: '15952.36', maintMarginChange: '14064.72', warningText: '' }));
+  };
+  const broker = new TwsBroker({ account, client });
+  client.emit(EventName.nextValidId, 1);
+  const preview = await broker.preview({ action: 'entry', contract, limit: 1, quantity: 1, ref: 'pt-test' });
+  assert.equal(preview.initialMarginChange, 15952.36);
+  assert.equal(preview.maintenanceMarginChange, 14064.72);
+  assert.equal(preview.warning, '');
+  assert.equal(client.listenerCount(EventName.openOrder), 1, 'Only the persistent broker listener remains');
 });
 
 test('price rounding handles penny and nickel bands at their boundary', () => {

@@ -85,7 +85,8 @@ export class TwsBroker {
     if (!Number.isSafeInteger(ruleId) || ruleId <= 0) throw new Error('IB SMART price-increment rule is unavailable');
     const rules = await this.collect(EventName.marketRule, EventName.marketRule, () => this.ib.reqMarketRule(ruleId), { id: ruleId, select: ([, increments]) => increments });
     const priceIncrements = normalizePriceIncrements(rules[0]);
-    return { conid: d.contract.conId, symbol: pick.ticker, expiry, side: pick.side, strike: pick.K, multiplier: 100, tick: Math.min(...priceIncrements.map(r => r.increment)), priceIncrements, underlyingConid: d.underConId, raw: { ...d.contract, exchange: 'SMART' } };
+    // Contract details can append a time and zone; requests require the eight-digit expiry.
+    return { conid: d.contract.conId, symbol: pick.ticker, expiry, side: pick.side, strike: pick.K, multiplier: 100, tick: Math.min(...priceIncrements.map(r => r.increment)), priceIncrements, underlyingConid: d.underConId, raw: { ...d.contract, exchange: 'SMART', lastTradeDateOrContractMonth: expiry.replaceAll('-', '') } };
   }
   quote(contract, { entry = true } = {}) {
     const id = ++this.id;
@@ -118,7 +119,14 @@ export class TwsBroker {
   }
   async preview(order) {
     const id = this.nextOrderId++;
-    const rows = await this.collect(EventName.openOrder, EventName.openOrder, () => this.ib.placeOrder(id, order.contract.raw, this.payload(order, true)), { id, select: ([, , , state]) => state });
+    // IB can acknowledge the preview before the subsequent margin calculation arrives.
+    const hasMargin = state => ['initMarginChange', 'maintMarginChange'].every(key => {
+      const value = state?.[key];
+      return value != null && value !== '' && Number.isFinite(Number(value)) && Math.abs(Number(value)) < 1e100;
+    });
+    const rows = await this.collect(EventName.openOrder, EventName.openOrder, () => this.ib.placeOrder(id, order.contract.raw, this.payload(order, true)), {
+      id, select: ([, , , state]) => hasMargin(state) ? state : null, endWhen: ([, , , state]) => hasMargin(state),
+    });
     const s = rows[0];
     return { initialMarginChange: Number(s?.initMarginChange), maintenanceMarginChange: Number(s?.maintMarginChange), warning: s?.warningText };
   }
