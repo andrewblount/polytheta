@@ -7,10 +7,10 @@
 	<key>ProgramArguments</key>
 	<array>
 		<string>/opt/homebrew/bin/node</string>
-		<string>/Users/andrewblount/Library/CloudStorage/Dropbox/development/polytheta/scripts/run_weekly_basket.mjs</string>
+		<string>/Users/andrewblount/Library/CloudStorage/Dropbox-BlueCielo/Andrew Blount/development/polytheta/scripts/run_weekly_basket.mjs</string>
 	</array>
 	<key>WorkingDirectory</key>
-	<string>/Users/andrewblount/Library/CloudStorage/Dropbox/development/polytheta</string>
+	<string>/Users/andrewblount/Library/CloudStorage/Dropbox-BlueCielo/Andrew Blount/development/polytheta</string>
 	<key>EnvironmentVariables</key>
 	<dict>
 		<key>PATH</key>

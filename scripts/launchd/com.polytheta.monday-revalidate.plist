@@ -16,10 +16,10 @@
 	<key>ProgramArguments</key>
 	<array>
 		<string>/opt/homebrew/bin/node</string>
-		<string>/Users/andrewblount/Library/CloudStorage/Dropbox/development/polytheta/scripts/verify_basket_live.mjs</string>
+		<string>/Users/andrewblount/Library/CloudStorage/Dropbox-BlueCielo/Andrew Blount/development/polytheta/scripts/verify_basket_live.mjs</string>
 	</array>
 	<key>WorkingDirectory</key>
-	<string>/Users/andrewblount/Library/CloudStorage/Dropbox/development/polytheta</string>
+	<string>/Users/andrewblount/Library/CloudStorage/Dropbox-BlueCielo/Andrew Blount/development/polytheta</string>
 	<key>EnvironmentVariables</key>
 	<dict>
 		<key>PATH</key>
