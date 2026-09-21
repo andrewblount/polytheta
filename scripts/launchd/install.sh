@@ -7,7 +7,7 @@
 #   scripts/launchd/install.sh status            # show status + last exit
 #   scripts/launchd/install.sh run-now <label>   # kickstart one agent
 #
-# Labels: weekly-basket monday-revalidate alert-bridge schwab-snapshot ib-execution
+# Labels: weekly-basket monday-revalidate alert-bridge schwab-snapshot ib-execution ib-heartbeat
 #
 # Notes:
 # - The repo lives under ~/Library/CloudStorage/Dropbox. launchd's xpcproxy is
@@ -21,7 +21,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 PLIST_DIR="$REPO_ROOT/scripts/launchd"
 LOG_DIR="$HOME/Library/Logs/polytheta"
-ALL_LABELS="weekly-basket monday-revalidate alert-bridge schwab-snapshot ib-execution"
+ALL_LABELS="weekly-basket monday-revalidate alert-bridge schwab-snapshot ib-execution ib-heartbeat"
 UID_="$(id -u)"
 
 cmd="${1:-status}"
