@@ -1,25 +1,25 @@
 # Polytheta project state
 
-Last updated: 2026-09-17
+Last updated: 2026-09-21
 
 ## Identity and objective
 
-Authoritative root: `/Users/andrewblount/Library/CloudStorage/Dropbox/development/polytheta`; GitHub `andrewblount/polytheta`, branch `main`; production `https://polytheta.com`, Netlify site `7c943fa5-689b-484d-abd0-5c506cf8843d`. Next.js website, local Node IB worker, native sources under `ios/`. Current objective: use the newly subscribed IBKR data and Paper Trading for the September 21–25 basket.
+Authoritative root: `/Users/andrewblount/Library/CloudStorage/Dropbox-BlueCielo/Andrew Blount/development/polytheta`; `/Users/andrewblount/Local/development/polytheta` resolves to it. The old `Dropbox/development/polytheta` path is absent. GitHub `andrewblount/polytheta`, branch `main`; production `https://polytheta.com`, Netlify site `7c943fa5-689b-484d-abd0-5c506cf8843d`. Next.js website, local Node IB worker, native sources under `ios/`. Objective: finish IBKR paper execution and market-data verification.
 
-## Decisions and implementation
+## Current operating state
 
-This Mac is selected, paper mode uses Gateway port 4002, and entries are unpaused. Local paper activation is true and `POLYTHETA_PAPER_ENTRY_WEEK=2026-09-21` limits new entries to that basket; live activation remains false. Entry window: September 21, 09:45–10:30 ET; preparation starts September 18 at 14:30 ET, finalization September 21 at 09:35 ET. Existing schedules run execution every 30 seconds and preparation every 60 seconds. Week limits do not disable paper-position exits.
+Gateway now listens on port 4002. A read-only diagnostic using separate client 98 authenticated the paper account and obtained valid NetLiquidation on September 21. No orders were sent by that diagnostic. The owner’s Gateway screenshot shows Read-Only API blocking a request; scheduled execution logs show response timeouts. Full reconciliation, subscribed real-time quotes and margin remain unverified.
 
-Connected basket finalization now requires exact IB option/underlying quotes, IV and Greeks and records contract IDs/source/timestamps. Invalid, stale, delayed or frozen data blocks finalization without a Yahoo quote fallback. Research/history, earnings, news and macros retain existing sources. Dedicated read client 97 avoids execution client 96. `npm run ib:data -- --help` describes the read-only data probe. Activated cycles now retain paper mode/account equity; invalid IB Greek sentinels are rejected. Paper journals, portfolio and fills remain isolated from live accounting. See [operator guide](docs/ib_operations.md).
+Saved settings remain paper/IBKR, entries unpaused, paper activation true, live activation false. `POLYTHETA_PAPER_ENTRY_WEEK=2026-09-21` restricts new entries; exits remain enabled for owned paper positions. This week’s 09:45–10:30 ET Monday window was missed: `baskets/2026-09-21/entry_preparation.json` reports preparation finished after its allowed session at 14:31:26 UTC, with no basket published. Do not force late entries or extend the authorized week implicitly. Execution/preparation schedules are loaded and point to the resolved root.
 
-## Verification and remaining work
+Finalization requires exact, fresh IB option/underlying quotes, IV and Greeks; no Yahoo execution-quote fallback. Data client 97 is separate from execution client 96. Paper journals and fills remain isolated. See [operator guide](docs/ib_operations.md).
 
-155 tests pass in the working and clean release trees, including native settings round trips. Full lint has zero errors (21 existing warnings). Gateway is open with Paper Trading selected and awaiting login. Both account and data probes return IB error 502; paper account/equity, subscription sharing, real-time quotes and margin remain unverified. No orders were submitted. No September 21 basket is finalized; the last research refresh completed but produced no qualifying basket. Code `9aa21b6` is pushed; GitHub checks/deployment succeeded. [Verified production release](https://app.netlify.com/projects/polytheta/deploys/6aac5fae26d8e69fc4ea5960) is ready; the live guide matches exactly and authenticated settings confirm the configuration above. Prior native changes compile but are not distributed to TestFlight. Preserve unrelated news-radar edits, AGENTS.md, launchd state and untracked baskets.
+## Verification and handoff
 
-Configuration backup, release receipt and verification logs: `/Users/andrewblount/.local/state/polytheta/paper-2026-09-21/`. Latest data probe: private `runtime/ib-market-data-check.json`.
+Prior release `9aa21b6`: 155 tests passed, lint zero errors (21 existing warnings), GitHub deployment succeeded. These checks were not repeated for this diagnostic. Current HEAD includes subsequent heartbeat work. Preserve concurrent adapter-utils/news-radar edits, AGENTS.md, launchd state and untracked baskets. Native TestFlight distribution remains outstanding.
+
+Evidence/configuration receipts: `/Users/andrewblount/.local/state/polytheta/paper-2026-09-21/`. Next action: in the confirmed paper Gateway session, disable Read-Only API and apply; then rerun account reconciliation, verify subscribed data during an open session, and validate paper margin/order access. This does not reopen today’s missed entry window.
 
 ## Access moderation, September 17
 
 Verified the local database matches Netlify production. Rejected 256 reviewed spam requests in one guarded transaction and verified every status afterward. Eight remain pending: six QA fixtures, Alfred Berkeley's product inquiry, and an ambiguous inquiry. The requested `fblount@biocurrent.com` is absent from all access requests, database profiles, and the Netlify Identity user list; approval awaits address clarification. No account was created. Private backup, decisions and receipt: `/Users/andrewblount/.local/state/polytheta/access-review-2026-09-17/`.
-
-Next action: finish IB Gateway paper login, verify account/equity and an exact real-time option with `ib:check` and `ib:data`, then confirm paper API order access/margin before Monday. Authentication is pending with the owner; no credentials belong in chat or Git.
