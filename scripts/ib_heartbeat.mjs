@@ -17,7 +17,9 @@
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { loadBrokerSettings } from './lib/broker_settings.mjs';
-import { createBroker } from './broker/index.mjs';
+import { createBroker, readBasketMarketData, marketDataReadiness } from './broker/index.mjs';
+import fs from 'node:fs';
+import { currentWeek, addDays } from '../shared/market-calendar.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 try { process.loadEnvFile(path.join(root, '.env.local')); } catch { /* environment may supply values */ }
@@ -34,6 +36,12 @@ function hint(reason) {
   }
   if (/timed out|ECONNREFUSED|ECONNRESET|connect|not running|socket/i.test(r)) {
     return 'IB Gateway is not reachable on the configured host/port. Start IB Gateway, log in, and confirm its API socket port matches Settings (twsPort).';
+  }
+  if (/10197|competing/i.test(r)) {
+    return 'Another session on the same IBKR login is holding the market-data entitlement (10197). Log OUT of Client Portal and the IBKR mobile app; only one session may be active while IB Gateway runs.';
+  }
+  if (/\b(354|10091|10168)\b|not subscribed|delayed or frozen|delayed/i.test(r)) {
+    return 'The live IBKR account lacks a REAL-TIME subscription for this data (354/10091). Client Portal > Settings > Market Data Subscriptions: add OPRA (US Options Exchanges) real-time plus a US equities feed (NASDAQ Network C/UTP + NYSE Network A/CTA, or the US Securities Snapshot bundle). Keep Paper Trading Account > share market data = Yes, then log out of Client Portal.';
   }
   if (/Database unavailable/i.test(r)) {
     return 'Could not read trading settings from the database. Check the DB URL in .env.local and network access.';
@@ -83,14 +91,30 @@ async function check() {
   } finally { try { broker.disconnect(); } catch { /* already closed */ } }
 }
 
+// Quote the first pick of the upcoming basket through the exact path the Monday
+// finalize uses, so subscription (354/10091), competing-session (10197) and
+// delayed-data failures surface before the entry window, not during it.
+async function marketDataProbe(settings) {
+  const week = currentWeek();
+  const candidates = [addDays(week, 7), week].map(w => path.join(root, 'baskets', w, 'data', 'prepared_basket.json')).filter(f => fs.existsSync(f));
+  if (!candidates.length) return { skipped: 'no prepared basket on disk yet (probe runs once Monday preparation exists)' };
+  const prepared = JSON.parse(fs.readFileSync(candidates[0], 'utf8'));
+  if (!prepared?.picks?.length) return { skipped: 'prepared basket has no picks' };
+  const markets = await readBasketMarketData([prepared.picks[0]], prepared.expiry, settings, { env });
+  const c = marketDataReadiness(markets, settings).contracts[0];
+  return { message: `${c.ticker} ${c.side} K${c.strike} ${c.expiry}: bid ${c.bid} / ask ${c.ask}, realtime=${c.realtime}, IV ${c.optionIv}` };
+}
+
 const target = () => new Promise((_, reject) => setTimeout(() => reject(new Error('IB heartbeat timed out (gateway not responding)')), HARD_TIMEOUT_MS));
 
 let settingsForMsg = null;
 try {
   const { settings, health, account } = await Promise.race([check(), target()]);
   settingsForMsg = settings;
+  const probe = await Promise.race([marketDataProbe(settings), target()]);
+  const probeLine = probe.skipped ? `market-data probe skipped: ${probe.skipped}` : `market data OK — ${probe.message}`;
   const where = settings.connection === 'web-api' ? settings.webApiUrl : `${settings.twsHost}:${settings.twsPort}`;
-  const line = `IB heartbeat OK ${stamp()} — ${health.mode} account ${account} via ${settings.connection} (${where}); entry window Mon ${settings.mondayEntryStart}–${settings.mondayEntryEnd} ET`;
+  const line = `IB heartbeat OK ${stamp()} — ${health.mode} account ${account} via ${settings.connection} (${where}); entry window Mon ${settings.mondayEntryStart}–${settings.mondayEntryEnd} ET; ${probeLine}`;
   console.log(line);
   if (notifyOk) { await sendEmail('Polytheta: IB ready for Monday', line); sendIMessage(`Polytheta: IB ready for Monday — ${health.mode} ${account}.`); }
   process.exit(0);
