@@ -8,7 +8,7 @@ export function selectBrokerAccount(accounts, configured, mode = 'live') {
   if (!['live', 'paper'].includes(mode)) throw new Error('Invalid IB account mode');
   let account = String(configured ?? '').trim();
   if (!account && mode === 'paper') {
-    const paper = authorized.filter(value => /^DU\d+$/.test(value));
+    const paper = authorized.filter(value => /^DU[A-Z]?\d+$/.test(value));
     if (paper.length !== 1) throw new Error('Sign in to one paper account in IB Gateway, or set IBKR_PAPER_ACCOUNT_ID locally when several paper accounts are available');
     account = paper[0];
   }

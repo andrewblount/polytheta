@@ -25,13 +25,19 @@ export async function executionCycle({ broker, proposal, settings, journal, save
   const entryCanWork = (intent, at = decisionTime()) => isEntryWindow(intent.week, settings, at)
     && (!authorizedEntryWeek || intent.week === authorizedEntryWeek)
     && (!intent.entryWindowEnd || +at < Date.parse(intent.entryWindowEnd));
+  // Paper-only capital cap: size entries against min(IB paper equity, POLYTHETA_PAPER_CAPITAL_CAP)
+  // so a $1M simulated balance never inflates the pilot; entry baselines freeze the capped values.
+  // Live mode ignores the variable entirely.
+  const capitalCap = settings.accountMode === 'paper' ? Number(process.env.POLYTHETA_PAPER_CAPITAL_CAP) : NaN;
+  const capAccount = s => Number.isFinite(capitalCap) && capitalCap > 0 ? { ...s, netLiquidation: Math.min(s.netLiquidation, capitalCap), cash: Math.min(s.cash, capitalCap), availableFunds: Math.min(s.availableFunds, capitalCap), excessLiquidity: Math.min(s.excessLiquidity, capitalCap) } : s;
+  const accountSummary = async () => capAccount(await broker.accountSummary());
   const readNews = pick => boundedRead(signal => scanNews(pick, { signal }), 10000, 'News scan timed out; retrying next cycle');
   const health = await broker.connect();
   if (settings.accountMode && health.mode !== settings.accountMode) throw new Error('IB account mode does not match Settings; sign in to the selected live or paper session');
   if (!settings.accountMode && health.mode !== 'live' && !(health.mode === 'paper' && allowPaper)) throw new Error('This service is configured for the live account only; select Paper trading in Settings');
   if (journal.mode && journal.mode !== health.mode) throw new Error('Execution journal belongs to a different account mode');
   journal.mode = health.mode;
-  const [positions, orders, executions, account] = await Promise.all([broker.positions(), broker.orders(), broker.executions(), broker.accountSummary()]);
+  const [positions, orders, executions, account] = await Promise.all([broker.positions(), broker.orders(), broker.executions(), accountSummary()]);
   journal.intents ??= {}; journal.fills ??= {}; journal.signals ??= {};
   if (journal.account && journal.account !== broker.account) throw new Error('Execution journal belongs to another account');
   journal.account = broker.account;
@@ -296,7 +302,7 @@ export async function executionCycle({ broker, proposal, settings, journal, save
     const q = await broker.quote(contract);
     if (!(q.optionIv > 0)) q.vix = await getVix();
     const order = { ...planEntry(pick, contract, q, fixed, settings, decisionTime()), ref, week: proposal.basket_date, entryWindowEnd: entrySchedule(proposal.basket_date, settings).end.toISOString() };
-    const currentAccount = await broker.accountSummary();
+    const currentAccount = await accountSummary();
     // A later account refresh can lose fields even after the initial snapshot
     // passed. Revalidate every required value before comparing capacity.
     entryBudget(proposal, currentAccount, settings, decisionTime());
@@ -314,7 +320,7 @@ export async function executionCycle({ broker, proposal, settings, journal, save
     // Freeze the actual account equity immediately before this entry, after
     // quote/margin preparation. An overlapping ticker retains its first entry's
     // baseline; a fully closed earlier basket receives a new baseline.
-    const baselineAccount = await broker.accountSummary();
+    const baselineAccount = await accountSummary();
     entryBudget(proposal, baselineAccount, settings, decisionTime());
     const baselineCapital = Math.min(baselineAccount.netLiquidation * settings.entryCapitalPct / 100 * (proposal.allocation_scale ?? 1), baselineAccount.cash);
     if (reserved + fixed.perTrade > baselineCapital + 1e-6 || fixed.perTrade > Math.min(baselineAccount.availableFunds, baselineAccount.excessLiquidity)) throw new Error('Account capacity fell below the remaining basket allocation; new entries blocked');
