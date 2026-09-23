@@ -138,7 +138,7 @@ export async function finalizeBasket(prepared, settings, { OUT, client = createY
     if (!Array.isArray(earnings) || !earnings.length || earnings.some(d => !Number.isFinite(+new Date(d)) || new Date(d).toISOString().slice(0,10) <= prepared.expiry)) throw new Error(`${p.ticker}: earnings are unknown or conflict with the holding period`);
     const series = chain?.options?.find(o => new Date(o.expirationDate).toISOString().slice(0,10) === prepared.expiry);
     const option = useIb ? { ...ib.quote, impliedVolatility: ib.quote.optionIv } : series?.[p.side === 'call' ? 'calls' : 'puts']?.find(o => o.strike === p.K);
-    if (!Number.isFinite(option?.bid) || !Number.isFinite(option?.ask) || !(option.bid > 0) || !(option.ask >= option.bid) || option.ask - option.bid > settings.maxEntrySpread) throw new Error(`${p.ticker}: exact option market unavailable or too wide`);
+    if (!Number.isFinite(option?.bid) || !Number.isFinite(option?.ask) || !(option.bid > 0) || !(option.ask >= option.bid) || option.ask - option.bid > settings.maxEntrySpread + 1e-9) throw new Error(`${p.ticker}: exact option market unavailable or too wide`);
     const reference = pricingReference(p, prepared);
     const pricing = repriceEntry({ reference, spot, optionIv: option.impliedVolatility, vix: VIX, now: asOf, settings });
     const delta = optionDelta({ spot, strike: p.K, years: (+sessionClose(prepared.expiry) - +asOf) / (365 * 86400000), iv: pricing.iv, rate: settings.modelRiskFreeRatePct / 100, side: p.side });
