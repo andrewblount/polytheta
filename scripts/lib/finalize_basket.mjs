@@ -126,7 +126,7 @@ export async function finalizeBasket(prepared, settings, { OUT, client = createY
   const scale = (score.score >= 3 && counts.puts ? .5 : 1) * (prepared.picks.some(p => p.frenzy === 'elevated') ? .5 : 1);
   const capital = prepared.model_equity * settings.entryCapitalPct / 100 * scale / counts.total;
   if (!Number.isFinite(capital) || capital <= 0) throw new Error('Equal allocation capital is unavailable');
-  const picks = prepared.picks.map((p, index) => {
+  const finalizePick = (p, index) => {
     if (isExcluded(p, settings) || news[p.ticker]?.error || !Array.isArray(news[p.ticker]?.[p.side]) || news[p.ticker][p.side].length) throw new Error(`${p.ticker}: exclusions/news changed; rebuild basket`);
     requireAge(news[p.ticker].checked_at, completed, 15 * 60000, `${p.ticker} news`);
     const { stock, chain, events, ib } = snapshots[index];
@@ -161,14 +161,24 @@ export async function finalizeBasket(prepared, settings, { OUT, client = createY
       allocated_capital: capital, capital_backing: contracts * Math.max(spot, p.K) * 100,
       credit_at_bid: Math.round(contracts * option.bid * 100), midpoint_to_bid_cost: Math.round(contracts * ((option.bid + option.ask) / 2 - option.bid) * 100),
     };
-  });
+  };
+  // Manual late entry (paper only): a pick that fails its live final check is dropped and
+  // recorded instead of failing the whole basket, because mid-week the Monday-calibrated
+  // strike/credit rules are borderline for most names. Scheduled Monday runs stay strict.
+  const dropped = [];
+  const picks = prepared.picks.map((p, index) => {
+    try { return finalizePick(p, index); }
+    catch (error) { if (!schedule.manual) throw error; dropped.push({ ticker: p.ticker, side: p.side, K: p.K, reason: error.message }); return null; }
+  }).filter(Boolean);
+  if (!picks.length) throw new Error(`No picks survive the final checks (${dropped.map(d => d.ticker).join(', ')})`);
+  if (dropped.length) console.warn(`Manual late entry: dropped ${dropped.map(d => `${d.ticker} (${d.reason})`).join('; ')}`);
   const observedAt = new Date(Math.min(...picks.flatMap(p => [Date.parse(p.quote_observed_at), Date.parse(p.underlying_observed_at)]), +new Date(bySymbol['^VIX'].regularMarketTime))).toISOString();
   return { ...prepared, phase: 'final', entry_timestamp: asOf.toISOString(), entry_date: schedule.date,
     entry_window: { start: schedule.start.toISOString(), end: schedule.end.toISOString() },
     generated_ts: completed.toISOString(), data_observed_at: observedAt, finalized_at: completed.toISOString(),
     finalization_started_at: started.toISOString(), weeklys_universe_source: { source: weeklys.source, fetched_at: weeklys.fetched_at, count: weeklys.tickers.length },
     tv_macros_source: { hy_oas: `FRED:BAMLH0A0HYM2 ${tv.hy_oas.date}`, pc: `CBOE ${tv.pc_ratio.as_of}`, fetched_at: tv.fetched_ts },
-    allocation_scale: scale, allocation_settings: settings, macro, gsrs: score.score, gsrs_components: score.components, gsrs_calculation: score,
+    allocation_scale: scale, allocation_settings: settings, dropped_picks: dropped, macro, gsrs: score.score, gsrs_components: score.components, gsrs_calculation: score,
     total_backing_capital: capital * counts.total, picks,
     totals: picks.reduce((t, p) => { t[p.side === 'call' ? 'callCredit' : 'putCredit'] += p.credit; t[p.side === 'call' ? 'callMargin' : 'putMargin'] += p.margin; return t; }, { callCredit: 0, putCredit: 0, callMargin: 0, putMargin: 0 }),
   };
