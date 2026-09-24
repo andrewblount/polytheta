@@ -161,6 +161,9 @@ struct PerformanceResponse: Codable {
     let account: AccountPerformance?
     // How the model legs were sized for this report (from the model settings).
     let basis: PerformanceBasis?
+    // The published legs and outcomes, so the app can re-size the track record
+    // itself as the sizing sliders move (ModelSizing.compute); absent on older servers.
+    let source: [PerformanceWeekSource]?
 }
 
 struct PerformanceBasis: Codable {
@@ -276,6 +279,8 @@ struct Stats: Codable {
     let legWinRatePct: Double
     let settledLegs: Int
     let maxDrawdown: Double
+    let worstLeg: WorstLeg?
+    struct WorstLeg: Codable { let ticker: String; let side: String; let pnl: Double }
 }
 
 struct BasketsResponse: Codable {

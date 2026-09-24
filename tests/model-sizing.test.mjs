@@ -35,3 +35,33 @@ test('historical legs re-size from the current model settings, keeping per-contr
   assert.equal(resizeLeg(leg, 1000).contracts, 0, 'unaffordable under the settings: not traded');
   assert.equal(resizeLeg({ ...leg, pnl: null }, perTrade).pnl, null);
 });
+
+test('the shared sizing report recalculates the whole track record from the published legs', async () => {
+  const { computeModelPerformance, modelBacking } = await import('../src/lib/model-sizing.ts');
+  const source = [{
+    weekOf: '2026-08-31', slug: 'weekly-basket-2026-08-31', title: 'Week', gsrs: 2.5, cashNeeded: 100000, allocationScale: 1,
+    legs: [
+      { positionId: 'a', ticker: 'AAA', side: 'call', strike: 36, entryPrice: 27.73, entryCredit: 0.58, contracts: 132, margin: 55024, credit: 7656, pnl: 7656, state: 'expired-otm', settledAt: '2026-09-04T20:00:00Z' },
+      { positionId: 'b', ticker: 'BBB', side: 'put', strike: 20, entryPrice: 25, entryCredit: 0.30, contracts: 100, margin: 40000, credit: 3000, pnl: -2000, state: 'expired-itm', settledAt: '2026-09-04T20:00:00Z' },
+    ],
+  }, {
+    weekOf: '2026-09-07', slug: 'weekly-basket-2026-09-07', title: 'Open', gsrs: 3, cashNeeded: 1, allocationScale: 1,
+    legs: [{ positionId: 'c', ticker: 'CCC', side: 'call', strike: 10, entryPrice: 9, entryCredit: 0.1, contracts: 10, margin: 1000, credit: 100, pnl: null, state: null, settledAt: null }],
+  }];
+  const model = { modelEquity: 50000, accountTradedPct: 100, marginAvailablePct: 400, sellCalls: true, sellPuts: true };
+  assert.equal(modelBacking(model), 200000);
+  const report = computeModelPerformance(source, model);
+  // $100,000 per leg: 27 contracts of AAA (+$1,566), 40 of BBB (−$800).
+  assert.equal(report.weeks[0].pnl, 766); assert.equal(report.weeks[0].complete, true); assert.equal(report.weeks[1].complete, false);
+  assert.equal(report.stats.totalPnl, 766); assert.equal(report.stats.completeWeeks, 1); assert.equal(report.stats.worstLeg.ticker, 'BBB');
+  assert.equal(report.basis.backing, 200000);
+  // Puts off: the calls take the whole backing and the losing put disappears.
+  const callsOnly = computeModelPerformance(source, { ...model, sellPuts: false });
+  assert.equal(callsOnly.weeks[0].legs, 1); assert.equal(callsOnly.weeks[0].pnl, 7656 * 55 / 132 | 0);
+  // Half the account: contracts halve, so does the P&L (within rounding).
+  const half = computeModelPerformance(source, { ...model, accountTradedPct: 50 });
+  assert.ok(Math.abs(half.weeks[0].pnl - 766 / 2) < 60);
+  // Published sizing is the original contracts.
+  const published = computeModelPerformance(source, null);
+  assert.equal(published.weeks[0].pnl, 5656); assert.equal(published.basis.sizing, 'published');
+});

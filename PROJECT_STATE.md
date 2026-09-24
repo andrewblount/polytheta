@@ -14,6 +14,10 @@ Every basket carries a generated trading thesis and provenance in `basket_metric
 
 Missing weeks recreated and published: 2026-09-07 (reconstructed, entry Tue 2026-09-08 09:45, 4 calls, settled +$264), 2026-09-14 (reconstructed, 7 calls, settled +$145), 2026-09-21 (rebuilt from the model's own 10:29 ET snapshot, 8 calls, late by 1 minute, expires 2026-09-25). Reconstructed weeks use real intraday underlying prices with Black-Scholes option quotes on the neighbouring weeks' IV surfaces (`scripts/lib/synthetic_chain.mjs`, `scripts/reconstruct_model_basket.mjs`); rebuilt weeks use observed snapshot quotes (`scripts/rebuild_model_basket.mjs`). Inputs are kept under `baskets/<week>/reconstruction|rebuild/` (gitignored). September baskets are sized at $50k model equity and are not comparable in dollars with the legacy $55k-per-name August baskets.
 
+## Sizing sliders (2026-09-24)
+
+The percentage settings (account traded 0–100%, margin available 100–1000%) are sliders in the web settings cards, on the web performance page and in the iOS Performance tab and settings sections. The performance API and report now carry `source` (every published leg with its settled outcome); `computeModelPerformance(source, settings)` in `src/lib/model-sizing.ts` is the single sizing engine (the server report wraps it; `resizeLeg` is re-exported from `src/server/repos/performance.ts`), and `ios/Sources/ModelSizing.swift` is its port. Clients recalculate the whole track record locally as the slider moves and save the model settings on release (`saveModelSettingsAction` on the web, `updateModelSettings` on the phone). The IB account section never changes with the sliders. TestFlight build 15.
+
 ## Known gaps
 
 - Account performance has no data until the execution service records fills.

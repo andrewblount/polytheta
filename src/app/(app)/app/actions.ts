@@ -75,3 +75,15 @@ export async function updateModelSettingsAction(formData: FormData) {
   revalidatePath("/app/performance");
   revalidatePath("/app/dashboard");
 }
+
+// JSON form of the same save, for the performance page's sliders: called when
+// a slider is released, after the page has already recalculated locally.
+export async function saveModelSettingsAction(input: { modelEquity: number; accountTradedPct: number; marginAvailablePct: number; sellCalls: boolean; sellPuts: boolean }) {
+  await requireAppUser("admin");
+  const { saveModelSettings } = await import("@/server/services/model-settings");
+  const saved = await saveModelSettings(input);
+  revalidatePath("/app/settings");
+  revalidatePath("/app/performance");
+  revalidatePath("/app/dashboard");
+  return saved;
+}

@@ -5,11 +5,10 @@ import { Input } from "@/components/ui/input";
 import { getBrokerSettings, getBrokerStatus, getExecutionHosts } from "@/server/services/broker-settings";
 import { StrikeSettingsEditor } from "./strike-settings-editor";
 import { BrokerAccountFields } from "./broker-account-fields";
+import { PercentSlider } from "@/components/ui/percent-slider";
 export async function BrokerSettingsCard() {
   const [s, status, hosts] = await Promise.all([getBrokerSettings(), getBrokerStatus(), getExecutionHosts()]);
   const fields = [
-    ["entryCapitalPct", "Percentage of account traded (% of IB equity)", 0, 100, 1],
-    ["marginAvailablePct", "Margin available (% of committed capital backed as notional)", 100, 1000, 25],
     ["maxAccountLossPct", "Maximum loss per ticker (% of account)", 0.1, 100, 0.1],
     ["maxTrades", "Maximum trades per basket", 1, 20, 1],
     ["callAllocationPct", "Calls (%)", 0, 100, 1],
@@ -46,6 +45,8 @@ export async function BrokerSettingsCard() {
       <label className="grid gap-2 text-sm">TWS restart time zone<Input name="twsRestartTimezone" required defaultValue={s.twsRestartTimezone} /></label>
       <p className="text-xs text-muted-foreground sm:col-span-2">Set the same auto-restart time in TWS → Lock and Exit. These fields describe its expected recovery window; they do not change TWS itself. The worker reconnects automatically. IB normally requires weekly authentication after Sunday 01:00 ET.</p>
       <div className="text-sm text-muted-foreground">Execution quotes: IB real-time bid/ask for the exact contract. Yahoo remains available for research. Delayed or unavailable IB quotes block entries.</div>
+      <PercentSlider name="entryCapitalPct" label="Percentage of account traded (% of IB equity)" defaultValue={s.entryCapitalPct} min={0} max={100} step={1} />
+      <PercentSlider name="marginAvailablePct" label="Margin available (% of committed capital backed as notional)" defaultValue={s.marginAvailablePct} min={100} max={1000} step={25} />
       {fields.map(([key, label, min, max, step]) => <label key={key} className="grid gap-2 text-sm">{label}<Input name={key} type="number" required min={min} max={max} step={step} defaultValue={s[key]} />{key === "maxAccountLossPct" && <span className="text-xs text-muted-foreground">Defaults to 20% of account equity recorded before entry. The worker monitors each ticker and closes only its PolyTheta contracts if triggered; no standing stop order at entry.</span>}</label>)}
       <label className="grid gap-2 text-sm sm:col-span-2">Do not trade these tickers
         <textarea name="excludedTickers" rows={3} defaultValue={s.excludedTickers.join(", ")} className="rounded-lg border bg-background p-3" />

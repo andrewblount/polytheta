@@ -5,13 +5,52 @@ struct PerformanceView: View {
     @EnvironmentObject var api: APIClient
     @State private var report: PerformanceResponse?
     @State private var error: String?
+    // Sizing sliders: the track record is recomputed on the phone from the
+    // published legs while a slider moves, and the settings are saved when it
+    // is released. `live` is nil until the first change.
+    @State private var model = ModelSettings()
+    @State private var modelLoaded = false
+    @State private var live: ModelPerformance?
+    @State private var saveState = ""
+
+    private var stats: Stats? { live?.stats ?? report?.stats }
+    private var cumulative: [CumulativePoint]? { live?.cumulative ?? report?.cumulative }
+    private var weeks: [WeekRow]? { live?.weeks ?? report?.weeks }
+    private var basis: PerformanceBasis? { live?.basis ?? report?.basis }
 
     var body: some View {
         NavigationStack {
             List {
                 if let error { ErrorBanner(message: error) }
 
-                if let stats = report?.stats {
+                if modelLoaded, report?.source != nil {
+                    Section {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack { Text("Account traded"); Spacer(); Text("\(Int(model.accountTradedPct))%").font(.body.monospacedDigit().weight(.semibold)) }
+                            Slider(value: $model.accountTradedPct, in: ModelSizing.tradedRange, step: ModelSizing.tradedStep) { Text("Account traded") }
+                                minimumValueLabel: { Text("0%").font(.caption2) } maximumValueLabel: { Text("100%").font(.caption2) }
+                                onEditingChanged: { editing in if !editing { save() } }
+                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack { Text("Margin available"); Spacer(); Text("\(Int(model.marginAvailablePct))%").font(.body.monospacedDigit().weight(.semibold)) }
+                            Slider(value: $model.marginAvailablePct, in: ModelSizing.marginRange, step: ModelSizing.marginStep) { Text("Margin available") }
+                                minimumValueLabel: { Text("100%").font(.caption2) } maximumValueLabel: { Text("1000%").font(.caption2) }
+                                onEditingChanged: { editing in if !editing { save() } }
+                        }
+                        Toggle("Sell calls", isOn: $model.sellCalls).onChange(of: model.sellCalls) { save() }
+                        Toggle("Sell puts", isOn: $model.sellPuts).onChange(of: model.sellPuts) { save() }
+                    } header: {
+                        Text("Model sizing")
+                    } footer: {
+                        Text(saveState.isEmpty ? "Every historical leg is re-sized as you drag: equity \(money(model.modelEquity)) × \(Int(model.accountTradedPct))% traded × \(Int(model.marginAvailablePct))% margin backs \(money(ModelSizing.backing(model))) per basket. Released settings are saved and size the next basket; the IB account below is real fills." : saveState)
+                    }
+                    .onChange(of: model.accountTradedPct) { recompute() }
+                    .onChange(of: model.marginAvailablePct) { recompute() }
+                    .onChange(of: model.sellCalls) { recompute() }
+                    .onChange(of: model.sellPuts) { recompute() }
+                }
+
+                if let stats {
                     Section {
                         HStack {
                             stat("Total", money(stats.totalPnl), stats.totalPnl >= 0 ? .green : .red)
@@ -32,13 +71,13 @@ struct PerformanceView: View {
                     } header: {
                         Text("Modeled — held to expiry or exited on a radar signal")
                     } footer: {
-                        if let b = report?.basis, b.sizing == "model", let equity = b.modelEquity {
-                            Text("Every leg is sized from the model settings: equity \(money(equity)), \(Int(b.accountTradedPct ?? 100))% traded, \(Int(b.marginAvailablePct ?? 100))% margin available\((b.sellCalls ?? true) ? "" : ", calls off")\((b.sellPuts ?? true) ? "" : ", puts off"). Change them in Settings and this tab recalculates.")
+                        if let b = basis, b.sizing == "model", let equity = b.modelEquity {
+                            Text("Every leg is sized from the model settings: equity \(money(equity)), \(Int(b.accountTradedPct ?? 100))% traded, \(Int(b.marginAvailablePct ?? 100))% margin available\((b.sellCalls ?? true) ? "" : ", calls off")\((b.sellPuts ?? true) ? "" : ", puts off").")
                         }
                     }
                 }
 
-                if let cumulative = report?.cumulative, !cumulative.isEmpty {
+                if let cumulative, !cumulative.isEmpty {
                     Section("Weekly P&L") {
                         Chart(cumulative) { point in
                             BarMark(
@@ -76,7 +115,7 @@ struct PerformanceView: View {
                     AccountPerformanceSection(account: report?.account)
                 }
 
-                if let weeks = report?.weeks {
+                if let weeks {
                     Section("Settled weeks") {
                         // Each settled week opens the full basket: its trades, each
                         // position's outcome and the trading thesis behind it.
@@ -118,9 +157,33 @@ struct PerformanceView: View {
         guard api.isConfigured else { return }
         do {
             report = try await api.performance()
+            live = nil
             error = nil
         } catch {
             self.error = error.localizedDescription
+        }
+        if !modelLoaded, let m = try? await api.getBrokerSettings().model {
+            model = m
+            modelLoaded = true
+        }
+    }
+
+    func recompute() {
+        guard let source = report?.source else { return }
+        live = ModelSizing.compute(source, model: model)
+    }
+
+    func save() {
+        let snapshot = model
+        saveState = "Saving model settings…"
+        Task {
+            do {
+                let saved = try await api.updateModelSettings(snapshot)
+                // Only the latest release lands; an older response never overwrites a newer drag.
+                if model == snapshot { model = saved; saveState = "Saved — the model uses these settings." }
+            } catch {
+                saveState = "Not saved: \(error.localizedDescription)"
+            }
         }
     }
 }

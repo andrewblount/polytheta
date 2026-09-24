@@ -82,7 +82,7 @@ struct BrokerSettings: Codable {
 struct StrikeOverride: Codable { var ticker = ""; var side = "call"; var expiry = ""; var minimumOtmPct = 5.0 }
 // The model's own sizing (app_settings 'model'). Changing it re-sizes every
 // historical leg in the model performance report; the IB account is untouched.
-struct ModelSettings: Codable {
+struct ModelSettings: Codable, Equatable {
     var modelEquity = 1000000.0
     var accountTradedPct = 100.0
     var marginAvailablePct = 400.0
@@ -152,8 +152,8 @@ struct BrokerSettingsSection: View {
             TextField("TWS restart time zone", text: $settings.twsRestartTimezone)
             LabeledContent("Restart recovery window (minutes)") { TextField("Minutes", value: $settings.twsRestartGraceMinutes, format: .number) }
             Text("Configure the same auto-restart time inside TWS. PolyTheta reconnects afterward; IB still normally requires weekly authentication.").font(.caption).foregroundStyle(.secondary)
-            LabeledContent("Percentage of account traded (%)") { TextField("Percent", value: $settings.entryCapitalPct, format: .number).multilineTextAlignment(.trailing) }
-            LabeledContent("Margin available (%)") { TextField("Percent", value: $settings.marginAvailablePct, format: .number).multilineTextAlignment(.trailing) }
+            PercentSlider(label: "Percentage of account traded", value: $settings.entryCapitalPct, range: ModelSizing.tradedRange, step: ModelSizing.tradedStep)
+            PercentSlider(label: "Margin available", value: $settings.marginAvailablePct, range: ModelSizing.marginRange, step: ModelSizing.marginStep)
             Toggle("Sell calls", isOn: $settings.sellCalls)
             Toggle("Sell puts", isOn: $settings.sellPuts)
             Text("Side toggles decide which legs of the published model basket this account executes; a skipped leg’s share stays unallocated. Margin available scales contracts: 400% backs four dollars of strike or spot per committed dollar. IB’s margin preview must still approve every order.").font(.caption).foregroundStyle(.secondary)
@@ -218,13 +218,21 @@ struct ModelSettingsSection: View {
     @State private var saving = false
     @State private var error: String?
     @State private var saved = false
+    @State private var source: [PerformanceWeekSource]?
     var body: some View {
         Section {
             LabeledContent("Model equity ($)") { TextField("Equity", value: $settings.modelEquity, format: .number).multilineTextAlignment(.trailing) }
-            LabeledContent("Percentage of account traded (%)") { TextField("Percent", value: $settings.accountTradedPct, format: .number).multilineTextAlignment(.trailing) }
-            LabeledContent("Margin available (%)") { TextField("Percent", value: $settings.marginAvailablePct, format: .number).multilineTextAlignment(.trailing) }
+            PercentSlider(label: "Percentage of account traded", value: $settings.accountTradedPct, range: ModelSizing.tradedRange, step: ModelSizing.tradedStep)
+            PercentSlider(label: "Margin available", value: $settings.marginAvailablePct, range: ModelSizing.marginRange, step: ModelSizing.marginStep)
             Toggle("Sell calls", isOn: $settings.sellCalls)
             Toggle("Sell puts", isOn: $settings.sellPuts)
+            if let source, !source.isEmpty {
+                let preview = ModelSizing.compute(source, model: settings)
+                LabeledContent("Track record under these settings") {
+                    Text(money(preview.stats.totalPnl)).foregroundStyle(preview.stats.totalPnl >= 0 ? .green : .red).font(.body.weight(.semibold))
+                }
+                Text("\(preview.stats.completeWeeks) settled weeks · \(preview.stats.winningWeeks) winning · avg \(money(preview.stats.avgWeeklyPnl))/week · max drawdown \(money(preview.stats.maxDrawdown)). Recalculated as the sliders move; saved on Save.").font(.caption).foregroundStyle(.secondary)
+            }
             Text("The model selects and sizes its weekly basket from these settings, and the Performance tab re-sizes every historical leg from them. 400% margin backs four dollars of notional per committed dollar; 100% reproduces the original cash-backed sizing. With both sides on, the IB call/put split sets the counts. The IB account report always shows real fills.").font(.caption).foregroundStyle(.secondary)
             if let error { ErrorBanner(message: error) }
             Button(saving ? "Saving…" : saved ? "Saved — performance recalculated" : "Save model settings") {
@@ -241,6 +249,23 @@ struct ModelSettingsSection: View {
             guard api.isConfigured else { return }
             do { settings = try await api.getBrokerSettings().model ?? ModelSettings(); loaded = true }
             catch { self.error = error.localizedDescription }
+            source = try? await api.performance().source
+        }
+    }
+}
+
+// A labelled percentage slider for the settings forms.
+struct PercentSlider: View {
+    let label: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let step: Double
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack { Text(label); Spacer(); Text("\(Int(value))%").font(.body.monospacedDigit().weight(.semibold)) }
+            Slider(value: $value, in: range, step: step) { Text(label) }
+                minimumValueLabel: { Text("\(Int(range.lowerBound))%").font(.caption2) }
+                maximumValueLabel: { Text("\(Int(range.upperBound))%").font(.caption2) }
         }
     }
 }
