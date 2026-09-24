@@ -23,7 +23,8 @@ import { minimumOtmFor, otmPercent } from '../../shared/strike-settings.mjs';
 import { firstSessionOfWeek, easternTime } from '../../shared/market-calendar.mjs';
 import { entrySchedule } from '../../shared/entry-schedule.mjs';
 import { preparationPolicy } from './finalize_basket.mjs';
-import { resolveModelEquity } from '../../shared/model-equity.mjs';
+import { resolveModelEquity, accountEquityReference } from '../../shared/model-equity.mjs';
+import { pickSummary } from '../../shared/basket-thesis.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), '..', '..');
 
@@ -74,7 +75,10 @@ export function selectAffordableBasket({ settings, modelEquity, gsrs, select }) 
   return { auto: { picks: [], skipped: { calls: [], puts: [] }, pool_counts: { calls: 0, puts: 0 } }, picks: [], allocationScale: 1, backingPerTrade: 0 };
 }
 
-export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget = 55000, nPerSide = 4, brokerSettings = DEFAULT_BROKER_SETTINGS, brokerEquity = null, outFileName = 'basket_proposal.json' }) {
+// `now` and `frozen` support after-the-fact rebuilds from a saved snapshot:
+// age checks are evaluated at the snapshot's own time and cached signal files
+// are used as they were, never refetched.
+export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget = 55000, nPerSide = 4, brokerSettings = DEFAULT_BROKER_SETTINGS, brokerEquity = null, outFileName = 'basket_proposal.json', now = new Date(), frozen = false }) {
   const settings = validateBrokerSettings(brokerSettings);
   const schedule = entrySchedule(BASKET_DATE, settings);
   if (EXPIRY_ISO !== schedule.expiry) throw new Error('Basket expiry does not match the selected exchange week');
@@ -90,12 +94,12 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
 
   const tv = JSON.parse(fs.readFileSync(path.join(OUT, 'tv_macros.json'), 'utf8'));
   const HY_OAS = tv.hy_oas?.value, PC = tv.pc_ratio?.total;
-  const tvAge = Date.now() - Date.parse(tv.fetched_ts);
+  const tvAge = +now - Date.parse(tv.fetched_ts);
   if (!Number.isFinite(HY_OAS) || HY_OAS <= 0 || !Number.isFinite(PC) || PC <= 0 || tv.error ||
       !Number.isFinite(tvAge) || tvAge < -60000 || tvAge > 2 * 3600000) throw new Error('Macro inputs are unavailable or stale; retry data import');
   const tv_macros_source = { hy_oas: `FRED:BAMLH0A0HYM2 ${tv.hy_oas.date}`, pc: `CBOE ${tv.pc_ratio.as_of}` };
   const refresh = JSON.parse(fs.readFileSync(path.join(OUT, 'data_refresh.json'), 'utf8'));
-  const refreshAge = Date.now() - Date.parse(refresh.started_at);
+  const refreshAge = +now - Date.parse(refresh.started_at);
   if (refresh.expiry !== EXPIRY_ISO || !Number.isFinite(refreshAge) || refreshAge < -60000 || refreshAge > 2 * 3600000) throw new Error('Yahoo source snapshot is stale');
 
   // ---- GSRS first: it gates put-side participation and sizing ----
@@ -141,11 +145,12 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
   const siCache = await fetchShortInterest(
     boundedCandidates,
     path.join(OUT, 'short_interest.json'),
+    { now, frozen },
   );
   // Pre-entry news radar: fresh M&A chatter disqualifies call candidates,
   // fresh downside-gap news disqualifies put candidates. Clean scans feed
   // the thesis scorecard (manual overrides still win).
-  const radarCache = await scanRadar(boundedCandidates, path.join(OUT, 'news_radar.json'), { names: Object.fromEntries(enrichedSummary.map(r => [r.ticker, r.name ?? ''])) });
+  const radarCache = await scanRadar(boundedCandidates, path.join(OUT, 'news_radar.json'), { names: Object.fromEntries(enrichedSummary.map(r => [r.ticker, r.name ?? ''])), now, frozen });
   const autoRadarFor = (ticker, side) => {
     const scan = radarCache[ticker];
     if (!scan || scan.error) return null;
@@ -168,10 +173,12 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
     }
   }
 
-  // Select against the same equity the execution service sizes entries with.
-  const equity = resolveModelEquity({ brokerEquity, settings });
+  // The model sizes against model equity only. The account it will later be
+  // compared with is recorded for reference and never affects selection.
+  const equity = resolveModelEquity({ settings });
   const modelEquity = equity.modelEquity;
-  console.log(`[basket ${BASKET_DATE}] model equity ${modelEquity.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} (${equity.source}${equity.observedAt ? ` as of ${equity.observedAt}` : ''})`);
+  const accountReference = accountEquityReference(brokerEquity);
+  console.log(`[basket ${BASKET_DATE}] model equity ${modelEquity.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} (${equity.source})${accountReference ? `; account reference ${accountReference.mode ?? ''} ${accountReference.netLiquidation.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} as of ${accountReference.observedAt}` : ''}`);
   const { auto, picks, allocationScale, backingPerTrade } = selectAffordableBasket({ settings, modelEquity, gsrs,
     select: (counts, perTrade) => autoPick({
       refined_summary: enrichedSummary.map(row => ({ ...row,
@@ -241,6 +248,7 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
       ivAtm: Number.isFinite(ivAtm) ? +ivAtm.toFixed(2) : null,
       earnings_date: earningsDate, earnings_clear: !earningsConflict(p.ticker),
       thesis: p.thesis,
+      thesis_summary: null, // filled after enrichment below
       si_pct: sig?.si_pct ?? null,
       contracts, credit, margin, spread,
       allocated_capital: backingPerTrade,
@@ -266,6 +274,7 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
       },
     };
   }).filter(Boolean);
+  for (const row of enriched) row.thesis_summary = pickSummary(row);
 
   const totals = enriched.reduce((acc, r) => {
     if (r.side === 'call') { acc.callCredit += r.credit; acc.callMargin += r.margin; }
@@ -281,10 +290,12 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
     policy: 'v3-news-only-no-doubling',
     allocation_settings: settings, allocation_scale: allocationScale, model_equity: modelEquity,
     model_equity_source: equity.source, model_equity_observed_at: equity.observedAt,
+    account_equity_reference: accountReference,
+    data_provenance: 'live-snapshot',
     total_backing_capital: picks.length * backingPerTrade,
     gsrs_calculation: score,
-    generated_ts: new Date().toISOString(),
-    entry_note: `Week ${BASKET_DATE}; entry ${easternTime().date}; exchange-adjusted expiry ${EXPIRY_ISO}. Auto-generated by scripts/run_weekly_basket.mjs.`,
+    generated_ts: now.toISOString(),
+    entry_note: `Week ${BASKET_DATE}; entry ${schedule.date}; exchange-adjusted expiry ${EXPIRY_ISO}. Auto-generated by scripts/run_weekly_basket.mjs.`,
     hold_window: { start: HOLD_START, end: HOLD_END },
     earnings_filter_applied: true,
     earnings_in_window_count_universe: Object.values(earningsByT)

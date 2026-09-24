@@ -57,6 +57,8 @@ struct DashboardView: View {
                         }
                     }
 
+                    ThesisSection(basket: b)
+
                     positionSection("Calls", b.calls)
                     positionSection("Puts", b.puts)
 

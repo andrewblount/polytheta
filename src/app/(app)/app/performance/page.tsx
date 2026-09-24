@@ -6,11 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/format";
 import { getPerformanceReport } from "@/server/repos/performance";
+import { getAccountPerformanceReport } from "@/server/repos/account-performance";
+import { AccountPerformanceSection } from "@/components/performance/account-performance-section";
 
 export const dynamic = "force-dynamic";
 
 export default async function PerformancePage() {
-  const report = await getPerformanceReport();
+  const [report, accountReport] = await Promise.all([getPerformanceReport(), getAccountPerformanceReport()]);
 
   if (!report || report.stats.completeWeeks === 0) {
     return (
@@ -71,6 +73,8 @@ export default async function PerformancePage() {
           <WeeklyPnlChart data={cumulative} />
         </CardContent>
       </Card>
+
+      <AccountPerformanceSection report={accountReport} />
 
       <Card>
         <CardHeader>

@@ -2,6 +2,14 @@
 
 Updated September 10, 2026. Owner-approved policy: **live IB account, news exits plus a per-ticker maximum loss exception, no doubling**. The loss exception supplements policy v3; GSRS and ordinary news rules are unchanged. Live IB authentication and activation remain separate operating steps.
 
+## Model first, trading second
+
+- The weekly basket is a **model**. It is built from the model's own data (Yahoo chains and quotes, the Cboe weekly universe, FRED, the news radar) and sized against **model equity** (`POLYTHETA_MODEL_EQUITY`, otherwise the $1,000,000 modeling basis). Nothing in basket generation reads the IB account: not the selected execution computer, not IB equity, not IB market data, not the account mode. A missing, unfunded, disconnected or wrong-mode IB session cannot stop a basket from being published.
+- The model publishes every week. Finalization starts at the configured lead before the entry window; if the data checks only pass later, the basket is still published and marked **late** with its actual pricing time, through the last session before expiry. Nothing is modeled on its own expiry day.
+- The execution service reads the published model basket from the database and applies its own rules unchanged: the strict entry window, fresh real-time IB quotes, live delta and buffer checks, the account's own equity and margin. A late model basket is never entered.
+- Every published basket carries a generated **trading thesis** (regime, selection rules, why each name, risk and exits, model-versus-execution) and a **provenance** label: live model, rebuilt from the model's own snapshot, or reconstructed with modeled option quotes when no snapshot survived.
+- Performance is reported on two tracks: the **model track** (modeled credits held to expiry) and the **account track** per IB account (paper or live): execution rate, slippage of fills against the modeled credit, fees, and actual P&L on the same contracts. The gap between the two is execution quality, not recommendation quality.
+
 ## Allocation
 
 - Settings choose **total allocation as a percentage of IB account equity**, maximum trades, and call/put percentages. Calls default to 100%, puts to 0%; the maximum defaults to 8.

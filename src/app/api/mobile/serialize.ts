@@ -71,6 +71,11 @@ export function leanBasket(basket: BasketData) {
     },
     calls: basket.callPositions.map(leanPosition),
     puts: basket.putPositions.map(leanPosition),
+    // The trading thesis and the model provenance travel with every basket so
+    // the archive drill-down can show why the model chose what it chose.
+    thesis: basket.thesis,
+    model: basket.model,
+    notes: basket.freeformNotes,
   };
 }
 

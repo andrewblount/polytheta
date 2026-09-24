@@ -14,6 +14,7 @@ import postgres from 'postgres';
 import { entrySchedule } from '../../shared/entry-schedule.mjs';
 import { sessionClose } from '../../shared/market-calendar.mjs';
 import { pricingReference } from '../../shared/entry-pricing.mjs';
+import { basketThesis, pickSummary } from '../../shared/basket-thesis.mjs';
 
 const DISCLAIMER =
   'I am not a financial advisor, registered broker, or investment professional. ' +
@@ -177,7 +178,10 @@ export async function importProposal(proposalPath, { publish = false, connection
   if (proposal.phase === 'final') {
     const schedule = entrySchedule(proposal.basket_date, proposal.allocation_settings);
     const entry = Date.parse(proposal.entry_timestamp);
-    if (!Number.isFinite(entry) || entry < +schedule.start || entry >= +schedule.end || proposal.entry_date !== schedule.date || proposal.expiry !== schedule.expiry || schedule.skipped) throw new Error('Final basket entry timestamp/expiry does not match its exchange window');
+    // A model basket is valid from the start of its entry window until its
+    // expiry session. Late pricing is recorded, never rejected.
+    if (!Number.isFinite(entry) || entry < +schedule.start || entry >= +sessionClose(schedule.expiry) || proposal.expiry !== schedule.expiry || schedule.skipped) throw new Error('Final basket entry timestamp/expiry does not match its exchange week');
+    if (!proposal.late && (entry >= +schedule.end || proposal.entry_date !== schedule.date)) throw new Error('Final basket priced outside its entry window must be marked late');
     if (!Array.isArray(proposal.picks) || !proposal.picks.length) throw new Error('Final basket has no entries');
     const identities = proposal.picks.map(p => `${p.ticker}:${p.side}:${p.K}`);
     if (new Set(identities).size !== identities.length) throw new Error('Final basket contains duplicate option contracts');
@@ -222,6 +226,26 @@ export async function findPublishedProposal(proposal, { connectionFactory = () =
     });
   } finally { await connection.end(); }
 }
+// Readback for the scheduler: is this week's model basket already published?
+export async function publishedBasketForWeek(week, { connectionFactory = () => postgres(requireUrl(), { max: 1 }) } = {}) {
+  const connection = connectionFactory();
+  try {
+    const rows = await connection.unsafe('select id, slug, status, publication_date from baskets where slug=$1', [`weekly-basket-${week}`]);
+    const basket = rows[0];
+    if (!basket || basket.status !== 'published') return null;
+    return { slug: basket.slug, basketId: basket.id, publishedAt: new Date(basket.publication_date).toISOString() };
+  } finally { await connection.end(); }
+}
+// The execution service reads the published model basket from the database,
+// so it never depends on the file system of whichever computer built it.
+export const MODEL_BASKET_KEY = week => `model_basket:${week}`;
+export async function loadPublishedProposal(week, { connectionFactory = () => postgres(requireUrl(), { max: 1 }) } = {}) {
+  const connection = connectionFactory();
+  try {
+    const rows = await connection.unsafe('select value from app_settings where key=$1', [MODEL_BASKET_KEY(week)]);
+    return rows[0]?.value ?? null;
+  } finally { await connection.end(); }
+}
 
 async function importInTransaction(proposal, publish, sql) {
 
@@ -264,6 +288,9 @@ async function importInTransaction(proposal, publish, sql) {
   ];
 
   const commentary = [
+    proposal.late_note,
+    proposal.data_provenance === 'reconstructed' ? `RECONSTRUCTED BASKET: ${proposal.reconstruction?.note ?? 'no live option-chain snapshot survived for this week; quotes are modeled'}` : null,
+    proposal.data_provenance === 'rebuilt-from-snapshot' ? `Rebuilt after the fact from the model's own option-chain snapshot observed ${proposal.reconstruction?.snapshot_observed_at ?? 'at the time'}.` : null,
     proposal.entry_note,
     proposal.hold_window ? `Hold window: ${proposal.hold_window}.` : null,
     proposal.filter_note,
@@ -283,12 +310,21 @@ async function importInTransaction(proposal, publish, sql) {
   const status = publish ? 'published' : 'archived';
   let basketId;
 
+  const thesis = basketThesis(proposal);
+  const provenance = proposal.data_provenance ?? 'live-snapshot';
+  const titleSuffix = provenance === 'reconstructed' ? ' (reconstructed)' : proposal.late ? ' (late model entry)' : '';
   if (existing.length) {
     basketId = existing[0].id;
     // A retry must not delete positions, fills, alert deduplication or performance.
     const stored = await sql.query('select ticker, side, strike, expiry, contracts, estimated_entry_credit, entry_timestamp, source_metadata from positions where basket_id=$1 order by sort_order', [basketId]);
     verifyStoredProposal(proposal, stored, existing[0].publication_date);
     if (existing[0].status !== status) await sql.query('update baskets set status=$2, updated_at=now() where id=$1', [basketId, status]);
+    // A retry writes nothing, except to fill in the execution copy if an
+    // older importer never stored one.
+    if (publish && proposal.phase === 'final') {
+      const copy = await sql.query('select key from app_settings where key=$1', [MODEL_BASKET_KEY(basketDate)]);
+      if (!copy.length) await storeModelBasket(sql, proposal);
+    }
     return { slug, basketId, basketDate, expiry, status, positions: stored.length, totalMargin, totalCredit, unchanged: true };
   } else {
     const ins = await sql.query(
@@ -297,7 +333,7 @@ async function importInTransaction(proposal, publish, sql) {
           disclaimer, quick_summary, commentary)
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning id`,
       [
-        `Weekly Basket — ${prettyDate} Entry`,
+        `Weekly Basket — ${prettyDate} Entry${titleSuffix}`,
         slug,
         basketDate,
         proposal.generated_ts,
@@ -356,7 +392,18 @@ async function importInTransaction(proposal, publish, sql) {
         hold_days: holdDays,
         pool_counts: proposal.pool_counts ?? null,
         generated_ts: proposal.generated_ts,
-        source: 'run_weekly_basket.mjs',
+        source: proposal.reconstruction?.source ?? 'run_weekly_basket.mjs',
+        model_equity: proposal.model_equity ?? null,
+        model_equity_source: proposal.model_equity_source ?? null,
+        account_equity_reference: proposal.account_equity_reference ?? null,
+        allocation_scale: proposal.allocation_scale ?? null,
+        entry_timestamp: proposal.entry_timestamp ?? null,
+        entry_window: proposal.entry_window ?? null,
+        late: Boolean(proposal.late),
+        late_minutes: proposal.late_minutes ?? 0,
+        data_provenance: provenance,
+        reconstruction: proposal.reconstruction ?? null,
+        thesis,
       }),
     ],
   );
@@ -393,12 +440,13 @@ async function importInTransaction(proposal, publish, sql) {
         p.margin,
         p.atr ?? null,
         p.buf != null ? `${p.buf}x ATR` : null,
-        p.thesis ?? 'Auto-selected.',
+        p.thesis_summary ?? pickSummary(p),
         JSON.stringify(thesisBulletsFrom(p)),
         JSON.stringify(cautionFlagsFrom(p, proposal.constraints)),
         entryTs,
         JSON.stringify({
           ...p,
+          thesis_text: thesis.picks.find(t => t.ticker === p.ticker && t.side === p.side && t.strike === Number(p.K))?.text ?? null,
           _not_evaluated: [
             ...(p.si_pct == null ? ['shortInterestPctFloat'] : []),
             'fanScore', 'glassdoorScore', 'buybackScore',
@@ -491,6 +539,8 @@ async function importInTransaction(proposal, publish, sql) {
     );
   }
 
+  if (publish && proposal.phase === 'final') await storeModelBasket(sql, proposal);
+
   return {
     slug,
     basketId,
@@ -501,6 +551,14 @@ async function importInTransaction(proposal, publish, sql) {
     totalMargin,
     totalCredit,
   };
+}
+
+async function storeModelBasket(sql, proposal) {
+  await sql.query(
+    `insert into app_settings (key, value, updated_at) values ($1, $2, now())
+     on conflict (key) do update set value = excluded.value, updated_at = now()`,
+    [MODEL_BASKET_KEY(proposal.basket_date), JSON.stringify(proposal)],
+  );
 }
 
 export function findProposals(repoRoot) {

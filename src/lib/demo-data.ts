@@ -845,6 +845,8 @@ export const demoBaskets: BasketData[] = [
       "If GSRS closes below 5, reopen consideration for normal put-side sizing next week.",
       "Monitor LCID and MARA for squeeze behavior into low-float headlines.",
     ],
+    thesis: null,
+    model: { provenance: "live-snapshot", late: false, lateMinutes: 0, entryTimestamp: null, entryWindow: null, modelEquity: null, modelEquitySource: null, reconstructionNote: null },
     lastRefreshAt: "2026-03-31T18:30:00.000Z",
   },
   {
@@ -1247,6 +1249,8 @@ export const demoBaskets: BasketData[] = [
     freeformNotes: [
       "This archived basket shows both expiry-resolved and actual closed outcomes.",
     ],
+    thesis: null,
+    model: { provenance: "live-snapshot", late: false, lateMinutes: 0, entryTimestamp: null, entryWindow: null, modelEquity: null, modelEquitySource: null, reconstructionNote: null },
     lastRefreshAt: "2026-03-18T20:00:00.000Z",
   },
 ];

@@ -1,27 +1,32 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveModelEquity, brokerEquitySnapshot, DEFAULT_MODEL_EQUITY } from '../shared/model-equity.mjs';
+import { resolveModelEquity, brokerEquitySnapshot, accountEquityReference, DEFAULT_MODEL_EQUITY } from '../shared/model-equity.mjs';
 import { executionCycle } from '../scripts/broker/execution-engine.mjs';
 const now = new Date('2026-09-14T13:30:00Z');
 const fresh = { netLiquidation: 60000, mode: 'paper', observedAt: '2026-09-14T13:00:00Z' };
-test('basket equity follows the published IB account value', () => {
-  const r = resolveModelEquity({ brokerEquity: fresh, settings: { executionHostId: 'h' }, env: {}, now });
-  assert.deepEqual(r, { modelEquity: 60000, source: 'ib-paper', observedAt: fresh.observedAt });
-  // IB wins even when an env override is present
-  assert.equal(resolveModelEquity({ brokerEquity: fresh, settings: {}, env: { POLYTHETA_MODEL_EQUITY: '1' }, now }).modelEquity, 60000);
+test('the model never sizes against the IB account, whatever the account or host state', () => {
+  // A selected execution computer with a fresh IB snapshot changes nothing for the model.
+  const r = resolveModelEquity({ brokerEquity: fresh, settings: { executionHostId: 'h', accountMode: 'paper' }, env: {}, now });
+  assert.deepEqual(r, { modelEquity: DEFAULT_MODEL_EQUITY, source: 'modeling-default', observedAt: null });
+  // A missing, stale or cross-mode snapshot cannot block the model either.
+  for (const brokerEquity of [null, { ...fresh, observedAt: '2026-09-01T13:00:00Z' }, { ...fresh, mode: 'live' }, { ...fresh, netLiquidation: 0 }, { ...fresh, observedAt: 'never' }]) {
+    assert.doesNotThrow(() => resolveModelEquity({ brokerEquity, settings: { executionHostId: 'h', accountMode: 'paper' }, env: {}, now }));
+  }
 });
-test('without an execution computer the modeling basis remains $1M, env override honored', () => {
-  assert.equal(resolveModelEquity({ brokerEquity: null, settings: {}, env: {}, now }).modelEquity, DEFAULT_MODEL_EQUITY);
-  assert.equal(resolveModelEquity({ brokerEquity: null, settings: {}, env: { POLYTHETA_MODEL_EQUITY: '250000' }, now }).source, 'env-override');
-  assert.throws(() => resolveModelEquity({ brokerEquity: null, settings: {}, env: { POLYTHETA_MODEL_EQUITY: 'x' }, now }), /POLYTHETA_MODEL_EQUITY/);
+test('model equity comes from the operator override, then stored settings, then the $1M modeling basis', () => {
+  assert.equal(resolveModelEquity({ settings: {}, env: {}, now }).modelEquity, DEFAULT_MODEL_EQUITY);
+  assert.deepEqual(resolveModelEquity({ settings: {}, env: { POLYTHETA_MODEL_EQUITY: '250000' }, now }), { modelEquity: 250000, source: 'env-override', observedAt: null });
+  assert.deepEqual(resolveModelEquity({ settings: { modelEquity: 75000 }, env: {}, now }), { modelEquity: 75000, source: 'settings', observedAt: null });
+  assert.equal(resolveModelEquity({ settings: { modelEquity: 75000 }, env: { POLYTHETA_MODEL_EQUITY: '50000' }, now }).modelEquity, 50000, 'the explicit override wins');
+  assert.throws(() => resolveModelEquity({ settings: {}, env: { POLYTHETA_MODEL_EQUITY: 'x' }, now }), /POLYTHETA_MODEL_EQUITY/);
+  assert.throws(() => resolveModelEquity({ settings: {}, env: { POLYTHETA_MODEL_EQUITY: '-1' }, now }), /POLYTHETA_MODEL_EQUITY/);
 });
-test('a selected execution computer refuses to size against a missing or stale snapshot', () => {
-  const settings = { executionHostId: 'h' };
-  assert.throws(() => resolveModelEquity({ brokerEquity: null, settings, env: {}, now }), /ib:check/);
-  const stale = { ...fresh, observedAt: '2026-09-01T13:00:00Z' };
-  assert.throws(() => resolveModelEquity({ brokerEquity: stale, settings, env: {}, now }), /old/);
-  assert.throws(() => resolveModelEquity({ brokerEquity: { ...fresh, netLiquidation: 0 }, settings, env: {}, now }), /Invalid/);
-  assert.throws(() => resolveModelEquity({ brokerEquity: { ...fresh, observedAt: 'never' }, settings, env: {}, now }), /timestamp/);
+test('the account is recorded as a reference for slippage analysis, never as an input', () => {
+  assert.equal(accountEquityReference(null), null);
+  assert.equal(accountEquityReference({ netLiquidation: 0, observedAt: fresh.observedAt }), null);
+  const reference = accountEquityReference(fresh, { now });
+  assert.equal(reference.netLiquidation, 60000); assert.equal(reference.mode, 'paper'); assert.equal(reference.stale, false);
+  assert.equal(accountEquityReference({ ...fresh, observedAt: '2026-09-01T13:00:00Z' }, { now }).stale, true);
 });
 test('equity snapshot requires a real NetLiquidation', () => {
   assert.throws(() => brokerEquitySnapshot({ netLiquidation: NaN }, { mode: 'live' }), /NetLiquidation/);

@@ -99,3 +99,8 @@ baskets/retro_cache/prices.json
 /baskets/*/delivery.json
 /baskets/*/data/refresh_history/
 /baskets/*/data/data_refresh.json
+
+# After-the-fact model rebuilds keep their synthetic/copied snapshots locally; the
+# resulting basket_proposal.json is tracked like any other week's.
+/baskets/*/rebuild/
+/baskets/*/reconstruction/

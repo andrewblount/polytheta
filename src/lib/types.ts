@@ -127,6 +127,35 @@ export interface BasketSummaryMetrics {
   gsrsConstraintNote: string;
 }
 
+export interface BasketThesisPick {
+  ticker: string;
+  side: PositionSide;
+  strike: number;
+  text: string;
+}
+
+export interface BasketThesisData {
+  headline: string;
+  regime: string;
+  selection: string;
+  picks: BasketThesisPick[];
+  risk: string;
+  execution: string;
+}
+
+export type BasketProvenance = "live-snapshot" | "rebuilt-from-snapshot" | "reconstructed";
+
+export interface BasketModelInfo {
+  provenance: BasketProvenance;
+  late: boolean;
+  lateMinutes: number;
+  entryTimestamp: string | null;
+  entryWindow: { start: string; end: string } | null;
+  modelEquity: number | null;
+  modelEquitySource: string | null;
+  reconstructionNote: string | null;
+}
+
 export interface BasketData {
   id: string;
   title: string;
@@ -151,6 +180,8 @@ export interface BasketData {
   freeformNotes: string[];
   adminOnlyNotes?: string[];
   lastRefreshAt: string;
+  thesis: BasketThesisData | null;
+  model: BasketModelInfo;
 }
 
 export interface DashboardData {

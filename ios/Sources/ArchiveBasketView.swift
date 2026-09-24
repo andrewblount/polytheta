@@ -55,6 +55,8 @@ struct ArchiveBasketView: View {
                     Text("Tap any position for the signals and screen checks behind it.")
                 }
 
+                ThesisSection(basket: b)
+
                 positionSection("Calls", b.calls)
                 positionSection("Puts", b.puts)
 

@@ -45,12 +45,13 @@ export function loadOverrides(repoRoot) {
 // Fetch short interest (% of float) for a list of tickers, with an on-disk
 // cache inside the week's data dir so re-runs are idempotent and Monday's
 // values are what the basket is judged against (walk-forward discipline).
-export async function fetchShortInterest(tickers, cacheFile, { concurrency = 5 } = {}) {
+export async function fetchShortInterest(tickers, cacheFile, { concurrency = 5, now = new Date(), frozen = false } = {}) {
   let cache = {};
   if (cacheFile && fs.existsSync(cacheFile)) {
     try { cache = JSON.parse(fs.readFileSync(cacheFile, 'utf8')); } catch { cache = {}; }
   }
-  const missing = tickers.filter(t => !cache[t] || cache[t].error || Date.now() - new Date(cache[t].fetched_at).getTime() > 6 * 3600000);
+  if (frozen) return cache; // rebuild from a snapshot: the cached values are the record
+  const missing = tickers.filter(t => !cache[t] || cache[t].error || +now - new Date(cache[t].fetched_at).getTime() > 6 * 3600000);
   for (let i = 0; i < missing.length; i += concurrency) {
     const batch = missing.slice(i, i + concurrency);
     const results = await Promise.all(

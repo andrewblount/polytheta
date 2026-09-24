@@ -1,11 +1,17 @@
-// Model equity for basket selection. The basket must be selected against the
-// same equity the execution service sizes against, otherwise names that clear
-// the affordability filter at a modeled $1M cannot fill one whole contract in
-// the real account. Source order:
-//   1. `broker_equity` published by the execution worker from IB NetLiquidation
-//   2. POLYTHETA_MODEL_EQUITY (explicit operator override / modeling runs)
-//   3. the historical $1,000,000 modeling basis, only while no execution
-//      computer is selected (website performance track record)
+// Model equity for basket selection.
+//
+// The weekly basket is a MODEL. It is selected and sized against a model
+// equity that never depends on the state of any brokerage account, so the
+// basket is generated every week whether or not IB is connected, funded, on
+// the right account, or publishing an equity snapshot. Source order:
+//   1. POLYTHETA_MODEL_EQUITY (explicit operator model basis)
+//   2. settings.modelEquity when the operator stores one
+//   3. the historical $1,000,000 modeling basis (website track record)
+//
+// The execution service sizes its OWN entries against the live IB account
+// (shared/execution-policy.mjs entryBudget). Comparing the two is what the
+// model-versus-account performance report measures; the model must not be
+// polluted by the account it is being compared against.
 export const DEFAULT_MODEL_EQUITY = 1000000;
 export const MAX_BROKER_EQUITY_AGE_MS = 7 * 24 * 3600000;
 
@@ -19,27 +25,24 @@ export function brokerEquitySnapshot(account, { mode, hostId, observedAt = new D
   };
 }
 
-export function resolveModelEquity({ brokerEquity, settings, env = process.env, now = new Date() }) {
+export function resolveModelEquity({ settings, env = process.env } = {}) {
   const override = env.POLYTHETA_MODEL_EQUITY;
-  const hostSelected = Boolean(settings?.executionHostId);
-  if (brokerEquity) {
-    if (settings?.accountMode && brokerEquity.mode !== settings.accountMode) throw new Error('Broker equity belongs to a different account mode; run npm run ib:check for the selected account');
-    if (hostSelected && brokerEquity.hostId && brokerEquity.hostId !== settings.executionHostId) throw new Error('Broker equity belongs to a different execution computer; run npm run ib:check');
-    const age = +now - Date.parse(brokerEquity.observedAt);
-    if (!Number.isFinite(age) || age < -60000) throw new Error('Broker equity snapshot has an invalid timestamp');
-    if (age > MAX_BROKER_EQUITY_AGE_MS) {
-      if (hostSelected && override == null) throw new Error(`Broker equity snapshot is ${Math.round(age / 3600000)}h old; run npm run ib:check with IB signed in`);
-    } else {
-      const value = Number(brokerEquity.netLiquidation);
-      if (!Number.isFinite(value) || value <= 0) throw new Error('Invalid broker equity snapshot');
-      return { modelEquity: value, source: `ib-${brokerEquity.mode ?? 'account'}`, observedAt: brokerEquity.observedAt };
-    }
-  }
-  if (override != null) {
+  if (override != null && override !== '') {
     const value = Number(override);
     if (!Number.isFinite(value) || value <= 0) throw new Error('Invalid POLYTHETA_MODEL_EQUITY');
     return { modelEquity: value, source: 'env-override', observedAt: null };
   }
-  if (hostSelected) throw new Error('No IB equity snapshot published for the selected execution computer; run npm run ib:check with IB signed in');
+  const stored = Number(settings?.modelEquity);
+  if (settings?.modelEquity != null && Number.isFinite(stored) && stored > 0) return { modelEquity: stored, source: 'settings', observedAt: null };
   return { modelEquity: DEFAULT_MODEL_EQUITY, source: 'modeling-default', observedAt: null };
+}
+
+// Informational only: the account the model will be compared against at the
+// time the basket was built. Never used for selection or sizing.
+export function accountEquityReference(brokerEquity, { now = new Date() } = {}) {
+  if (!brokerEquity) return null;
+  const value = Number(brokerEquity.netLiquidation);
+  const age = +now - Date.parse(brokerEquity.observedAt);
+  if (!Number.isFinite(value) || value <= 0 || !Number.isFinite(age)) return null;
+  return { netLiquidation: value, mode: brokerEquity.mode ?? null, hostId: brokerEquity.hostId ?? null, observedAt: brokerEquity.observedAt, stale: age > MAX_BROKER_EQUITY_AGE_MS };
 }

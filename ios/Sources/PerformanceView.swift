@@ -66,6 +66,10 @@ struct PerformanceView: View {
                     }
                 }
 
+                if report != nil {
+                    AccountPerformanceSection(account: report?.account)
+                }
+
                 if let weeks = report?.weeks {
                     Section("Settled weeks") {
                         ForEach(weeks.filter(\.complete).reversed()) { w in

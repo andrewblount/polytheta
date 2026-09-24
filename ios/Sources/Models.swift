@@ -46,8 +46,55 @@ struct MobileBasket: Codable {
     let metrics: MetricsBlock
     let calls: [MobilePosition]
     let puts: [MobilePosition]
+    // Added with the model-first release; older servers omit them.
+    let thesis: BasketThesis?
+    let model: BasketModelInfo?
+    let notes: [String]?
 
     var allPositions: [MobilePosition] { calls + puts }
+}
+
+// The trading thesis generated from the numbers the model used
+// (shared/basket-thesis.mjs), served with every basket.
+struct BasketThesis: Codable {
+    let headline: String
+    let regime: String
+    let selection: String
+    let picks: [BasketThesisPick]
+    let risk: String
+    let execution: String
+}
+
+struct BasketThesisPick: Codable, Identifiable {
+    var id: String { "\(ticker)-\(side)-\(strike)" }
+    let ticker: String
+    let side: String
+    let strike: Double
+    let text: String
+}
+
+struct BasketModelInfo: Codable {
+    let provenance: String
+    let late: Bool
+    let lateMinutes: Int
+    let entryTimestamp: String?
+    let entryWindow: EntryWindow?
+    let modelEquity: Double?
+    let modelEquitySource: String?
+    let reconstructionNote: String?
+
+    struct EntryWindow: Codable {
+        let start: String
+        let end: String
+    }
+
+    var provenanceLabel: String {
+        switch provenance {
+        case "reconstructed": return "Reconstructed"
+        case "rebuilt-from-snapshot": return "Rebuilt from snapshot"
+        default: return "Live model"
+        }
+    }
 }
 
 struct MarketBlock: Codable {
@@ -110,6 +157,75 @@ struct PerformanceResponse: Codable {
     let weeks: [WeekRow]
     let cumulative: [CumulativePoint]
     let stats: Stats?
+    // Account track (IB paper/live fills against the model); absent on older servers.
+    let account: AccountPerformance?
+}
+
+struct AccountPerformance: Codable {
+    let accounts: [AccountTrack]
+    let generatedAt: String?
+}
+
+struct AccountTrack: Codable, Identifiable {
+    var id: String { mode }
+    let mode: String
+    let weeks: [AccountWeek]
+    let totals: AccountTotals
+}
+
+struct AccountTotals: Codable {
+    let weeks: Int
+    let modelLegs: Int
+    let executedLegs: Int
+    let executionRatePct: Double
+    let modeledPnl: Double
+    let modeledPnlAtAccountSize: Double
+    let actualPnl: Double
+    let slippageTotal: Double
+    let fees: Double
+    let avgSlippagePerContract: Double?
+}
+
+struct AccountWeek: Codable, Identifiable {
+    var id: String { slug }
+    let weekOf: String
+    let slug: String
+    let title: String
+    let modelLegs: Int
+    let executedLegs: Int
+    let executionRatePct: Double
+    let modeledPnl: Double?
+    let modeledPnlAtAccountSize: Double?
+    let actualPnl: Double?
+    let slippageTotal: Double
+    let fees: Double
+    let complete: Bool
+    let legs: [AccountLeg]
+}
+
+struct AccountLeg: Codable, Identifiable {
+    var id: String { positionId }
+    let positionId: String
+    let ticker: String
+    let side: String
+    let strike: Double
+    let expiry: String
+    let modeledCredit: Double
+    let modeledContracts: Int
+    let modeledPnl: Double?
+    let executed: Bool
+    let openedContracts: Int
+    let closedContracts: Int
+    let avgOpenCredit: Double?
+    let avgCloseDebit: Double?
+    let fees: Double
+    let slippagePerContract: Double?
+    let slippageTotal: Double
+    let modeledPnlAtAccountSize: Double?
+    let actualPnl: Double?
+    let settlementValue: Double?
+    let status: String
+    let firstFillAt: String?
 }
 
 struct WeekRow: Codable, Identifiable {

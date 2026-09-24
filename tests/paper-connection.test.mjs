@@ -10,7 +10,7 @@ import * as journalModule from '../scripts/broker/host-runtime.mjs';
 import { TwsBroker } from '../scripts/broker/tws.mjs';
 import { WebApiBroker } from '../scripts/broker/web-api.mjs';
 import { executionCycle } from '../scripts/broker/execution-engine.mjs';
-import { resolveModelEquity } from '../shared/model-equity.mjs';
+import { accountEquityReference, resolveModelEquity } from '../shared/model-equity.mjs';
 
 test('paper mode persists, defaults to the paper gateway port and rejects invalid modes', () => {
   const paper = validateBrokerSettings({ accountMode: 'paper' });
@@ -37,7 +37,7 @@ test('paper runtime ignores live account and live activation and uses isolated s
   const paper = brokerModule.brokerRuntime(validateBrokerSettings({ accountMode: 'paper' }), env);
   assert.equal(paper.account, '');
   assert.equal(paper.enabled, false);
-  assert.equal(paper.importLedger, false);
+  assert.equal(paper.importLedger, true, 'paper fills are ledgered, labelled by mode, for account-vs-model performance');
   const enabled = brokerModule.brokerRuntime(validateBrokerSettings({ accountMode: 'paper' }), { ...env, IBKR_PAPER_ACCOUNT_ID: 'DU123456', POLYTHETA_PAPER_EXECUTION_ENABLED: 'true' });
   assert.equal(enabled.account, 'DU123456');
   assert.equal(enabled.enabled, true);
@@ -148,6 +148,8 @@ test('equity and portfolio snapshots cannot cross account modes', () => {
   const now = new Date('2026-09-17T14:00:00Z');
   const settings = { accountMode: 'live', executionHostId: 'h', connection: 'tws' };
   const paper = { mode: 'paper', hostId: 'h', connection: 'tws', observedAt: now.toISOString(), netLiquidation: 1000000 };
-  assert.throws(() => resolveModelEquity({ settings, brokerEquity: paper, now, env: {} }), /account mode/i);
+  // The model never sizes against any account; a paper snapshot is reference data only.
+  assert.equal(resolveModelEquity({ settings, brokerEquity: paper, now, env: {} }).source, 'modeling-default');
+  assert.equal(accountEquityReference(paper, { now }).mode, 'paper');
   assert.equal(portfolioModule.brokerPortfolioIsStale({ settings, snapshot: paper, status: { ...paper, connected: true }, settingsUpdatedAt: new Date(+now - 1000) }, now), true);
 });

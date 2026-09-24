@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { finalizeBasket, freezeFinalProposal, preparationMatches, preparationPolicy, requireCurrentBasketAuthority } from '../scripts/lib/finalize_basket.mjs';
+import { finalizeBasket, freezeFinalProposal, preparationMatches, preparationPolicy, requireCurrentModelPolicy } from '../scripts/lib/finalize_basket.mjs';
+import { basketThesis } from '../shared/basket-thesis.mjs';
 import { chainUnderlying, WEEKLYS_SOURCE } from '../scripts/lib/refresh.mjs';
 import { importProposal, findPublishedProposal } from '../scripts/lib/import_proposal.mjs';
 import { DEFAULT_BROKER_SETTINGS } from '../shared/broker-settings.mjs';
@@ -37,44 +38,61 @@ function fixture(mode = 'monday-morning') {
 }
 const temporary = t => { const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'polytheta-finalization-')); t.after(() => fs.rmSync(directory, { recursive: true, force: true })); return directory; };
 
-test('connected basket finalization uses subscribed IB options and underlying without a Yahoo chain fallback', async () => {
+test('the model finalizes on its own data whatever the IB account, host or connection state', async () => {
+  // A selected execution computer, a paper account and an IB outage change nothing for the model.
   const f = fixture();
-  f.settings.executionHostId = 'selected-host';
-  f.dependencies.client.options = async () => assert.fail('IB finalization must not request Yahoo option chains');
-  f.dependencies.client.quote = async symbols => { assert.ok(Array.isArray(symbols), 'Individual underlying must come from IB'); return f.macroQuotes; };
-  const market = { contract: { conid: 123 }, quote: { conid: 123, source: 'IB TWS', realtime: true, observedAt: +f.now,
-    bid: .81, ask: .90, bidSize: 10, askSize: 10, underlyingPrice: 20, optionIv: .48, delta: .18 } };
-  const marketData = async () => [market];
-  const result = await finalizeBasket(f.prepared, f.settings, { ...f.dependencies, marketData });
-  assert.equal(result.picks[0].bid, .81);
-  assert.equal(result.picks[0].quote_source, 'IB TWS');
-  assert.equal(result.picks[0].ib_conid, 123);
-  assert.equal(result.picks[0].underlying_observed_at, f.now.toISOString());
-  assert.match(result.picks[0].quote_timestamp_basis, /IB.*received/);
-  for (const bad of [{ realtime: false }, { observedAt: +f.now - 16000 }, { underlyingPrice: NaN }, { optionIv: -1 }]) {
-    await assert.rejects(finalizeBasket(f.prepared, f.settings, { ...f.dependencies, marketData: async () => [{ ...market, quote: { ...market.quote, ...bad } }] }), /IB/);
-  }
-  await assert.rejects(finalizeBasket(f.prepared, f.settings, { ...f.dependencies, marketData: async () => { throw new Error('IB subscription missing'); } }), /subscription missing/);
+  f.settings.executionHostId = 'selected-host'; f.settings.accountMode = 'paper';
+  const result = await finalizeBasket(f.prepared, f.settings, f.dependencies);
+  assert.equal(result.phase, 'final');
+  assert.equal(result.picks[0].quote_source, 'Yahoo Finance');
+  assert.equal(result.picks[0].bid, .80);
+  assert.equal(result.late, false);
+  assert.equal(f.calls.length, 1, 'the model reads its own Yahoo chain');
+  // Execution-only settings never invalidate a model preparation.
+  const execOnly = { ...f.settings, executionHostId: 'other-host', twsPort: 4002, accountMode: 'live', connection: 'web-api', pauseEntries: true };
+  assert.equal(preparationPolicy(execOnly), preparationPolicy(f.settings));
+  assert.notEqual(preparationPolicy({ ...f.settings, maxTrades: 3 }), preparationPolicy(f.settings));
+  const thesis = basketThesis(result);
+  assert.match(thesis.headline, /1 short call/); assert.match(thesis.regime, /GSRS/); assert.equal(thesis.picks[0].ticker, 'ABC'); assert.match(thesis.picks[0].text, /strike 21/);
 });
 
-test('publication and delivery re-read selected host and settings at every side-effect boundary', async () => {
-  const f = fixture(), hostId = 'selected-host';
-  let settings = { ...f.settings, executionHostId: hostId }, reads = 0;
+test('a basket priced after the entry window is still finalized, marked late with its true pricing time', async () => {
+  const f = fixture();
+  const lateTime = new Date('2026-09-14T15:10:00Z'); // 11:10 ET, 40 minutes after the window closed
+  f.stock.regularMarketTime = lateTime; for (const q of f.macroQuotes) q.regularMarketTime = lateTime;
+  f.tv.fetched_ts = lateTime.toISOString(); f.news.ABC.checked_at = lateTime.toISOString(); f.weeklys.fetched_at = lateTime.toISOString();
+  const result = await finalizeBasket(f.prepared, f.settings, { ...f.dependencies, now: lateTime });
+  assert.equal(result.late, true); assert.equal(result.late_minutes, 40);
+  assert.equal(result.entry_timestamp, lateTime.toISOString()); assert.equal(result.entry_date, '2026-09-14'); assert.equal(result.scheduled_entry_date, '2026-09-14');
+  assert.match(result.late_note, /40 minutes after/);
+  // Wednesday of the same week still publishes (late); the expiry session never does.
+  const wednesday = new Date('2026-09-16T15:00:00Z');
+  f.option.impliedVolatility = .62; // two days out the same strike only qualifies at a higher IV; otherwise the model rebuilds
+  f.stock.regularMarketTime = wednesday; for (const q of f.macroQuotes) q.regularMarketTime = wednesday;
+  f.tv.fetched_ts = wednesday.toISOString(); f.news.ABC.checked_at = wednesday.toISOString(); f.weeklys.fetched_at = wednesday.toISOString();
+  const midweek = await finalizeBasket(f.prepared, f.settings, { ...f.dependencies, now: wednesday });
+  assert.equal(midweek.late, true); assert.equal(midweek.entry_date, '2026-09-16');
+  await assert.rejects(finalizeBasket(f.prepared, f.settings, { ...f.dependencies, now: new Date('2026-09-18T15:00:00Z') }), /expiry session/);
+  await assert.rejects(finalizeBasket(f.prepared, f.settings, { ...f.dependencies, now: lateTime, allowLate: false }), /late model publication is disabled/);
+});
+
+test('publication re-reads the model policy at every side-effect boundary and ignores execution settings', async () => {
+  const f = fixture();
+  let settings = { ...f.settings, executionHostId: 'selected-host' }, reads = 0;
   const loadSettings = async () => { reads++; return settings; };
-  const rejected = error => error.code === 'BASKET_AUTHORITY_CHANGED';
-  await requireCurrentBasketAuthority(f.prepared, hostId, { loadSettings });
+  const rejected = error => error.code === 'MODEL_POLICY_CHANGED';
+  await requireCurrentModelPolicy(f.prepared, { loadSettings });
   settings = { ...settings, executionHostId: 'new-host' };
-  await assert.rejects(requireCurrentBasketAuthority(f.prepared, hostId, { loadSettings }), rejected);
-  await assert.rejects(requireCurrentBasketAuthority(f.prepared, hostId, { loadSettings, deliveryOnly: true }), rejected);
+  await requireCurrentModelPolicy(f.prepared, { loadSettings });
   settings = { ...settings, executionHostId: '' };
-  await assert.rejects(requireCurrentBasketAuthority(f.prepared, hostId, { loadSettings, deliveryOnly: true }), rejected);
-  settings = { ...settings, executionHostId: hostId, entryCapitalPct: 25 };
-  await assert.rejects(requireCurrentBasketAuthority(f.prepared, hostId, { loadSettings }), rejected);
+  await requireCurrentModelPolicy(f.prepared, { loadSettings, deliveryOnly: true });
+  settings = { ...settings, entryCapitalPct: 25 };
+  await assert.rejects(requireCurrentModelPolicy(f.prepared, { loadSettings }), rejected);
   const original = structuredClone(f.prepared);
-  await requireCurrentBasketAuthority(f.prepared, hostId, { loadSettings, deliveryOnly: true });
+  await requireCurrentModelPolicy(f.prepared, { loadSettings, deliveryOnly: true });
   assert.deepEqual(f.prepared, original);
-  await assert.rejects(requireCurrentBasketAuthority(f.prepared, hostId, { loadSettings: async () => { throw new Error('Database unavailable'); } }), rejected);
-  assert.equal(reads, 6);
+  await assert.rejects(requireCurrentModelPolicy(f.prepared, { loadSettings: async () => { throw new Error('Database unavailable'); } }), rejected);
+  assert.equal(reads, 5);
 });
 
 test('Monday finalization preserves the dated exact-contract anchor and uses current IV and underlying', async () => {
@@ -113,7 +131,12 @@ test('finalization uses completion time and refuses reads finishing after entry 
   assert.equal(result.picks[0].quote_observed_at, completed.toISOString());
   assert.equal(result.data_observed_at, f.now.toISOString());
   reads = 0;
-  await assert.rejects(finalizeBasket(f.prepared, f.settings, { ...f.dependencies, clock: () => ++reads === 1 ? f.now : new Date('2026-09-14T14:30:01Z') }), /late publication/);
+  const after = new Date('2026-09-14T14:30:01Z');
+  f.stock.regularMarketTime = after; for (const q of f.macroQuotes) q.regularMarketTime = after;
+  f.tv.fetched_ts = after.toISOString(); f.news.ABC.checked_at = after.toISOString(); f.weeklys.fetched_at = after.toISOString();
+  const late = await finalizeBasket(f.prepared, f.settings, { ...f.dependencies, clock: () => ++reads === 1 ? f.now : after });
+  assert.equal(late.late, true, 'reads finishing after the window still publish, flagged late');
+  assert.equal(late.entry_timestamp, '2026-09-14T14:30:01.000Z');
 });
 
 test('Friday preparation remains reusable at Monday open until finalization without a full rebuild', () => {
@@ -186,9 +209,12 @@ test('prepared or late-entry artifacts never open a database connection', async 
   const connectionFactory = () => { connections++; throw new Error('Unexpected database access'); };
   fs.writeFileSync(file, JSON.stringify(f.prepared));
   await assert.rejects(importProposal(file, { publish: true, connectionFactory }), /finalization is required/);
-  const final = await finalizeBasket(f.prepared, f.settings, f.dependencies); final.entry_timestamp = '2026-09-14T14:30:01.000Z';
-  fs.writeFileSync(file, JSON.stringify(final));
-  await assert.rejects(importProposal(file, { publish: true, connectionFactory }), /exchange window/);
+  const final = await finalizeBasket(f.prepared, f.settings, f.dependencies);
+  // A late pricing time must be declared late; an unflagged out-of-window stamp is a corrupt artifact.
+  fs.writeFileSync(file, JSON.stringify({ ...final, entry_timestamp: '2026-09-14T14:30:01.000Z' }));
+  await assert.rejects(importProposal(file, { publish: true, connectionFactory }), /marked late/);
+  fs.writeFileSync(file, JSON.stringify({ ...final, entry_timestamp: '2026-09-18T20:00:00.000Z', late: true }));
+  await assert.rejects(importProposal(file, { publish: true, connectionFactory }), /exchange week/);
   assert.equal(connections, 0);
 });
 
@@ -200,6 +226,7 @@ test('Friday import persists its pricing audit and a seven-day hold without rewr
     queries.push([sql, params]);
     if (sql.startsWith('select id, status')) return stored ? [{ id: 'basket', status: 'published' }] : [];
     if (sql.startsWith('select ticker')) return stored;
+    if (sql.startsWith('select key from app_settings')) return [{ key: params[0] }];
     return sql.includes('returning id') ? [{ id: 'fixture' }] : [];
   } }), end: async () => {} });
   await importProposal(file, { publish: true, connectionFactory });
@@ -209,6 +236,12 @@ test('Friday import persists its pricing audit and a seven-day hold without rewr
   assert.deepEqual(JSON.parse(position[22]).entry_pricing, proposal.picks[0].entry_pricing);
   const metrics = queries.find(([sql]) => sql.includes('insert into basket_metrics'))[1];
   assert.equal(JSON.parse(metrics[10]).hold_days, 7);
+  assert.match(JSON.parse(metrics[10]).thesis.headline, /short call/);
+  assert.equal(JSON.parse(metrics[10]).late, false);
+  const modelBasket = queries.find(([sql]) => sql.includes('insert into app_settings'));
+  assert.equal(modelBasket[1][0], 'model_basket:2026-09-14');
+  assert.equal(JSON.parse(modelBasket[1][1]).phase, 'final');
+  assert.match(position[18], /Short call at 21/);
   assert.match(queries.find(([sql]) => sql.includes('insert into baskets'))[1][0], /September 11/);
   const p = proposal.picks[0];
   stored = [{ ticker: p.ticker, side: p.side, strike: p.K, expiry: proposal.expiry, contracts: p.contracts, estimated_entry_credit: p.cr, entry_timestamp: proposal.entry_timestamp, source_metadata: { pricing_reference: p.pricing_reference, entry_pricing: p.entry_pricing } }];

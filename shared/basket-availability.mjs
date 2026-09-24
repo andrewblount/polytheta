@@ -34,7 +34,7 @@ export function missingBasketAvailability(settings, now = new Date()) {
       preparationLabel: timeLabel(preparationAt),
       finalRefreshLabel: timeLabel(finalRefreshAt),
       entryLabel: `${timeLabel(next.start)} to ${timeLabel(next.end)}`,
-      note: 'Scheduled under your entry settings. Publication depends on the data and selection checks passing.',
+      note: 'Scheduled under your entry settings. The model publishes on its own data; the IB account only affects execution.',
     };
     break;
   }
@@ -44,7 +44,7 @@ export function missingBasketAvailability(settings, now = new Date()) {
     message: current.skipped
       ? 'Your Friday holiday setting skips entry for this week.'
       : missed
-        ? `No basket was published for this week. Its entry window ended ${timeLabel(current.end)}. A late basket would use different entry prices.`
+        ? `No basket has been published for this week yet. The entry window ended ${timeLabel(current.end)}; the model keeps building through the week and publishes a late basket, marked with its actual pricing time, as soon as its data checks pass.`
         : `This week's basket has not been published yet. The entry window is ${timeLabel(current.start)} to ${timeLabel(current.end)}.`,
     nextScheduled,
   };

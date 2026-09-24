@@ -29,7 +29,11 @@ test('Monday holiday shifts the morning window, never creates a late-week entry'
   assert.equal(window.start.toISOString(), '2026-09-08T13:45:00.000Z');
   assert.equal(isEntryWindow(window.week, monday, new Date('2026-09-08T14:29:59Z')), true);
   assert.equal(isEntryWindow(window.week, monday, new Date('2026-09-08T14:30:00Z')), false);
-  assert.equal(buildContext(monday, new Date('2026-09-09T14:00:00Z')), null);
+  // The model keeps publishing (late) through the week; the execution window never widens.
+  const wednesday = buildContext(monday, new Date('2026-09-09T14:00:00Z'));
+  assert.equal(wednesday.week, '2026-09-07'); assert.equal(wednesday.late, true); assert.equal(wednesday.prepare, false);
+  assert.equal(isEntryWindow('2026-09-07', monday, new Date('2026-09-09T14:00:00Z')), false);
+  assert.equal(buildContext(monday, new Date('2026-09-11T14:00:00Z')), null, 'no model basket on its expiry day');
   assert.equal(entrySchedule('2026-11-02', monday).start.toISOString(), '2026-11-02T14:45:00.000Z');
 });
 test('screening starts ahead of Friday and finalization precedes the entry window', () => {

@@ -1,6 +1,7 @@
 import { formatCurrency, formatDateLabel, formatDateTimeLabel } from "@/lib/format";
 import type { BasketData, TradeRecord } from "@/lib/types";
 
+import { BasketThesisCard } from "@/components/baskets/basket-thesis-card";
 import { OrderBlockCard } from "@/components/baskets/order-block-card";
 import { ResponsivePositionTable } from "@/components/baskets/responsive-position-table";
 import { resolvedSnapshot } from "@/components/baskets/settled-outcome";
@@ -83,6 +84,10 @@ export function BasketDetailView({
             {basket.disclaimer}
           </CardContent>
         </Card>
+      </section>
+
+      <section>
+        <BasketThesisCard basket={basket} />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-3">

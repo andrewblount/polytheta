@@ -8,21 +8,10 @@ export function clockMinute(value) {
 export function sessionTime(date, minute) {
   return new Date(+sessionClose(date) + (minute - marketSession(date).closeMinute) * 60000);
 }
-// Manual late entry, PAPER ONLY. POLYTHETA_MANUAL_LATE_ENTRY=<basket Monday> lets a
-// deliberate operator run enter that week's basket during any later session of the
-// same week (through the expiry session), from the open to the close. The scheduled
-// jobs never set it, live mode ignores it, and it only ever widens the window for
-// the one named week. Every guard (buildContext, finalize, publish, execution)
-// derives from entrySchedule, so this is the single place the window is defined.
-function manualLateEntry(week, settings, now = new Date()) {
-  const target = globalThis.process?.env?.POLYTHETA_MANUAL_LATE_ENTRY;
-  if (!target || target !== week || settings.accountMode !== 'paper') return null;
-  const today = easternTime(now).date;
-  if (today < firstSessionOfWeek(week) || today > weeklyExpiry(week)) return null;
-  const session = marketSession(today);
-  if (!session.open) return null;
-  return { date: today, start: sessionTime(today, session.openMinute), end: sessionClose(today) };
-}
+// The entry window is the execution service's window: the only time the IB
+// worker may place entry orders for a week's basket. The MODEL basket is
+// finalized at the same time when everything works, but it is not bound by the
+// window — see buildContext and modelPublicationWindow.
 export function entrySchedule(week, settings) {
   if (weekOf(week) !== week) throw new Error('Basket week must be its Monday date');
   const friday = settings.entryTiming === 'friday-close';
@@ -33,8 +22,6 @@ export function entrySchedule(week, settings) {
   const endMinute = friday ? session.closeMinute : Math.min(clockMinute(settings.mondayEntryEnd ?? '10:30'), session.closeMinute);
   if (startMinute < session.openMinute || endMinute <= startMinute) throw new Error('Entry window is outside the exchange session');
   const mode = friday ? 'friday-close' : 'monday-morning';
-  const late = manualLateEntry(week, settings);
-  if (late) return { week, date: late.date, start: late.start, end: late.end, skipped: false, expiry: weeklyExpiry(week), mode, manual: true };
   return { week, date, start: sessionTime(date, startMinute), end: sessionTime(date, endMinute), skipped,
     expiry: weeklyExpiry(week), mode };
 }
@@ -46,21 +33,41 @@ export function entryWeek(settings, now = new Date()) {
   const week = currentWeek(now);
   return settings.entryTiming === 'friday-close' ? addDays(week, 7) : week;
 }
+// The model publication window: from the final-refresh lead before the entry
+// window until the close of the last session BEFORE expiry. A basket finalized
+// after the entry window is a late model basket; it is still published, with
+// its actual pricing time, because the model track record must exist for every
+// week regardless of what any broker did. Nothing is ever modeled on its own
+// expiry day (0 DTE is not the strategy).
+export function modelPublicationWindow(week, settings, now = new Date()) {
+  const schedule = entrySchedule(week, settings);
+  if (schedule.skipped) return { open: false, late: false, reason: 'Friday holiday policy skips this week', schedule };
+  const today = easternTime(now);
+  const session = marketSession(today.date);
+  const lead = (settings.finalizeLeadMinutes ?? 10) * 60000;
+  if (today.date < schedule.date || today.date === schedule.date && +now < +schedule.start - lead) return { open: false, late: false, reason: 'Finalization begins at the configured lead before the entry window', schedule };
+  if (today.date >= schedule.expiry) return { open: false, late: true, reason: 'No model basket is finalized on or after its expiry session', schedule };
+  if (!session.open || today.minutes < session.openMinute || today.minutes >= session.closeMinute) return { open: false, late: +now >= +schedule.end, reason: 'Exchange session closed', schedule };
+  return { open: true, late: +now >= +schedule.end, schedule };
+}
 // Friday research prepares next week's contracts before the five-minute window.
-// Monday mode can use that same dated baseline, then refresh at the open.
+// Monday mode can use that same dated baseline, then refresh at the open. After
+// the entry window the model keeps building and publishes late rather than
+// leaving a hole in the track record.
 export function buildContext(settings, now = new Date()) {
   const today = easternTime(now), session = marketSession(today.date), week = currentWeek(now);
   if (!session.open || today.minutes < session.openMinute || today.minutes >= session.closeMinute) return null;
+  const lead = (settings.finalizeLeadMinutes ?? 10) * 60000;
   const next = addDays(week, 7);
   if (today.date === weeklyExpiry(week) && today.minutes >= session.closeMinute - (settings.preparationLeadMinutes ?? 90)) {
     const target = entrySchedule(next, settings);
     if (target.skipped) return null;
-    return { week: next, prepare: +now < +target.start - (settings.finalizeLeadMinutes ?? 10) * 60000, schedule: target };
+    return { week: next, prepare: +now < +target.start - lead, late: +now >= +target.end, schedule: target };
   }
-  if (settings.entryTiming !== 'friday-close') {
-    const target = entrySchedule(week, settings);
-    if (today.date === target.date && +now < +target.end) return { week, prepare: +now < +target.start - (settings.finalizeLeadMinutes ?? 10) * 60000, schedule: target };
-  }
+  const target = entrySchedule(week, settings);
+  if (target.skipped) return null;
+  if (today.date === target.date) return { week, prepare: +now < +target.start - lead, late: +now >= +target.end, schedule: target };
+  if (today.date > target.date && today.date < target.expiry) return { week, prepare: false, late: true, schedule: target };
   return null;
 }
 export function proposalWindow(proposal) {

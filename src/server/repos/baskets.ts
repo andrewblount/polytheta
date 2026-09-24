@@ -29,6 +29,8 @@ import type {
   AdminUserRecord,
   AnalyticsSummary,
   BasketData,
+  BasketModelInfo,
+  BasketThesisData,
   DashboardData,
   PositionDetailData,
   SyncJobRecord,
@@ -63,6 +65,45 @@ async function getSnapshotsForPositionIds(positionIds: string[]) {
     map.set(row.positionId, list);
     return map;
   }, new Map<string, ReturnType<typeof normalizeSnapshot>[]>());
+}
+
+// The importer stores the generated trading thesis and the model provenance
+// in basket_metrics.other_metrics (see scripts/lib/import_proposal.mjs).
+export function thesisFromMetrics(other: Record<string, unknown> | null | undefined): BasketThesisData | null {
+  const raw = other?.thesis as Partial<BasketThesisData> | undefined;
+  if (!raw || typeof raw.headline !== "string") return null;
+  return {
+    headline: raw.headline,
+    regime: String(raw.regime ?? ""),
+    selection: String(raw.selection ?? ""),
+    picks: Array.isArray(raw.picks)
+      ? raw.picks.map((pick) => ({
+          ticker: String(pick.ticker ?? ""),
+          side: pick.side === "put" ? "put" : "call",
+          strike: Number(pick.strike ?? 0),
+          text: String(pick.text ?? ""),
+        }))
+      : [],
+    risk: String(raw.risk ?? ""),
+    execution: String(raw.execution ?? ""),
+  };
+}
+
+export function modelInfoFromMetrics(other: Record<string, unknown> | null | undefined): BasketModelInfo {
+  const provenance = other?.data_provenance;
+  const window = other?.entry_window as { start?: string; end?: string } | undefined;
+  const reconstruction = other?.reconstruction as { note?: string } | undefined;
+  return {
+    provenance:
+      provenance === "reconstructed" || provenance === "rebuilt-from-snapshot" ? provenance : "live-snapshot",
+    late: Boolean(other?.late),
+    lateMinutes: Number(other?.late_minutes ?? 0) || 0,
+    entryTimestamp: typeof other?.entry_timestamp === "string" ? other.entry_timestamp : null,
+    entryWindow: window?.start && window?.end ? { start: window.start, end: window.end } : null,
+    modelEquity: Number.isFinite(Number(other?.model_equity)) && other?.model_equity != null ? Number(other.model_equity) : null,
+    modelEquitySource: typeof other?.model_equity_source === "string" ? other.model_equity_source : null,
+    reconstructionNote: typeof reconstruction?.note === "string" ? reconstruction.note : null,
+  };
 }
 
 function buildBasketFromDemo(slug: string) {
@@ -191,6 +232,8 @@ async function buildBasketFromDb(slug: string): Promise<BasketData | null> {
         title: rule.title,
         body: rule.body,
       })),
+    thesis: thesisFromMetrics(metrics.otherMetrics),
+    model: modelInfoFromMetrics(metrics.otherMetrics),
     freeformNotes:
       basket.commentary
         ?.split("\n")

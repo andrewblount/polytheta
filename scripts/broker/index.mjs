@@ -15,7 +15,9 @@ export function brokerRuntime(settings, env = process.env) {
   return {
     mode, authorizedEntryWeek, account: (paper ? env.IBKR_PAPER_ACCOUNT_ID : env.IBKR_ACCOUNT_ID) ?? '',
     enabled: (paper ? env.POLYTHETA_PAPER_EXECUTION_ENABLED : env.POLYTHETA_EXECUTION_ENABLED) === 'true',
-    importLedger: !paper, journalKey: `ib_execution_journal:${mode}`, journalFile: `ib-execution-${mode}.json`,
+    // Fills from either account enter the ledger, labelled by mode, so account
+    // performance and slippage can be measured against the model for each.
+    importLedger: true, journalKey: `ib_execution_journal:${mode}`, journalFile: `ib-execution-${mode}.json`,
   };
 }
 

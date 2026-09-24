@@ -8,7 +8,7 @@
 // Settled positions never change, so this runs once per basket rather than
 // hourly.
 //
-//   node scripts/backfill_settled.mjs            # all archived baskets missing snapshots
+//   node scripts/backfill_settled.mjs            # all expired baskets missing snapshots (archived or published)
 //   node scripts/backfill_settled.mjs --all      # include ones already backfilled
 //   node scripts/backfill_settled.mjs --dry-run
 //
@@ -86,7 +86,7 @@ const rows = await sql.query(`
          (select count(*)::int from performance_snapshots where position_id = p.id) snaps
   from baskets b
   join positions p on p.basket_id = b.id
-  where b.status = 'archived'
+  where b.status in ('archived', 'published')
     and p.expiry < current_date
   order by b.week_of desc, p.sort_order
 `);
