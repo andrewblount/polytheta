@@ -248,7 +248,10 @@ test('Friday import persists its pricing audit and a seven-day hold without rewr
   assert.match(queries.find(([sql]) => sql.includes('insert into baskets'))[1][0], /September 11/);
   const p = proposal.picks[0];
   // The database rounds the credit to two decimals; the retry must still recognise its own basket.
-  stored = [{ ticker: p.ticker, side: p.side, strike: String(p.K), expiry: new Date(proposal.expiry), contracts: p.contracts, estimated_entry_credit: p.cr.toFixed(2), entry_timestamp: proposal.entry_timestamp, source_metadata: { pricing_reference: p.pricing_reference, entry_pricing: p.entry_pricing } }];
+  // PostgreSQL rounds numeric(10,2) half-up on the exact decimal (0.195 -> 0.20); JS toFixed does not.
+  const half = (Math.round(p.cr * 100) / 100 + 0.005).toFixed(3);
+  proposal.picks[0].cr = Number(half); fs.writeFileSync(file, JSON.stringify(proposal));
+  stored = [{ ticker: p.ticker, side: p.side, strike: String(p.K), expiry: new Date(proposal.expiry), contracts: p.contracts, estimated_entry_credit: (Math.round(Number(half) * 100 + 1e-6) / 100).toFixed(2), entry_timestamp: proposal.entry_timestamp, source_metadata: { pricing_reference: p.pricing_reference, entry_pricing: p.entry_pricing } }];
   queries.length = 0;
   assert.equal((await importProposal(file, { publish: true, connectionFactory })).unchanged, true);
   assert.ok(!queries.some(([sql]) => /delete|insert|update/i.test(sql)));

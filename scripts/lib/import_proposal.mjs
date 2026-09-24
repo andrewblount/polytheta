@@ -198,8 +198,11 @@ export async function importProposal(proposalPath, { publish = false, connection
 
 const canonical = value => JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item);
 function verifyStoredProposal(proposal, stored, publishedAt) {
-  // positions.estimated_entry_credit is numeric(10,2); a finalized credit carries four decimals.
-  const identity = rows => JSON.stringify(rows.map(p => [p.ticker, p.side, Number(p.K ?? p.strike), (p.expiry instanceof Date ? p.expiry.toISOString().slice(0,10) : String(p.expiry ?? proposal.expiry).slice(0,10)), Number(p.contracts), Number(p.cr ?? p.estimated_entry_credit).toFixed(2)]).sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
+  // positions.estimated_entry_credit is numeric(10,2), rounded half-up by the
+  // database; a finalized credit carries four decimals. Compare in cents with
+  // the same rounding (0.195 -> 20, 0.105 -> 11), not via toFixed on binary floats.
+  const cents = value => Math.round(Number(value) * 100 + 1e-6);
+  const identity = rows => JSON.stringify(rows.map(p => [p.ticker, p.side, Number(p.K ?? p.strike), (p.expiry instanceof Date ? p.expiry.toISOString().slice(0,10) : String(p.expiry ?? proposal.expiry).slice(0,10)), Number(p.contracts), cents(p.cr ?? p.estimated_entry_credit)]).sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
   if (identity(stored) !== identity(proposal.picks ?? [])) throw new Error(`Published basket ${proposal.basket_date} is immutable; create an explicit revision instead of overwriting its trade history`);
   if (proposal.phase === 'final') {
     if (publishedAt != null && +new Date(publishedAt) !== +new Date(proposal.generated_ts)) throw new Error('Published basket has a different original publication timestamp');
