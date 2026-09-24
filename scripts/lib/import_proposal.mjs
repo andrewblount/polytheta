@@ -198,7 +198,8 @@ export async function importProposal(proposalPath, { publish = false, connection
 
 const canonical = value => JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item);
 function verifyStoredProposal(proposal, stored, publishedAt) {
-  const identity = rows => JSON.stringify(rows.map(p => [p.ticker, p.side, Number(p.K ?? p.strike), (p.expiry instanceof Date ? p.expiry.toISOString().slice(0,10) : String(p.expiry ?? proposal.expiry).slice(0,10)), Number(p.contracts), Number(p.cr ?? p.estimated_entry_credit)]).sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
+  // positions.estimated_entry_credit is numeric(10,2); a finalized credit carries four decimals.
+  const identity = rows => JSON.stringify(rows.map(p => [p.ticker, p.side, Number(p.K ?? p.strike), (p.expiry instanceof Date ? p.expiry.toISOString().slice(0,10) : String(p.expiry ?? proposal.expiry).slice(0,10)), Number(p.contracts), Number(p.cr ?? p.estimated_entry_credit).toFixed(2)]).sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
   if (identity(stored) !== identity(proposal.picks ?? [])) throw new Error(`Published basket ${proposal.basket_date} is immutable; create an explicit revision instead of overwriting its trade history`);
   if (proposal.phase === 'final') {
     if (publishedAt != null && +new Date(publishedAt) !== +new Date(proposal.generated_ts)) throw new Error('Published basket has a different original publication timestamp');
@@ -247,6 +248,9 @@ export async function loadPublishedProposal(week, { connectionFactory = () => po
   } finally { await connection.end(); }
 }
 
+// jsonb parameters are passed as JavaScript values: the postgres.js driver
+// serializes them for the server-reported jsonb type. Passing pre-serialized
+// JSON text double-encodes it into a jsonb string (seen 2026-09-24).
 async function importInTransaction(proposal, publish, sql) {
 
   const basketDate = proposal.basket_date;
@@ -342,7 +346,7 @@ async function importInTransaction(proposal, publish, sql) {
         'Auto — radars not evaluated',
         cashNeeded,
         DISCLAIMER,
-        JSON.stringify(quickSummary),
+        quickSummary,
         commentary,
       ],
     );
@@ -387,7 +391,7 @@ async function importInTransaction(proposal, publish, sql) {
       dailyTheta,
       `Family cap of 2 names enforced at selection. Families present: ${[...new Set(picks.map((p) => p.family))].join(', ') || 'n/a'}.`,
       gsrsNoteFrom(proposal),
-      JSON.stringify({
+      {
         rom_pct: totalMargin ? Number(((totalCredit / totalMargin) * 100).toFixed(2)) : null,
         hold_days: holdDays,
         pool_counts: proposal.pool_counts ?? null,
@@ -404,7 +408,7 @@ async function importInTransaction(proposal, publish, sql) {
         data_provenance: provenance,
         reconstruction: proposal.reconstruction ?? null,
         thesis,
-      }),
+      },
     ],
   );
 
@@ -441,17 +445,17 @@ async function importInTransaction(proposal, publish, sql) {
         p.atr ?? null,
         p.buf != null ? `${p.buf}x ATR` : null,
         p.thesis_summary ?? pickSummary(p),
-        JSON.stringify(thesisBulletsFrom(p)),
-        JSON.stringify(cautionFlagsFrom(p, proposal.constraints)),
+        thesisBulletsFrom(p),
+        cautionFlagsFrom(p, proposal.constraints),
         entryTs,
-        JSON.stringify({
+        {
           ...p,
           thesis_text: thesis.picks.find(t => t.ticker === p.ticker && t.side === p.side && t.strike === Number(p.K))?.text ?? null,
           _not_evaluated: [
             ...(p.si_pct == null ? ['shortInterestPctFloat'] : []),
             'fanScore', 'glassdoorScore', 'buybackScore',
           ],
-        }),
+        },
         sortOrder++,
       ],
     );
@@ -557,7 +561,7 @@ async function storeModelBasket(sql, proposal) {
   await sql.query(
     `insert into app_settings (key, value, updated_at) values ($1, $2, now())
      on conflict (key) do update set value = excluded.value, updated_at = now()`,
-    [MODEL_BASKET_KEY(proposal.basket_date), JSON.stringify(proposal)],
+    [MODEL_BASKET_KEY(proposal.basket_date), proposal],
   );
 }
 

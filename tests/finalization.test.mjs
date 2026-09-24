@@ -36,6 +36,7 @@ function fixture(mode = 'monday-morning') {
   }, macros: async () => tv, radar: async () => news, universe: async () => weeklys };
   return { now, settings, prepared, stock, macroQuotes, option, chain, tv, news, weeklys, calls, dependencies };
 }
+const metricsOther = queries => queries.find(([sql]) => sql.includes('insert into basket_metrics'))[1][10];
 const temporary = t => { const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'polytheta-finalization-')); t.after(() => fs.rmSync(directory, { recursive: true, force: true })); return directory; };
 
 test('the model finalizes on its own data whatever the IB account, host or connection state', async () => {
@@ -232,19 +233,22 @@ test('Friday import persists its pricing audit and a seven-day hold without rewr
   await importProposal(file, { publish: true, connectionFactory });
   const position = queries.find(([sql]) => sql.includes('insert into positions'))[1];
   assert.equal(position[21], '2026-09-11T19:55:00.000Z');
-  assert.deepEqual(JSON.parse(position[22]).pricing_reference, proposal.picks[0].pricing_reference);
-  assert.deepEqual(JSON.parse(position[22]).entry_pricing, proposal.picks[0].entry_pricing);
+  // jsonb parameters travel as objects; the driver serializes them (strings would be double-encoded).
+  assert.equal(typeof position[22], 'object'); assert.equal(typeof metricsOther(queries), 'object');
+  assert.deepEqual(position[22].pricing_reference, proposal.picks[0].pricing_reference);
+  assert.deepEqual(position[22].entry_pricing, proposal.picks[0].entry_pricing);
   const metrics = queries.find(([sql]) => sql.includes('insert into basket_metrics'))[1];
-  assert.equal(JSON.parse(metrics[10]).hold_days, 7);
-  assert.match(JSON.parse(metrics[10]).thesis.headline, /short call/);
-  assert.equal(JSON.parse(metrics[10]).late, false);
+  assert.equal(metrics[10].hold_days, 7);
+  assert.match(metrics[10].thesis.headline, /short call/);
+  assert.equal(metrics[10].late, false);
   const modelBasket = queries.find(([sql]) => sql.includes('insert into app_settings'));
   assert.equal(modelBasket[1][0], 'model_basket:2026-09-14');
-  assert.equal(JSON.parse(modelBasket[1][1]).phase, 'final');
+  assert.equal(modelBasket[1][1].phase, 'final');
   assert.match(position[18], /Short call at 21/);
   assert.match(queries.find(([sql]) => sql.includes('insert into baskets'))[1][0], /September 11/);
   const p = proposal.picks[0];
-  stored = [{ ticker: p.ticker, side: p.side, strike: p.K, expiry: proposal.expiry, contracts: p.contracts, estimated_entry_credit: p.cr, entry_timestamp: proposal.entry_timestamp, source_metadata: { pricing_reference: p.pricing_reference, entry_pricing: p.entry_pricing } }];
+  // The database rounds the credit to two decimals; the retry must still recognise its own basket.
+  stored = [{ ticker: p.ticker, side: p.side, strike: String(p.K), expiry: new Date(proposal.expiry), contracts: p.contracts, estimated_entry_credit: p.cr.toFixed(2), entry_timestamp: proposal.entry_timestamp, source_metadata: { pricing_reference: p.pricing_reference, entry_pricing: p.entry_pricing } }];
   queries.length = 0;
   assert.equal((await importProposal(file, { publish: true, connectionFactory })).unchanged, true);
   assert.ok(!queries.some(([sql]) => /delete|insert|update/i.test(sql)));
