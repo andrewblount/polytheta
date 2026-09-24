@@ -43,6 +43,7 @@ struct PerformanceView: View {
                             )
                             .foregroundStyle(point.pnl >= 0 ? Color.green.opacity(0.75) : Color.red.opacity(0.8))
                         }
+                        .chartXAxis { AxisMarks(values: .automatic(desiredCount: 4)) }
                         .frame(height: 220)
                         .padding(.vertical, 8)
                     }
@@ -61,6 +62,7 @@ struct PerformanceView: View {
                                 colors: [.accentColor.opacity(0.3), .clear],
                                 startPoint: .top, endPoint: .bottom))
                         }
+                        .chartXAxis { AxisMarks(values: .automatic(desiredCount: 4)) }
                         .frame(height: 180)
                         .padding(.vertical, 8)
                     }
@@ -72,17 +74,23 @@ struct PerformanceView: View {
 
                 if let weeks = report?.weeks {
                     Section("Settled weeks") {
+                        // Each settled week opens the full basket: its trades, each
+                        // position's outcome and the trading thesis behind it.
                         ForEach(weeks.filter(\.complete).reversed()) { w in
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text(w.weekOf).font(.subheadline.weight(.medium))
-                                    Text("GSRS \(w.gsrs, specifier: "%.2f") · \(w.wins)/\(w.settledLegs) OTM")
-                                        .font(.caption).foregroundStyle(.secondary)
+                            NavigationLink {
+                                ArchiveBasketView(slug: w.slug, weekOf: w.weekOf)
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading) {
+                                        Text(w.weekOf).font(.subheadline.weight(.medium))
+                                        Text("GSRS \(w.gsrs, specifier: "%.2f") · \(w.wins)/\(w.settledLegs) OTM")
+                                            .font(.caption).foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Text(money(w.pnl))
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(w.pnl >= 0 ? .green : .red)
                                 }
-                                Spacer()
-                                Text(money(w.pnl))
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(w.pnl >= 0 ? .green : .red)
                             }
                         }
                     }
