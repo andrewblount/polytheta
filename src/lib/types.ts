@@ -113,6 +113,8 @@ export interface PositionData {
   actualExitCredit?: number | null;
   latestPerformance: PerformanceSnapshotData;
   performanceHistory: PerformanceSnapshotData[];
+  // Last news-radar hit recorded for this name during its week, if any.
+  radarLastHit?: { title: string; at: string; link?: string } | null;
 }
 
 export interface BasketSummaryMetrics {

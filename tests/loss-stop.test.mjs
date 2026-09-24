@@ -320,7 +320,7 @@ test('a fresh account read immediately before transmission determines the baseli
   const args = fixture(); args.journal = emptyJournal(); args.broker.positions = async () => [];
   const pick = { ticker: 'ABC', name: 'Acme', side: 'call', K: 25, px: 20, atr: 2, cr: .5, iv: 1,
     pricing_reference: { observedAt: now.toISOString(), spot: 20, iv: 1, vix: 20, credit: .5, strike: 25, side: 'call', expiry: contract.expiry },
-    doubles_allowed: false, rule_checks: { earnings_clear: 'pass', thesis_signals: { radar: 'pass' } } };
+    rule_checks: { earnings_clear: 'pass', thesis_signals: { radar: 'pass' } } };
   args.proposal = { basket_date: week, expiry: contract.expiry, generated_ts: now.toISOString(), data_observed_at: now.toISOString(), picks: [pick] };
   args.broker.resolve = async () => contract;
   args.broker.quote = async () => ({ ...quote(contract, .55), bid: .45, delta: .18, optionIv: 1, underlyingPrice: 20 });

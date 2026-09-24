@@ -92,25 +92,22 @@ struct SettingsView: View {
                 }
                 ModelSettingsSection()
                 BrokerSettingsSection()
-                Section("Notifications") {
-                    if let settingsError { ErrorBanner(message: settingsError) }
-                    ForEach(categories, id: \.key) { cat in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(cat.label).font(.subheadline.weight(.medium))
-                            HStack(spacing: 14) {
-                                channelToggle(cat.key, "email", "Email")
-                                channelToggle(cat.key, "imessage", "iMessage")
-                            }
-                            HStack(spacing: 14) {
-                                channelToggle(cat.key, "sms", "SMS")
-                                channelToggle(cat.key, "whatsapp", "WhatsApp")
-                            }
+                if let settingsError { Section { ErrorBanner(message: settingsError) } }
+                // One section per alert category, one toggle per row: the
+                // two-column grid overlapped its switches on a phone.
+                ForEach(categories, id: \.key) { cat in
+                    Section {
+                        channelToggle(cat.key, "email", "Email")
+                        channelToggle(cat.key, "imessage", "iMessage")
+                        channelToggle(cat.key, "sms", "SMS")
+                        channelToggle(cat.key, "whatsapp", "WhatsApp")
+                    } header: {
+                        Text(cat.key == categories.first?.key ? "Notifications · \(cat.label)" : cat.label)
+                    } footer: {
+                        if cat.key == categories.last?.key {
+                            Text("SMS and WhatsApp go through Twilio to your mobile. WhatsApp also needs the Twilio sandbox activated and joined from WhatsApp. Changes apply to the next scheduled send.")
                         }
-                        .padding(.vertical, 2)
                     }
-                    Text("SMS and WhatsApp go through Twilio to your mobile. WhatsApp also needs the Twilio sandbox activated and joined from WhatsApp. Changes apply to the next scheduled send.")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
                 }
                 Section {
                     Text("Data is modeled from recommended entries. Verify everything against live broker chains before trading.")
@@ -132,7 +129,6 @@ struct SettingsView: View {
                 Task { await saveSettings(category: category, channel: channel, value: newValue) }
             }
         ))
-        .font(.caption)
         .toggleStyle(.switch)
     }
 

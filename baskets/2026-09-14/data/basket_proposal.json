@@ -10,7 +10,7 @@
     "end": "2026-09-14T14:30:00.000Z"
   },
   "data_observed_at": "2026-09-14T13:40:00.000Z",
-  "policy": "v3-news-only-no-doubling",
+  "policy": "v3-news-only",
   "allocation_settings": {
     "connection": "tws",
     "accountMode": "live",
@@ -117,7 +117,6 @@
     "puts_allowed": true,
     "put_budget": 27500,
     "call_budget": 55000,
-    "put_doubles_allowed": false,
     "delta_band": [
       0.15,
       0.2
@@ -232,7 +231,6 @@
       "credit_at_bid": 33,
       "midpoint_to_bid_cost": 7,
       "pricing_basis": "dated model adjusted for time, current underlying and IV; actual entry requires an IB fill",
-      "doubles_allowed": false,
       "frenzy": "calm",
       "mom": {
         "r1": 0,
@@ -324,7 +322,6 @@
       "credit_at_bid": 36,
       "midpoint_to_bid_cost": 5,
       "pricing_basis": "dated model adjusted for time, current underlying and IV; actual entry requires an IB fill",
-      "doubles_allowed": false,
       "frenzy": "calm",
       "mom": {
         "r1": 0.2,
@@ -416,7 +413,6 @@
       "credit_at_bid": 42,
       "midpoint_to_bid_cost": 1,
       "pricing_basis": "dated model adjusted for time, current underlying and IV; actual entry requires an IB fill",
-      "doubles_allowed": false,
       "frenzy": "calm",
       "mom": {
         "r1": 3.5,
@@ -508,7 +504,6 @@
       "credit_at_bid": 30,
       "midpoint_to_bid_cost": 3,
       "pricing_basis": "dated model adjusted for time, current underlying and IV; actual entry requires an IB fill",
-      "doubles_allowed": false,
       "frenzy": "calm",
       "mom": {
         "r1": -2.4,
@@ -600,7 +595,6 @@
       "credit_at_bid": 25,
       "midpoint_to_bid_cost": 4,
       "pricing_basis": "dated model adjusted for time, current underlying and IV; actual entry requires an IB fill",
-      "doubles_allowed": false,
       "frenzy": "calm",
       "mom": {
         "r1": 3,
@@ -692,7 +686,6 @@
       "credit_at_bid": 24,
       "midpoint_to_bid_cost": 3,
       "pricing_basis": "dated model adjusted for time, current underlying and IV; actual entry requires an IB fill",
-      "doubles_allowed": false,
       "frenzy": "calm",
       "mom": {
         "r1": 0.6,
@@ -784,7 +777,6 @@
       "credit_at_bid": 29,
       "midpoint_to_bid_cost": 3,
       "pricing_basis": "dated model adjusted for time, current underlying and IV; actual entry requires an IB fill",
-      "doubles_allowed": false,
       "frenzy": "calm",
       "mom": {
         "r1": -2.1,
@@ -884,7 +876,7 @@
   "thesis": {
     "version": 1,
     "headline": "7 short calls for expiry 2026-09-18, selected in a moderate stress (GSRS 3.09) for premium capture on high-IV names with strikes beyond the modeled move.",
-    "regime": "GSRS 3.09 (moderate stress, band 3-5). VIX 17.42 (up 1.58 on the day), SKEW 152.09, high-yield OAS 2.65%, MOVE 83.90, total put/call 0.86. Score contributions: VIX 2.64, SKEW 5.21, HY OAS 2.75, MOVE 3.39, P/C 0.98 (weights 40/20/20/10/10). Implication: put allocation halved, no put doubles; call side unrestricted.",
+    "regime": "GSRS 3.09 (moderate stress, band 3-5). VIX 17.42 (up 1.58 on the day), SKEW 152.09, high-yield OAS 2.65%, MOVE 83.90, total put/call 0.86. Score contributions: VIX 2.64, SKEW 5.21, HY OAS 2.75, MOVE 3.39, P/C 0.98 (weights 40/20/20/10/10). Implication: put allocation halved; call side unrestricted.",
     "selection": "7 short options (7 calls, 0 puts) under the 100% calls / 0% puts, at most 8 trades. Model equity $50,000 (env-override), allocation scale 1.00; each trade is backed equally with about $6,250, contracts rounded down to whole lots. Screen: single stocks with weekly options, price $8–$100, average volume ≥1.5M, OTM side volume ≥500, positive bid, modeled credit ≥$0.10, spread ≤$0.15, |delta| 0.15–0.20, strike buffer ≥1 ATR for calls and ≥2 ATR for puts; earnings inside the hold window, active call-side buybacks, triggered news radars, extreme upward frenzy, duplicate names and more than two names per family are excluded. The screened pool held 25 call candidates and 0 put candidates. Ranking: confirmed thesis signals first, then the side criterion (highest option IV for calls, largest market cap for puts); calm names outrank names that just ripped.",
     "picks": [
       {
@@ -930,7 +922,7 @@
         "text": "MP (MP Materials Corp.): short call, strike 54, 7.5% OTM from $50.25, |delta| 0.17, 1.25× ATR (ATR 3.00). Selected for 67% option IV with HV rank 15 in the rare earths materials family. Modeled credit $0.32 per contract × 1 contract = $32 against $662 naked margin (market 0.29/0.35). Next earnings 2026-11-05, outside the hold window. Short interest 19.6% of float. Thesis signals: pass radar; fail short interest (2/5 known). Entry credit repriced from the dated reference for elapsed time, current underlying and current option IV."
       }
     ],
-    "risk": "Hold to expiry; the weekly tenor is the stop and there is no doubling or averaging down. Automatic exits only on a credible company-specific news signal (acquisition risk for a short call, a serious downside event for a short put) or when a ticker's combined loss reaches 20% of the account equity recorded before its entry. Expiry is modeled at intrinsic value from the expiry-session close.",
+    "risk": "Hold to expiry; the weekly tenor is the stop and there is no averaging down. Automatic exits only on a credible company-specific news signal (acquisition risk for a short call, a serious downside event for a short put) or when a ticker's combined loss reaches 20% of the account equity recorded before its entry. Expiry is modeled at intrinsic value from the expiry-session close.",
     "execution": "Model entry 2026-09-14T13:45:00.000Z, expiry 2026-09-18. Modeled credits are midpoints or dated-reference reprices, not fills; the execution service enters only inside its own window with fresh IB quotes, so account results differ from the model by slippage and by whatever it could not execute. Data provenance: RECONSTRUCTED — no live option-chain snapshot survived for this week; option quotes are Black-Scholes values on the neighbouring weeks' IV surfaces with real intraday underlying prices.",
     "generated_at": "2026-09-24T03:00:39.894Z"
   }

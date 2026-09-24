@@ -26,7 +26,7 @@ export default function TradingRulesPage() {
       <p>The maximum loss is per ticker, initially 20% of account equity recorded immediately before entry. For example, $1 million of account equity gives that ticker a $200,000 loss trigger. The running worker monitors only its PolyTheta exposure; other tickers’ gains do not offset it. The percentage is configurable, and no standing stop is placed at entry.</p>
       <p>A loss trigger persists through recoveries and restarts until its remaining PolyTheta contracts are closed. The exit limit tracks fresh IB asks. Closed markets, missing quotes, outages and slippage can carry losses beyond the trigger.</p>
       <p>Your Exit NOW and Exit all NOW buttons are manual overrides and apply only to PolyTheta trades. Exit all pauses new entries. Actual holdings and P/L are visible on the website, iPhone and paired Watch with sync timestamps and request status.</p>
-      <p>There is no doubling or averaging down. A limit order may remain unfilled, and overnight events wait for the next session. Broker connectivity, assignment and actual fills require reconciliation.</p>
+      <p>There is no averaging down. A limit order may remain unfilled, and overnight events wait for the next session. Broker connectivity, assignment and actual fills require reconciliation.</p>
     </CardContent></Card>
     <Card><CardHeader><CardTitle>How GSRS is calculated</CardTitle></CardHeader><CardContent className="space-y-4 text-sm leading-7">
       <p>Clip each component to 0–10, multiply by its weight, add the results and round to two decimals.</p>

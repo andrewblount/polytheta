@@ -47,7 +47,7 @@ export function planEntry(pick, contract, q, budget, settings, now = new Date())
   if (isExcluded(pick, settings) || isExcluded(contract, settings)) throw new Error('Ticker is on the do-not-trade list');
   if (!sideEnabled(pick.side, settings)) throw new Error(`Selling ${pick.side}s is switched off in Settings`);
   validateQuote(q, contract, settings, now);
-  if (pick.doubles_allowed !== false || pick.rule_checks?.earnings_clear !== 'pass' || pick.rule_checks?.thesis_signals?.radar !== 'pass') throw new Error('Entry rules are not confirmed');
+  if (pick.rule_checks?.earnings_clear !== 'pass' || pick.rule_checks?.thesis_signals?.radar !== 'pass') throw new Error('Entry rules are not confirmed');
   if (!Number.isFinite(q.delta) || Math.abs(q.delta) < 0.15 || Math.abs(q.delta) > 0.20) throw new Error('Live IB delta is outside the entry band');
   const spot = q.underlyingPrice;
   if (!Number.isFinite(spot) || spot <= 0 || !Number.isFinite(pick.atr) || pick.atr <= 0) throw new Error('Live underlying price or ATR unavailable');

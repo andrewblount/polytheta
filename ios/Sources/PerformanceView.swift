@@ -68,6 +68,28 @@ struct PerformanceView: View {
                             stat("Max DD", money(stats.maxDrawdown), .red)
                         }
                         .frame(maxWidth: .infinity)
+                        if let pf = stats.profitFactor ?? (stats.losingWeeks == 0 && stats.completeWeeks > 0 ? Double.infinity : nil) {
+                            HStack {
+                                stat("Profit factor", pf.isFinite ? String(format: "%.2f", pf) : "∞", .primary)
+                                Divider()
+                                stat("Credit kept", pctText(stats.creditCapturePct), (stats.creditCapturePct ?? 0) >= 0 ? .green : .red)
+                                Divider()
+                                stat("Sharpe", stats.sharpe.map { String(format: "%.2f", $0) } ?? "—", .primary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            HStack {
+                                stat("Calls", stats.calls.map { "\(Int($0.winRatePct))% · \(money($0.pnl))" } ?? "—", .primary)
+                                Divider()
+                                stat("Puts", stats.puts.map { $0.legs > 0 ? "\(Int($0.winRatePct))% · \(money($0.pnl))" : "none" } ?? "—", .primary)
+                                Divider()
+                                stat("Cushion W/L", "\(pctText(stats.avgCushionWinnersPct, 0)) / \(pctText(stats.avgCushionLosersPct, 0))", .primary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            if let w = stats.worstLeg {
+                                Text("Worst leg: \(w.ticker) \(w.side) \(money(w.pnl))\(w.expiryPrice != nil && w.entryPrice != nil && w.strike != nil ? " — \(priceText(w.entryPrice)) → \(priceText(w.expiryPrice)) at expiry vs the \(priceText(w.strike)) strike" : ""). Longest losing streak \(stats.longestLosingStreak ?? 0) wk; \(money(stats.expectancyPerLeg ?? 0)) expectancy per leg; \(pctText(stats.returnOnMarginPct, 2)) on margin.")
+                                    .font(.caption2).foregroundStyle(.secondary)
+                            }
+                        }
                     } header: {
                         Text("Modeled — held to expiry or exited on a radar signal")
                     } footer: {
@@ -124,10 +146,15 @@ struct PerformanceView: View {
                                 ArchiveBasketView(slug: w.slug, weekOf: w.weekOf)
                             } label: {
                                 HStack {
-                                    VStack(alignment: .leading) {
+                                    VStack(alignment: .leading, spacing: 2) {
                                         Text(w.weekOf).font(.subheadline.weight(.medium))
                                         Text("GSRS \(w.gsrs, specifier: "%.2f") · \(w.wins)/\(w.settledLegs) OTM")
                                             .font(.caption).foregroundStyle(.secondary)
+                                        if let worst = w.worstLeg, let entry = worst.entryPrice, let exp = worst.expiryPrice, let k = worst.strike {
+                                            // Worst leg's entry → expiry price against its strike.
+                                            Text("\(worst.ticker) \(worst.side == "call" ? "C" : "P") \(k, specifier: "%.2f"): \(entry, specifier: "%.2f") → \(exp, specifier: "%.2f") at expiry")
+                                                .font(.caption2).foregroundStyle(worst.pnl < 0 ? .red : .secondary)
+                                        }
                                     }
                                     Spacer()
                                     Text(money(w.pnl))

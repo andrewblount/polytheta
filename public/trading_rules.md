@@ -1,6 +1,6 @@
 # PolyTheta — entry, exit and allocation rules
 
-Updated September 10, 2026. Owner-approved policy: **live IB account, news exits plus a per-ticker maximum loss exception, no doubling**. The loss exception supplements policy v3; GSRS and ordinary news rules are unchanged. Live IB authentication and activation remain separate operating steps.
+Updated September 10, 2026. Owner-approved policy: **live IB account, news exits plus a per-ticker maximum loss exception**. The loss exception supplements policy v3; GSRS and ordinary news rules are unchanged. Live IB authentication and activation remain separate operating steps.
 
 ## Allocation
 
@@ -8,7 +8,7 @@ Updated September 10, 2026. Owner-approved policy: **live IB account, news exits
 - Percentages determine the **number of trades**. A 75/25 split permits 3 calls + 1 put or 6 calls + 2 puts. The largest qualifying basket within the maximum is selected. If fewer names qualify, use a smaller basket with the same split. An impossible split produces no basket.
 - Divide the available allocation **equally across those trades**, then round contract counts down. Unused amounts remain unallocated; they are not redistributed after a fill or loss.
 - New entries use at most equity, positive cash, available funds and excess liquidity. Backing per contract is 100 × the greater of strike and current stock price. IB's order preview must also approve the margin requirement within the trade's allocation.
-- The configurable margin reserve ceiling defaults to **4× equity**. The code monitors IB-reported gross position value divided by equity. Exceeding the configured ceiling blocks new entries and flags review; it never causes a price-based exit. The ceiling does not multiply entry size, promise 4× buying power, or authorize doubling. IB sets the actual requirement. A naked call still has unlimited potential loss.
+- The configurable margin reserve ceiling defaults to **4× equity**. The code monitors IB-reported gross position value divided by equity. Exceeding the configured ceiling blocks new entries and flags review; it never causes a price-based exit. The ceiling does not multiply entry size, or promise 4× buying power. IB sets the actual requirement. A naked call still has unlimited potential loss.
 - Existing entry risk reductions apply uniformly to the basket to preserve equal allocation: an elevated frenzy signal halves the basket allocation; GSRS 3–5 halves it when puts are included. Both together quarter it. GSRS ≥5 prohibits new puts.
 
 ## Entry
@@ -22,7 +22,7 @@ Updated September 10, 2026. Owner-approved policy: **live IB account, news exits
 - Screen single stocks with weekly options, prices $8–$100, average stock volume ≥1.5 million, and the strategy's high-volatility screen. Require OTM side volume ≥500, a positive bid, modeled credit ≥$0.10, spread ≤$0.15 and absolute delta 0.15–0.20. Calls need ≥1 ATR strike buffer; puts ≥2 ATR.
 - Exclude conflicting or unknown earnings dates, active call-side buybacks, triggered or unavailable news scans, extreme upward frenzy, duplicate names and more than two names in one family. Thesis signals remain explicitly known/pass/fail/unknown; the original three-of-five rule is enforced only where enough signals are known.
 - Before an order, resolve the exact standard USD, 100-share IB contract. Require fresh **real-time IB bid/ask, size, underlying price and delta**. Yahoo is a research fallback, never an execution-price fallback. Recheck strike buffer and adverse drift: 4% or 0.5 ATR invalidates the entry.
-- Enter with a DAY sell limit near midpoint. The minimum credit defaults to 90% of the time/underlying/IV-adjusted expected credit, never below $0.10, rounded to a valid conservative tick. Reprice at most once per minute within that floor. Cancel an unfilled entry after the configurable timeout (default five minutes) or when its configured entry window ends. DAY orders require the worker to be connected for cancellation at the end of a Monday morning window; a worker outage can leave one working until the broker's session end. Partial fills remain recorded; no automatic second entry or doubling.
+- Enter with a DAY sell limit near midpoint. The minimum credit defaults to 90% of the time/underlying/IV-adjusted expected credit, never below $0.10, rounded to a valid conservative tick. Reprice at most once per minute within that floor. Cancel an unfilled entry after the configurable timeout (default five minutes) or when its configured entry window ends. DAY orders require the worker to be connected for cancellation at the end of a Monday morning window; a worker outage can leave one working until the broker's session end. Partial fills remain recorded; there is no automatic second entry.
 
 ## Exit
 
@@ -30,7 +30,7 @@ Updated September 10, 2026. Owner-approved policy: **live IB account, news exits
 - Trade screens show IB-derived **PolyTheta holdings and P/L only**. Other account positions and their P/L are excluded. Account equity is used for allocation, account-level capacity checks and the per-ticker loss baseline. The refresh timestamp, execution activation state, incomplete fees and blocked exits are visible. A stale or disconnected snapshot cannot authorize a new exit request.
 - The Watch relays refreshes and confirmed exit requests through the paired iPhone. The iPhone must be reachable; the execution Mac must also be running and connected to IB. An exit request is queued work, not a fill receipt.
 
-- Normally **hold to expiry**. There is no early profit target, doubling or averaging down. Automatic early exits have two causes: qualifying news or the maximum loss rule below.
+- Normally **hold to expiry**. There is no early profit target or averaging down. Automatic early exits have two causes: qualifying news or the maximum loss rule below.
 - News exits require credible company-specific news: acquisition/takeover risk for a short call, or a serious downside event for a short put. A keyword match alone does not authorize an exit. The code checks issuer identity, publication time, source and, for calls, whether the company is the target rather than the buyer.
 - The execution service scans Yahoo-distributed news for its own positions each cycle. Recognized primary/wire sources qualify for automatic decisions; other matches require review. This is limited news coverage, not a claim to see every rumor or filing. Apify is not required by the current data paths and has not been subscribed to or activated.
 - Cancel any remaining entry quantity first. After broker reconciliation, buy to close only the owned short quantity. The initial exit limit is the current ask; repricing stays under a configurable ceiling (default 1.5× the initial ask). Unfilled or blocked exits require attention at IB. A limit order cannot guarantee an immediate fill.

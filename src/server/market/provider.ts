@@ -38,6 +38,7 @@ export interface MarketDataProvider {
     startDate: string,
     endDate: string,
   ): Promise<HistoricalPrice[]>;
+  getIntradayPrices?(ticker: string, start: Date, end: Date, interval?: "30m" | "1h"): Promise<HistoricalPrice[]>;
   getOptionChain(ticker: string, expiry: string): Promise<OptionChainResult | null>;
   getOptionQuote(
     ticker: string,

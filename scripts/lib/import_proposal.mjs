@@ -54,7 +54,7 @@ function gsrsNoteFrom(proposal) {
     proposal.gsrs < 3
       ? 'below 3.0 — full sizing available'
       : proposal.gsrs < 5
-        ? '3–5 band — put sizing constrained, doubles prohibited on puts'
+        ? '3–5 band — put sizing halved'
         : '5+ — elevated stress, sizing materially constrained';
   return `GSRS ${proposal.gsrs} (${band}). Components: ${parts.join(', ')}.`;
 }
@@ -160,7 +160,7 @@ const RULES = [
   ['hard-stop', 'Acquisition radar signal (call side)', 'Immediate full exit on that name. Radar emails fire automatically from the hourly news scan.', 0],
   ['hard-stop', 'Downside-gap radar signal (put side)', 'Immediate full exit on that name. Radar emails fire automatically from the hourly news scan.', 1],
   ['hard-stop', '30% total portfolio drawdown', 'Close everything.', 2],
-  ['protocol', 'Hold to expiry (risk policy v3)', 'The weekly tenor is the stop. No doubling down (simulated: the double protocol cut +$280K to +$125K across 96 settled legs). ATR breaks and adverse-move emails are attention signals only; exits happen on radar triggers, not price. See docs/risk_policy_v2.md.', 3],
+  ['protocol', 'Hold to expiry (risk policy v3)', 'The weekly tenor is the stop. ATR breaks and adverse-move emails are attention signals only; exits happen on radar triggers, not price. See docs/risk_policy_v2.md.', 3],
   ['protocol', 'Adverse-move heads-up at -25% of allocation', 'Informational email from the hourly sync — prompts a news check, not an exit.', 4],
   ['profit-target', 'Close at 50–70% of collected credit', 'Per position.', 5],
   ['profit-target', 'Daily 1% account gain target', 'Whichever comes first.', 6],

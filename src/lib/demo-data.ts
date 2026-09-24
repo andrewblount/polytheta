@@ -29,7 +29,7 @@ export const demoBaskets: BasketData[] = [
     ],
     marketConditions: {
       gsrsNote:
-        "GSRS remains in the 5–7 band. Put-side names are sized at 1% risk and doubles are prohibited.",
+        "GSRS remains in the 5–7 band. Put-side names are sized at 1% risk.",
       vix: 31.05,
       skew: 144,
       hyOas: 3.17,
@@ -772,7 +772,7 @@ export const demoBaskets: BasketData[] = [
         side: "call",
         label: "Break #1",
         thresholdValue: 21.2,
-        protocolNote: "Double size if IV remains elevated.",
+        protocolNote: "Hold to expiry.",
       },
       {
         id: "alert-hims-2",
@@ -781,7 +781,7 @@ export const demoBaskets: BasketData[] = [
         side: "call",
         label: "Break #2",
         thresholdValue: 21.8,
-        protocolNote: "Second double then mandatory full exit.",
+        protocolNote: "Hold to expiry; exit only on a radar signal.",
       },
       {
         id: "alert-mara-1",
@@ -799,7 +799,7 @@ export const demoBaskets: BasketData[] = [
         label: "Restriction",
         thresholdValue: 5.8,
         protocolNote:
-          "Put-side doubles remain prohibited while GSRS stays above 5.",
+          "New puts remain blocked while GSRS stays above 5.",
       },
     ],
     hardStops: [
@@ -837,7 +837,7 @@ export const demoBaskets: BasketData[] = [
       },
     ],
     freeformNotes: [
-      "Put-side doubles remain blocked by GSRS.",
+      "New puts remain blocked by GSRS.",
       "Ford recall risk remains a monitored flag rather than an outright disqualifier.",
       "MARA is the highest-velocity live warning and should stay on a high-priority watchlist.",
     ],
@@ -868,7 +868,7 @@ export const demoBaskets: BasketData[] = [
     ],
     marketConditions: {
       gsrsNote:
-        "The system stayed in the 3–5 band, so put-side sizing was halved and doubles remained prohibited.",
+        "The system stayed in the 3–5 band, so put-side sizing was halved.",
       vix: 28.8,
       skew: 138,
       hyOas: 3.02,
@@ -1226,7 +1226,7 @@ export const demoBaskets: BasketData[] = [
       totalEstimatedCredit: 4050,
       dailyTheta: 10000,
       concentrationNote: "Exposure balanced between biotech/data infrastructure and regional banks.",
-      gsrsConstraintNote: "Put-side doubledown protocol remained disabled for the full week.",
+      gsrsConstraintNote: "Put sizing stayed halved for the full week.",
     },
     orderBlocks: [],
     priceAlerts: [],

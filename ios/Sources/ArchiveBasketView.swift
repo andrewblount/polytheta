@@ -13,6 +13,8 @@ struct ArchiveBasketView: View {
     @State private var trades: [Trade] = []
     @State private var error: String?
     @State private var loading = false
+    // Price path + analysis per position id, loaded after the basket.
+    @State private var legs: [String: LegPath] = [:]
 
     var settledPnl: Double? {
         guard let basket else { return nil }
@@ -138,7 +140,16 @@ struct ArchiveBasketView: View {
                                     .foregroundStyle(l.pnlAmount >= 0 ? .green : .red)
                             }
                         }
+                        if let st = p.settled {
+                            // Entry → settlement against the strike: the outcome in one line.
+                            let through = p.side == "call" ? st.underlyingPrice > p.strike : st.underlyingPrice < p.strike
+                            Text("\(priceText(p.entryPrice)) → \(priceText(st.underlyingPrice)) \(st.state == "manually-closed" ? "at exit" : "at expiry") · \(through ? "through" : "clear of") the \(priceText(p.strike)) strike")
+                                .font(.caption2).foregroundStyle(through ? .red : .green)
+                        }
                     }
+                }
+                if let leg = legs[p.id] {
+                    LegPathCard(leg: leg)
                 }
             }
         }
@@ -155,6 +166,14 @@ struct ArchiveBasketView: View {
             error = nil
         } catch {
             self.error = error.localizedDescription
+        }
+        await loadLegs()
+    }
+
+    func loadLegs() async {
+        guard let slug = basket?.slug else { return }
+        if let response = try? await api.basketLegs(slug: slug) {
+            legs = Dictionary(uniqueKeysWithValues: response.legs.map { ($0.positionId, $0) })
         }
     }
 }

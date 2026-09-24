@@ -25,7 +25,7 @@ export async function BrokerSettingsCard() {
     ["twsRestartGraceMinutes", "Expected restart recovery window (minutes)", 1, 60, 1],
   ] as const;
   return <Card><CardHeader><CardTitle>Interactive Brokers · {s.accountMode === 'paper' ? 'Paper account' : 'Live account'}</CardTitle>
-    <p className="text-sm text-muted-foreground">Equal allocation per trade. No doubling. Automatic exits follow news and configured ticker-loss rules.</p>
+    <p className="text-sm text-muted-foreground">Equal allocation per trade. Automatic exits follow news and configured ticker-loss rules.</p>
   </CardHeader><CardContent className="space-y-5">
     <p role="status" className="rounded-xl border p-3 text-sm">{status && !status.stale ? String(status.message ?? "Connection status unavailable") : "IB connection has not been verified recently. Sign in to your selected gateway on the trading Mac."}</p>
     <form action={updateBrokerSettingsAction} className="grid gap-4 sm:grid-cols-2">

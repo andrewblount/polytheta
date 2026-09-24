@@ -42,8 +42,17 @@ export function leanPosition(p: PositionData) {
       p.latestPerformance != null &&
       p.margin > 0 &&
       p.latestPerformance.pnlAmount <= -0.25 * p.margin,
+    // Settlement: the underlying price the leg settled at (expiry close, or the
+    // exit price on a model exit) and the resulting outcome.
+    settled: p.latestPerformance && SETTLED.has(p.latestPerformance.state)
+      ? { state: p.latestPerformance.state, underlyingPrice: p.latestPerformance.underlyingPrice, observedAt: p.latestPerformance.observedAt, pnlAmount: p.latestPerformance.pnlAmount, exitDate: p.manualCloseDate ?? null }
+      : null,
+    breakeven: p.side === "call" ? +(p.strike + p.estimatedEntryCredit).toFixed(2) : +(p.strike - p.estimatedEntryCredit).toFixed(2),
+    atr: p.atr14d ?? null,
   };
 }
+
+const SETTLED = new Set(["expired-otm", "expired-itm", "manually-closed"]);
 
 export function leanBasket(basket: BasketData) {
   return {

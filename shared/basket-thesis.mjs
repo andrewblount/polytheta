@@ -13,7 +13,7 @@ export function gsrsBand(gsrs) {
   const g = Number(gsrs);
   if (!Number.isFinite(g)) return { band: 'unknown', label: 'GSRS unavailable', putPolicy: 'Put sizing rule could not be evaluated' };
   if (g < 3) return { band: '0-3', label: 'calm regime', putPolicy: 'full put sizing permitted' };
-  if (g < 5) return { band: '3-5', label: 'moderate stress', putPolicy: 'put allocation halved, no put doubles' };
+  if (g < 5) return { band: '3-5', label: 'moderate stress', putPolicy: 'put allocation halved' };
   if (g < 7) return { band: '5-7', label: 'elevated stress', putPolicy: 'no new puts' };
   return { band: '7-10', label: 'crisis regime', putPolicy: 'no new puts; hedge recommended' };
 }
@@ -80,7 +80,7 @@ export function pickThesis(pick, proposal = {}) {
 function riskParagraph(p) {
   const s = p.allocation_settings ?? {};
   return [
-    'Hold to expiry; the weekly tenor is the stop and there is no doubling or averaging down.',
+    'Hold to expiry; the weekly tenor is the stop and there is no averaging down.',
     'Automatic exits only on a credible company-specific news signal (acquisition risk for a short call, a serious downside event for a short put)',
     s.maxAccountLossPct != null ? `or when a ticker's combined loss reaches ${s.maxAccountLossPct}% of the account equity recorded before its entry.` : '.',
     'Expiry is modeled at intrinsic value from the expiry-session close.',

@@ -173,7 +173,7 @@ export async function sendBriefing(slot: "open" | "close") {
 
   // Fan out to members who opted into briefing emails in their own settings,
   // each with their tracked account line up top. Andrew's env address is
-  // handled above, so it's excluded here to avoid doubles.
+  // handled above, so it's excluded here to avoid duplicates.
   if (env.sendGridApiKey && env.sendGridFromEmail && db) {
     const prefKey = slot === "open" ? "briefing_open_email" : "briefing_close_email";
     const memberRows = await db

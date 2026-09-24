@@ -8,7 +8,7 @@
 //   3. Thesis signals (short interest live; buyback/fan/culture/radar from
 //      baskets/thesis_overrides.json when maintained)
 //   4. Auto-pick with hard disqualifiers and signal-aware ordering
-//   5. GSRS-banded sizing: <3 full puts, 3–5 half puts + no doubles,
+//   5. GSRS-banded sizing: <3 full puts, 3–5 half puts,
 //      >=5 no new puts
 
 import fs from 'node:fs';
@@ -118,17 +118,16 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
   const gsrs = score.score;
 
   // GSRS bands per the spec ("apply strictly to all put-side positions"):
-  //   0–3  full sizing, doubles allowed
-  //   3–5  halve initial put sizing, prohibit put doubles
+  //   0–3  full sizing
+  //   3–5  halve initial put sizing
   //   5–7  prohibit new put entries
   //   7–10 prohibit new puts + hedge (flagged in the summary)
   let putBudget = nameBudget;
-  let putDoublesAllowed = false;
   let putsAllowed = true;
   let gsrsBand = '0-3';
-  if (gsrs >= 7) { putsAllowed = false; putDoublesAllowed = false; putBudget = 0; gsrsBand = '7-10'; }
-  else if (gsrs >= 5) { putsAllowed = false; putDoublesAllowed = false; putBudget = 0; gsrsBand = '5-7'; }
-  else if (gsrs >= 3) { putBudget = Math.round(nameBudget / 2); putDoublesAllowed = false; gsrsBand = '3-5'; }
+  if (gsrs >= 7) { putsAllowed = false; putBudget = 0; gsrsBand = '7-10'; }
+  else if (gsrs >= 5) { putsAllowed = false; putBudget = 0; gsrsBand = '5-7'; }
+  else if (gsrs >= 3) { putBudget = Math.round(nameBudget / 2); gsrsBand = '3-5'; }
 
   // ---- Compliant strike re-selection from the full chain ----
   const chainsByTicker = new Map();
@@ -259,7 +258,6 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
       credit_at_bid: Math.round(contracts * bid * 100),
       midpoint_to_bid_cost: Math.round(contracts * (mid - bid) * 100),
       pricing_basis: "modeled midpoint; executable credit requires broker fill",
-      doubles_allowed: false,
       frenzy: p.frenzy ?? 'unknown',
       mom: p.mom ?? null,
       rule_checks: {
@@ -290,7 +288,7 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
     phase: 'prepared', preparation_policy: preparationPolicy(settings),
     entry_window: { start: schedule.start.toISOString(), end: schedule.end.toISOString() },
     data_observed_at: refresh.started_at,
-    policy: 'v3-news-only-no-doubling',
+    policy: 'v3-news-only',
     allocation_settings: settings, allocation_scale: allocationScale, model_equity: modelEquity,
     model_equity_source: equity.source, model_equity_observed_at: equity.observedAt,
     sizing: { accountTradedPct: settings.entryCapitalPct, marginAvailablePct: settings.marginAvailablePct, sellCalls: settings.sellCalls, sellPuts: settings.sellPuts, backing: sizingBacking(modelEquity, settings) },
@@ -320,7 +318,6 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
       puts_allowed: putsAllowed,
       put_budget: putBudget,
       call_budget: nameBudget,
-      put_doubles_allowed: putDoublesAllowed,
       delta_band: [DELTA_MIN, DELTA_MAX],
       max_spread: MAX_SPREAD,
       min_put_atr_buffer: MIN_ATR_BUF_PUT,

@@ -10,7 +10,7 @@
     "end": "2026-09-21T14:30:00.000Z"
   },
   "data_observed_at": "2026-09-21T14:29:53.000Z",
-  "policy": "v3-news-only-no-doubling",
+  "policy": "v3-news-only",
   "allocation_settings": {
     "connection": "tws",
     "accountMode": "live",
@@ -114,7 +114,6 @@
     "puts_allowed": true,
     "put_budget": 55000,
     "call_budget": 55000,
-    "put_doubles_allowed": false,
     "delta_band": [
       0.15,
       0.2
@@ -228,7 +227,6 @@
       "credit_at_bid": 60,
       "midpoint_to_bid_cost": 20,
       "pricing_basis": "dated model adjusted for time, current underlying and IV; actual entry requires an IB fill",
-      "doubles_allowed": false,
       "frenzy": "calm",
       "mom": {
         "r1": -1.9,
@@ -262,7 +260,7 @@
         "referenceSpot": 11.27,
         "iv": 1.3750031249999999,
         "ivSource": "current option IV",
-        "timeEffect": -0.000025000230929878777,
+        "timeEffect": -2.5000230929878777e-05,
         "underlyingEffect": 0,
         "ivEffect": 0,
         "model": "market-premium-anchored Black-Scholes approximation",
@@ -319,7 +317,6 @@
       "credit_at_bid": 42,
       "midpoint_to_bid_cost": 2,
       "pricing_basis": "dated model adjusted for time, current underlying and IV; actual entry requires an IB fill",
-      "doubles_allowed": false,
       "frenzy": "calm",
       "mom": {
         "r1": 1.1,
@@ -353,7 +350,7 @@
         "referenceSpot": 18.545,
         "iv": 1.08984830078125,
         "ivSource": "current option IV",
-        "timeEffect": -0.00008441765621844098,
+        "timeEffect": -8.441765621844098e-05,
         "underlyingEffect": 0,
         "ivEffect": 0,
         "model": "market-premium-anchored Black-Scholes approximation",
@@ -410,7 +407,6 @@
       "credit_at_bid": 42,
       "midpoint_to_bid_cost": 3,
       "pricing_basis": "dated model adjusted for time, current underlying and IV; actual entry requires an IB fill",
-      "doubles_allowed": false,
       "frenzy": "calm",
       "mom": {
         "r1": 1.4,
@@ -444,7 +440,7 @@
         "referenceSpot": 28.35,
         "iv": 0.7695335546875001,
         "ivSource": "current option IV",
-        "timeEffect": -0.00006786706245683809,
+        "timeEffect": -6.786706245683809e-05,
         "underlyingEffect": 0,
         "ivEffect": 0,
         "model": "market-premium-anchored Black-Scholes approximation",
@@ -501,7 +497,6 @@
       "credit_at_bid": 24,
       "midpoint_to_bid_cost": 5,
       "pricing_basis": "dated model adjusted for time, current underlying and IV; actual entry requires an IB fill",
-      "doubles_allowed": false,
       "frenzy": "calm",
       "mom": {
         "r1": -2.2,
@@ -535,7 +530,7 @@
         "referenceSpot": 33.89,
         "iv": 0.6269568554687501,
         "ivSource": "current option IV",
-        "timeEffect": -0.0000850423631758565,
+        "timeEffect": -8.50423631758565e-05,
         "underlyingEffect": 0,
         "ivEffect": 0,
         "model": "market-premium-anchored Black-Scholes approximation",
@@ -592,7 +587,6 @@
       "credit_at_bid": 38,
       "midpoint_to_bid_cost": 1,
       "pricing_basis": "dated model adjusted for time, current underlying and IV; actual entry requires an IB fill",
-      "doubles_allowed": false,
       "frenzy": "calm",
       "mom": {
         "r1": 1.6,
@@ -626,7 +620,7 @@
         "referenceSpot": 25.3923,
         "iv": 0.6015664843750002,
         "ivSource": "current option IV",
-        "timeEffect": -0.00001749832405345862,
+        "timeEffect": -1.749832405345862e-05,
         "underlyingEffect": 0,
         "ivEffect": 0,
         "model": "market-premium-anchored Black-Scholes approximation",
@@ -683,7 +677,6 @@
       "credit_at_bid": 60,
       "midpoint_to_bid_cost": 3,
       "pricing_basis": "dated model adjusted for time, current underlying and IV; actual entry requires an IB fill",
-      "doubles_allowed": false,
       "frenzy": "calm",
       "mom": {
         "r1": 5.2,
@@ -717,7 +710,7 @@
         "referenceSpot": 8.7,
         "iv": 0.8906260937499999,
         "ivSource": "current option IV",
-        "timeEffect": -0.00001219267854661904,
+        "timeEffect": -1.219267854661904e-05,
         "underlyingEffect": 0,
         "ivEffect": 0,
         "model": "market-premium-anchored Black-Scholes approximation",
@@ -774,7 +767,6 @@
       "credit_at_bid": 33,
       "midpoint_to_bid_cost": 2,
       "pricing_basis": "dated model adjusted for time, current underlying and IV; actual entry requires an IB fill",
-      "doubles_allowed": false,
       "frenzy": "calm",
       "mom": {
         "r1": 3.6,
@@ -808,7 +800,7 @@
         "referenceSpot": 40.5201,
         "iv": 0.7568383691406251,
         "ivSource": "current option IV",
-        "timeEffect": -0.00009510151253259297,
+        "timeEffect": -9.510151253259297e-05,
         "underlyingEffect": 0,
         "ivEffect": 0,
         "model": "market-premium-anchored Black-Scholes approximation",
@@ -865,7 +857,6 @@
       "credit_at_bid": 40,
       "midpoint_to_bid_cost": 1,
       "pricing_basis": "dated model adjusted for time, current underlying and IV; actual entry requires an IB fill",
-      "doubles_allowed": false,
       "frenzy": "calm",
       "mom": {
         "r1": 5.7,
@@ -899,7 +890,7 @@
         "referenceSpot": 41.305,
         "iv": 0.7460962890625,
         "ivSource": "current option IV",
-        "timeEffect": -0.000049146330468390175,
+        "timeEffect": -4.9146330468390175e-05,
         "underlyingEffect": 0,
         "ivEffect": 0,
         "model": "market-premium-anchored Black-Scholes approximation",
@@ -993,7 +984,7 @@
         "text": "SMCI (Super Micro Computer, Inc.): short call, strike 44.5, 7.7% OTM from $41.30, |delta| 0.19, 1.33× ATR (ATR 2.41). Selected for 75% option IV with HV rank 30 in the ai infra family. Modeled credit $0.41 per contract × 1 contract = $41 against $548 naked margin (market 0.40/0.42). Next earnings 2026-11-03, outside the hold window. Short interest 18.5% of float. Thesis signals: pass radar; fail short interest (2/5 known). Entry credit repriced from the dated reference for elapsed time, current underlying and current option IV."
       }
     ],
-    "risk": "Hold to expiry; the weekly tenor is the stop and there is no doubling or averaging down. Automatic exits only on a credible company-specific news signal (acquisition risk for a short call, a serious downside event for a short put) or when a ticker's combined loss reaches 20% of the account equity recorded before its entry. Expiry is modeled at intrinsic value from the expiry-session close.",
+    "risk": "Hold to expiry; the weekly tenor is the stop and there is no averaging down. Automatic exits only on a credible company-specific news signal (acquisition risk for a short call, a serious downside event for a short put) or when a ticker's combined loss reaches 20% of the account equity recorded before its entry. Expiry is modeled at intrinsic value from the expiry-session close.",
     "execution": "Model entry 2026-09-21T14:31:26.000Z, expiry 2026-09-25. Modeled credits are midpoints or dated-reference reprices, not fills; the execution service enters only inside its own window with fresh IB quotes, so account results differ from the model by slippage and by whatever it could not execute. This basket was priced late: Model priced 1 minutes after the scheduled entry window closed (2026-09-21T14:30:00.000Z); the execution service does not enter late. Data provenance: rebuilt after the fact from the option-chain snapshot the model captured at 2026-09-21T14:31:11.080Z.",
     "generated_at": "2026-09-24T02:52:57.906Z"
   }

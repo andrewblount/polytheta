@@ -7,6 +7,8 @@ struct DashboardView: View {
     @State private var availability: BasketAvailability?
     @State private var error: String?
     @State private var loading = false
+    // Price path + analysis per position id, loaded after the basket.
+    @State private var legs: [String: LegPath] = [:]
 
     var body: some View {
         NavigationStack {
@@ -127,6 +129,11 @@ struct DashboardView: View {
                 } label: {
                     positionRow(p)
                 }
+                // The underlying against the strike, so a model trade can be
+                // watched as the week goes on.
+                if let leg = legs[p.id] {
+                    LegPathCard(leg: leg)
+                }
             }
         }
     }
@@ -185,6 +192,9 @@ struct DashboardView: View {
             error = nil
         } catch {
             self.error = error.localizedDescription
+        }
+        if let slug = basket?.slug, let response = try? await api.basketLegs(slug: slug) {
+            legs = Dictionary(uniqueKeysWithValues: response.legs.map { ($0.positionId, $0) })
         }
     }
 }

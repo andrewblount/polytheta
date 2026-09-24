@@ -72,6 +72,19 @@ export class YahooMarketDataProvider implements MarketDataProvider {
     }
   }
 
+  // Intraday bars (regular and extended hours; callers filter to the session).
+  // Yahoo serves 30-minute bars for the last 60 days and hourly bars for two years.
+  async getIntradayPrices(ticker: string, start: Date, end: Date, interval: "30m" | "1h" = "30m"): Promise<HistoricalPrice[]> {
+    try {
+      const chart = await retryRead(() => this.client.chart(ticker, { period1: start, period2: end, interval }), { attempts: this.attempts });
+      return chart.quotes.filter((q) => q.close != null).map((quote) => ({
+        date: quote.date.toISOString(), open: quote.open ?? null, high: quote.high ?? null, low: quote.low ?? null, close: quote.close ?? 0, volume: quote.volume ?? null,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
   async getOptionChain(
     ticker: string,
     expiry: string,

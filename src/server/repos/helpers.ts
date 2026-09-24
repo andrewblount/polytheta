@@ -164,6 +164,7 @@ export function normalizePosition(row: {
   sourceMetadata?: Record<string, unknown> | null;
 }): PositionData {
   const pricing = row.sourceMetadata?.entry_pricing as EntryPricingData | undefined;
+  const radarHit = row.sourceMetadata?.radar_last_hit as { title?: unknown; at?: unknown; link?: unknown } | undefined;
   const entryPricing = pricing && [pricing.credit, pricing.referenceCredit, pricing.elapsedCalendarDays,
     pricing.referenceSpot, pricing.spot, pricing.iv, pricing.timeEffect, pricing.underlyingEffect,
     pricing.ivEffect].every(Number.isFinite) && typeof pricing.ivSource === "string"
@@ -207,5 +208,6 @@ export function normalizePosition(row: {
     latestPerformance: row.latestPerformance,
     performanceHistory: row.performanceHistory,
     entryPricing,
+    radarLastHit: radarHit && typeof radarHit.title === "string" && typeof radarHit.at === "string" ? { title: radarHit.title, at: radarHit.at, link: typeof radarHit.link === "string" ? radarHit.link : undefined } : null,
   };
 }

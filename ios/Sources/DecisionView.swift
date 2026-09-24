@@ -155,7 +155,7 @@ struct BasketDecisionView: View {
                     .foregroundStyle(.secondary)
             }
             Section("Bands") {
-                Text("GSRS 0–3: full sizing · 3–5: half-size puts, no put doubles · 5–7: no new puts · 7–10: no puts, hedge flagged. Policy v3: all entries held to expiry; exits only on radar signals.")
+                Text("GSRS 0–3: full sizing · 3–5: half-size puts · 5–7: no new puts · 7–10: no puts, hedge flagged. Policy v3: all entries held to expiry; exits only on radar signals.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

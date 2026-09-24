@@ -2,6 +2,8 @@ import { formatCurrency, formatDateLabel, formatDateTimeLabel } from "@/lib/form
 import type { BasketData, TradeRecord } from "@/lib/types";
 
 import { BasketThesisCard } from "@/components/baskets/basket-thesis-card";
+import { LegPathsSection } from "@/components/baskets/leg-paths-section";
+import type { LegPath } from "@/server/services/price-paths";
 import { OrderBlockCard } from "@/components/baskets/order-block-card";
 import { ResponsivePositionTable } from "@/components/baskets/responsive-position-table";
 import { resolvedSnapshot } from "@/components/baskets/settled-outcome";
@@ -12,9 +14,11 @@ import { Separator } from "@/components/ui/separator";
 export function BasketDetailView({
   basket,
   trades = [],
+  legPaths = [],
 }: {
   basket: BasketData;
   trades?: TradeRecord[];
+  legPaths?: LegPath[];
 }) {
   // The archive reads best when the week's verdict sits next to its
   // reasoning. Only spoken once every leg has actually settled.
@@ -161,6 +165,8 @@ export function BasketDetailView({
         </div>
         <ResponsivePositionTable positions={basket.putPositions} />
       </section>
+
+      <LegPathsSection legs={legPaths} title={fullySettled ? "How each trade played out" : "How each trade is doing"} />
 
       <section className="grid gap-6 lg:grid-cols-2">
         <Card>

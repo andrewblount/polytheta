@@ -107,14 +107,20 @@ export function ModelSizingExplorer({ source, initial, canSave, save }: Props) {
             <StatCard title="Modeled P&L (all settled weeks)" value={formatCurrency(stats.totalPnl)} description={`${stats.completeWeeks} settled weeks · avg ${formatCurrency(stats.avgWeeklyPnl)}/week`} />
             <StatCard title="Weekly hit rate" value={`${stats.winningWeeks}/${stats.completeWeeks}`} description={`Legs expiring worthless: ${stats.legWinRatePct}% of ${stats.settledLegs}`} />
             <StatCard title="Avg win vs avg loss" value={`${formatCurrency(stats.avgWinningWeek)} / ${formatCurrency(stats.avgLosingWeek)}`} description={`Best ${formatCurrency(stats.bestWeek)} · worst ${formatCurrency(stats.worstWeek)}`} />
-            <StatCard title="Max drawdown (cumulative)" value={formatCurrency(stats.maxDrawdown)} description={stats.worstLeg ? `Worst leg: ${stats.worstLeg.ticker} ${stats.worstLeg.side} ${formatCurrency(stats.worstLeg.pnl)}` : undefined} />
+            <StatCard title="Max drawdown (cumulative)" value={formatCurrency(stats.maxDrawdown)} description={stats.worstLeg ? `Worst leg: ${stats.worstLeg.ticker} ${stats.worstLeg.side} ${formatCurrency(stats.worstLeg.pnl)}${stats.worstLeg.expiryPrice != null ? ` (${stats.worstLeg.entryPrice.toFixed(2)} → ${stats.worstLeg.expiryPrice.toFixed(2)} vs strike ${stats.worstLeg.strike})` : ""}` : undefined} />
+          </section>
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard title="Profit factor" value={stats.profitFactor != null ? stats.profitFactor.toFixed(2) : "∞"} description={`Gross winning weeks ÷ gross losing weeks · Sharpe (weekly, annualised) ${stats.sharpe != null ? stats.sharpe.toFixed(2) : "—"}`} />
+            <StatCard title="Credit kept" value={stats.creditCapturePct != null ? `${stats.creditCapturePct.toFixed(1)}%` : "—"} description={`P&L as a share of credit collected · ${formatCurrency(stats.expectancyPerLeg)} expectancy per leg · ${stats.returnOnMarginPct != null ? `${stats.returnOnMarginPct.toFixed(2)}% on margin` : ""}`} />
+            <StatCard title="Calls vs puts" value={`${stats.calls.winRatePct.toFixed(0)}% / ${stats.puts.legs ? `${stats.puts.winRatePct.toFixed(0)}%` : "—"}`} description={`Calls ${formatCurrency(stats.calls.pnl)} on ${stats.calls.legs} legs · puts ${formatCurrency(stats.puts.pnl)} on ${stats.puts.legs} legs`} />
+            <StatCard title="Entry cushion" value={stats.avgCushionPct != null ? `${stats.avgCushionPct.toFixed(1)}%` : "—"} description={`Winners ${stats.avgCushionWinnersPct != null ? `${stats.avgCushionWinnersPct.toFixed(1)}%` : "—"} · losers ${stats.avgCushionLosersPct != null ? `${stats.avgCushionLosersPct.toFixed(1)}%` : "—"} · longest losing streak ${stats.longestLosingStreak} wk · current ${stats.currentStreak > 0 ? `+${stats.currentStreak}` : stats.currentStreak}`} />
           </section>
 
           <Card>
             <CardHeader>
               <CardTitle>Weekly P&L and cumulative curve</CardTitle>
               <p className="text-xs text-muted-foreground">
-                Modeled from recommended entries held to expiry or exited on a radar signal — no doubles, no early profit-taking. This measures recommendation quality, not executed trades.
+                Modeled from recommended entries held to expiry or exited on a radar signal, with no early profit-taking. This measures recommendation quality, not executed trades.
                 {" "}Every leg is sized at equity {formatCurrency(basis.modelEquity ?? 0)}, {basis.accountTradedPct}% traded, {basis.marginAvailablePct}% margin available{!basis.sellCalls ? ", calls off" : ""}{!basis.sellPuts ? ", puts off" : ""}.
               </p>
             </CardHeader>
@@ -140,6 +146,7 @@ export function ModelSizingExplorer({ source, initial, canSave, save }: Props) {
                   <th className="py-2 pr-4 text-right">P&L</th>
                   <th className="py-2 pr-4 text-right">RoM</th>
                   <th className="py-2 pr-4">Worst leg</th>
+                  <th className="py-2 pr-4 text-right">Entry → expiry vs strike</th>
                 </tr>
               </thead>
               <tbody>
@@ -160,10 +167,13 @@ export function ModelSizingExplorer({ source, initial, canSave, save }: Props) {
                         </span>
                       ) : "—"}
                     </td>
+                    <td className="py-2 pr-4 text-right tabular-nums text-muted-foreground">
+                      {week.worstLeg && week.worstLeg.expiryPrice != null ? `${week.worstLeg.entryPrice.toFixed(2)} → ${week.worstLeg.expiryPrice.toFixed(2)} vs ${week.worstLeg.strike.toFixed(2)}` : "—"}
+                    </td>
                   </tr>
                 ))}
                 {settledWeeks.length === 0 ? (
-                  <tr><td colSpan={6} className="py-3 text-muted-foreground">No settled weeks under these settings.</td></tr>
+                  <tr><td colSpan={7} className="py-3 text-muted-foreground">No settled weeks under these settings.</td></tr>
                 ) : null}
               </tbody>
             </table>

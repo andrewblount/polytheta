@@ -3,6 +3,7 @@ import { BasketDetailView } from "@/components/baskets/basket-detail-view";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentBasket } from "@/server/repos/baskets";
 import { getBasketAvailability } from "@/server/services/basket-availability";
+import { getBasketLegPaths } from "@/server/services/price-paths";
 
 export default async function CurrentBasketPage() {
   const now = new Date();
@@ -36,5 +37,6 @@ export default async function CurrentBasketPage() {
       </div>
     );
   }
-  return <BasketDetailView basket={basket} />;
+  const legPaths = await getBasketLegPaths(basket, { now });
+  return <BasketDetailView basket={basket} legPaths={legPaths} />;
 }

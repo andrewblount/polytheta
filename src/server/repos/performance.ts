@@ -71,6 +71,7 @@ export async function loadPerformanceSource(): Promise<PerformanceWeekSource[] |
         contracts: position.contracts, margin: position.margin,
         credit: Math.round(asNumber(position.estimatedEntryCredit) * 100 * position.contracts),
         pnl: snap ? asNumber(snap.pnlAmount) : null, state: snap?.state ?? null, settledAt: snap ? asIsoString(snap.observedAt) : null,
+        expiryPrice: snap ? asNumber(snap.underlyingPrice) : null,
       };
     });
     if (legs.length === 0) continue;
@@ -85,7 +86,7 @@ export async function loadPerformanceSource(): Promise<PerformanceWeekSource[] |
 }
 
 // Settled-performance report across every basket. "Modeled" throughout:
-// entries at the recommended credit, held to expiry, no doubles, no stops,
+// entries at the recommended credit, held to expiry, no stops,
 // no early profit-taking — the raw quality of the recommendations, not a
 // record of executed trades. Sized from the model settings unless asked for
 // the published contracts.

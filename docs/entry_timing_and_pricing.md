@@ -1,6 +1,6 @@
 # PolyTheta: entry timing and entry prices
 
-September 10, 2026. **Owner-approved rules.** The owner also added a per-ticker maximum loss exception, described in [the full trading rules](trading_rules.md). No doubling, allocation rules and minimum OTM rules remain in place. Live IB trading is not activated.
+September 10, 2026. **Owner-approved rules.** The owner also added a per-ticker maximum loss exception, described in [the full trading rules](trading_rules.md). Allocation rules and minimum OTM rules remain in place. Live IB trading is not activated.
 
 ## 1. Choose when to enter
 
@@ -63,7 +63,7 @@ Fresh Monday option prices already reflect elapsed time and market changes. **Do
 1. Apply the existing entry rules to current data. If the weekend move means the selected strike fails minimum OTM, delta or ATR requirements, block it or rebuild before entry; never force that stale strike into the account.
 2. Compare the current IB market with the adjusted expected premium. The configurable minimum-credit ratio applies to the **adjusted estimate**, not an untouched Friday premium. At the current90% setting, an adjusted $0.60 estimate gives a $0.54 floor, rounded up to a valid option tick and subject to the existing $0.10 minimum.
 3. Start with a sell limit near the current bid/ask midpoint. Reprice within the credit floor and entry window. Confirm IB capacity and margin before sending.
-4. Stop new entries when the configured window ends; cancel remaining working entry quantities. A Monday DAY order can remain working until session end if the worker loses connectivity before cancellation; the morning deadline is currently worker-enforced. Preserve partial fills and never double or re-enter an already attempted basket allocation.
+4. Stop new entries when the configured window ends; cancel remaining working entry quantities. A Monday DAY order can remain working until session end if the worker loses connectivity before cancellation; the morning deadline is currently worker-enforced. Preserve partial fills and never re-enter an already attempted basket allocation.
 5. Record **the actual IB fill** and commission separately. An estimate, midpoint, limit or submitted order is not an achieved entry price.
 
 ## 6. Run on the selected computer and survive restarts

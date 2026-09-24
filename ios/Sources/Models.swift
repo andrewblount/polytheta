@@ -133,6 +133,90 @@ struct MobilePosition: Codable, Identifiable {
     let latest: LatestSnapshot?
     let stopBreach: Bool? // -25% of allocation crossed (heads-up, policy is hold to expiry)
     let signals: SignalScores?
+    // Settlement (expiry close or model exit price) and the breakeven; absent on older servers.
+    let settled: SettledInfo?
+    let breakeven: Double?
+    let atr: Double?
+}
+
+struct SettledInfo: Codable {
+    let state: String
+    let underlyingPrice: Double
+    let observedAt: String
+    let pnlAmount: Double
+    let exitDate: String?
+}
+
+// The underlying's price path for one leg with the strike / entry / breakeven
+// levels and the server-side analysis (GET /api/mobile/baskets/<slug>/legs).
+struct LegPathsResponse: Codable {
+    let slug: String
+    let weekOf: String
+    let legs: [LegPath]
+}
+
+struct LegPath: Codable, Identifiable {
+    var id: String { positionId }
+    let positionId: String
+    let ticker: String
+    let side: String
+    let strike: Double
+    let entryPrice: Double
+    let entryAt: String
+    let expiry: String
+    let credit: Double
+    let contracts: Int
+    let lines: LegLines
+    let points: [PricePoint]
+    let analysis: LegAnalysis
+    let complete: Bool
+    let fetchedAt: String
+    let source: String
+}
+
+struct LegLines: Codable { let strike: Double; let entry: Double; let breakeven: Double }
+
+struct PricePoint: Codable, Identifiable {
+    var id: String { t }
+    let t: String
+    let p: Double
+    let h: Double?
+    let l: Double?
+    var date: Date { PricePoint.parser.date(from: t) ?? PricePoint.fallback.date(from: t) ?? Date(timeIntervalSince1970: 0) }
+    static let parser: ISO8601DateFormatter = { let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return f }()
+    static let fallback = ISO8601DateFormatter()
+}
+
+struct LegAnalysis: Codable {
+    let outcome: String // otm | itm | exited | open
+    let breakeven: Double
+    let cushionPct: Double
+    let cushionAtr: Double?
+    let expiryPrice: Double?
+    let movePct: Double?
+    let lastPrice: Double?
+    let closestPrice: Double?
+    let closestAt: String?
+    let closestPct: Double?
+    let firstBreachAt: String?
+    let breachedSessions: Int
+    let intrinsicAtExpiry: Double?
+    let creditCapturePct: Double?
+    let returnOnMarginPct: Double?
+    let postMortem: PostMortem?
+}
+
+struct PostMortem: Codable {
+    let summary: String
+    let findings: [String]
+    let alternatives: [LegAlternative]
+}
+
+struct LegAlternative: Codable, Identifiable {
+    var id: String { label }
+    let label: String
+    let detail: String
+    let pnl: Double?
 }
 
 struct SignalScores: Codable {
@@ -257,6 +341,7 @@ struct WeekRow: Codable, Identifiable {
     let credit: Int
     let romPct: Double?
     let complete: Bool
+    let worstLeg: Stats.WorstLeg?
 }
 
 struct CumulativePoint: Codable, Identifiable {
@@ -280,7 +365,28 @@ struct Stats: Codable {
     let settledLegs: Int
     let maxDrawdown: Double
     let worstLeg: WorstLeg?
-    struct WorstLeg: Codable { let ticker: String; let side: String; let pnl: Double }
+    struct WorstLeg: Codable { let ticker: String; let side: String; let pnl: Double; let strike: Double?; let entryPrice: Double?; let expiryPrice: Double? }
+    // Leg-level statistics; absent on older servers.
+    let profitFactor: Double?
+    let expectancyPerLeg: Double?
+    let creditCapturePct: Double?
+    let returnOnMarginPct: Double?
+    let sharpe: Double?
+    let longestLosingStreak: Int?
+    let currentStreak: Int?
+    let avgCushionPct: Double?
+    let avgCushionWinnersPct: Double?
+    let avgCushionLosersPct: Double?
+    let calls: SidePerformance?
+    let puts: SidePerformance?
+}
+
+struct SidePerformance: Codable {
+    let legs: Int
+    let wins: Int
+    let pnl: Double
+    let credit: Double
+    let winRatePct: Double
 }
 
 struct BasketsResponse: Codable {
