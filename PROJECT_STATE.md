@@ -1,6 +1,6 @@
 # Polytheta project state
 
-Last updated: 2026-09-24
+Last updated: 2026-09-24 (evening)
 
 ## Identity and objective
 
@@ -17,6 +17,15 @@ Missing weeks recreated and published: 2026-09-07 (reconstructed, entry Tue 2026
 ## Sizing sliders (2026-09-24)
 
 The percentage settings (account traded 0–100%, margin available 100–1000%) are sliders in the web settings cards, on the web performance page and in the iOS Performance tab and settings sections. The performance API and report now carry `source` (every published leg with its settled outcome); `computeModelPerformance(source, settings)` in `src/lib/model-sizing.ts` is the single sizing engine (the server report wraps it; `resizeLeg` is re-exported from `src/server/repos/performance.ts`), and `ios/Sources/ModelSizing.swift` is its port. Clients recalculate the whole track record locally as the slider moves and save the model settings on release (`saveModelSettingsAction` on the web, `updateModelSettings` on the phone). The IB account section never changes with the sliders. TestFlight build 15.
+
+## Trade paths, post-mortems, leg metrics (2026-09-24, commit 64f566b)
+
+- `src/server/services/price-paths.ts` fetches each leg's regular-session underlying bars (Yahoo 30m within 60 days, 1h beyond) from two sessions before entry through expiry/exit, cached in `app_settings` `price_path:<positionId>` (permanent once complete, 15-minute refresh while open). `GET /api/mobile/baskets/<slug>/legs` returns the paths with strike/entry/breakeven lines and the analysis.
+- `src/lib/leg-analysis.ts` (`analyzeLeg`, pure, tested in `tests/leg-analysis.test.mjs`): cushion at entry (% and ATRs), closest approach, first breach, sessions closed through the strike, price at expiry, intrinsic, credit kept, return on margin; for an ITM expiry a post-mortem (gap vs grind, radar, loss attribution) with alternatives: surviving strike / minimum-OTM setting, exit at first breach (snapshot mark), −25% loss-limit exit, half sizing, side off — with modeled P&L where computable.
+- Web: `LegPathsSection` on `/app/baskets/current` and `/app/baskets/<slug>`; iOS: `LegChartView.swift` (`LegPathCard` inline under every position on Dashboard and ArchiveBasketView, `PostMortemView`), settlement line "entry → expiry vs strike" on archived positions, extra stats on the Performance tab.
+- Performance report (`computeModelPerformance`, Swift port in step): profit factor, expectancy per leg, credit kept, return on margin, weekly Sharpe (annualised), streaks, entry cushion winners vs losers, call/put breakdown; `worstLeg` carries entry and expiry prices; weeks carry their settled legs.
+- The double-down parameter (`doubles_allowed`, `put_doubles_allowed`) and every reference are removed from code, rule docs, thesis text, demo data and the app; the DB copies (theses, notes, gsrs notes, position metadata, published model baskets) were scrubbed on 2026-09-24. Historical research docs (`docs/risk_policy_v2.md`, `docs/system_gap_analysis.md`, archive/) keep their record of why doubling was rejected.
+- iOS settings: `SettingRow` puts a caption label above every field; notifications are one section per category with one toggle per row. TestFlight build 16.
 
 ## Known gaps
 

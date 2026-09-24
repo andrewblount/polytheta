@@ -2,6 +2,11 @@
 
 Updated September 10, 2026. Owner-approved policy: **live IB account, news exits plus a per-ticker maximum loss exception**. The loss exception supplements policy v3; GSRS and ordinary news rules are unchanged. Live IB authentication and activation remain separate operating steps.
 
+## Trade paths and post-mortems
+
+- Every leg carries the underlying's regular-session price path from before entry through expiry with the strike, entry and breakeven levels, on the basket pages and in the app. A leg that expires in the money gets a post-mortem: the move in ATRs, gap versus grind, whether the radar saw anything, the loss attribution, and what would have kept it out of the money (the surviving strike or minimum-OTM setting, an exit at first breach, the −25% loss limit, smaller size, the side switched off) with modeled results where they can be computed.
+- The performance report adds profit factor, expectancy per leg, credit kept, return on margin, annualised weekly Sharpe, streaks, entry cushion for winners versus losers and a call/put breakdown.
+
 ## Model first, trading second
 
 - The weekly basket is a **model**. It is built from the model's own data (Yahoo chains and quotes, the Cboe weekly universe, FRED, the news radar) and sized against **model equity** (`POLYTHETA_MODEL_EQUITY`, otherwise the $1,000,000 modeling basis). Nothing in basket generation reads the IB account: not the selected execution computer, not IB equity, not IB market data, not the account mode. A missing, unfunded, disconnected or wrong-mode IB session cannot stop a basket from being published.
