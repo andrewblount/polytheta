@@ -27,5 +27,10 @@ export async function saveModelSettings(input: unknown) {
   const settings = validateModelSettings({ ...(await getModelSettings()), ...(input as Record<string, unknown>) }) as ModelSettings;
   await db.insert(appSettings).values({ key: "model", value: { ...settings }, updatedAt: new Date() })
     .onConflictDoUpdate({ target: appSettings.key, set: { value: { ...settings }, updatedAt: new Date() } });
+  // A change to the starting equity or any sizing setting re-sizes every stored
+  // basket, historical and current, so the site, the apps and the performance
+  // report all show the model at this size.
+  const { remodelBaskets } = await import("../repos/model-remodel");
+  await remodelBaskets(settings);
   return settings;
 }
