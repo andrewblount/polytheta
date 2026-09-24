@@ -130,6 +130,37 @@ final class APIClient: ObservableObject {
         return try JSONDecoder().decode(Result.self, from: data).broker
     }
 
+    func updateModelSettings(_ settings: ModelSettings) async throws -> ModelSettings {
+        guard isConfigured, let url = URL(string: baseURL + "/api/mobile/settings") else { throw APIError.notConfigured }
+        struct Payload: Encodable { let model: ModelSettings }
+        struct Result: Decodable { let model: ModelSettings }
+        struct Failure: Decodable { let error: String }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(Payload(model: settings))
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            let message = (try? JSONDecoder().decode(Failure.self, from: data).error) ?? "Model settings could not be saved."
+            throw NSError(domain: "Polytheta", code: 400, userInfo: [NSLocalizedDescriptionKey: message])
+        }
+        return try JSONDecoder().decode(Result.self, from: data).model
+    }
+
+    // Register this phone's APNs token so trade warnings and exits push here.
+    func registerDevice(token: String, sandbox: Bool, label: String) async throws {
+        guard isConfigured, let url = URL(string: baseURL + "/api/mobile/devices") else { throw APIError.notConfigured }
+        struct Payload: Encodable { let token: String; let platform: String; let sandbox: Bool; let label: String }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(self.token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(Payload(token: token, platform: "ios", sandbox: sandbox, label: label))
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { throw APIError.badStatus((response as? HTTPURLResponse)?.statusCode ?? 0) }
+    }
+
     func getSettings() async throws -> [String: [String: Bool]] {
         struct SettingsResponse: Codable { let notifications: [String: [String: Bool]] }
         return try await get("/api/mobile/settings", as: SettingsResponse.self).notifications

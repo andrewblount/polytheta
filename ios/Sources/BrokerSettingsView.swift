@@ -5,6 +5,9 @@ struct BrokerSettings: Codable {
     var accountMode = "live"
     var pauseEntries = true
     var entryCapitalPct = 100.0
+    var marginAvailablePct = 400.0
+    var sellCalls = true
+    var sellPuts = true
     var maxAccountLossPct = 20.0
     var callAllocationPct = 100.0
     var putAllocationPct = 0.0
@@ -33,7 +36,7 @@ struct BrokerSettings: Codable {
 
     init() {}
     enum CodingKeys: String, CodingKey {
-        case connection, accountMode, pauseEntries, entryCapitalPct, maxAccountLossPct, callAllocationPct, putAllocationPct, maxTrades
+        case connection, accountMode, pauseEntries, entryCapitalPct, marginAvailablePct, sellCalls, sellPuts, maxAccountLossPct, callAllocationPct, putAllocationPct, maxTrades
         case reserveLeverageCeiling, minimumCreditRatio, entryTimeoutSeconds, maxExitPremiumMultiple, excludedTickers, strikeOverrides
         case executionHostId, twsHost, twsPort, twsClientId, webApiUrl, twsRestartTime, twsRestartTimezone, twsRestartGraceMinutes
         case entryTiming, mondayEntryStart, mondayEntryEnd, preparationLeadMinutes, finalizeLeadMinutes, vixIvSensitivity, modelRiskFreeRatePct
@@ -56,6 +59,9 @@ struct BrokerSettings: Codable {
         // Keep their defaults while still requiring the established core contract.
         maxExitPremiumMultiple = try values.decodeIfPresent(Double.self, forKey: .maxExitPremiumMultiple) ?? maxExitPremiumMultiple
         maxAccountLossPct = try values.decodeIfPresent(Double.self, forKey: .maxAccountLossPct) ?? maxAccountLossPct
+        marginAvailablePct = try values.decodeIfPresent(Double.self, forKey: .marginAvailablePct) ?? marginAvailablePct
+        sellCalls = try values.decodeIfPresent(Bool.self, forKey: .sellCalls) ?? sellCalls
+        sellPuts = try values.decodeIfPresent(Bool.self, forKey: .sellPuts) ?? sellPuts
         executionHostId = try values.decodeIfPresent(String.self, forKey: .executionHostId) ?? executionHostId
         twsHost = try values.decodeIfPresent(String.self, forKey: .twsHost) ?? twsHost
         twsPort = try values.decodeIfPresent(Int.self, forKey: .twsPort) ?? twsPort
@@ -74,8 +80,18 @@ struct BrokerSettings: Codable {
     }
 }
 struct StrikeOverride: Codable { var ticker = ""; var side = "call"; var expiry = ""; var minimumOtmPct = 5.0 }
+// The model's own sizing (app_settings 'model'). Changing it re-sizes every
+// historical leg in the model performance report; the IB account is untouched.
+struct ModelSettings: Codable {
+    var modelEquity = 1000000.0
+    var accountTradedPct = 100.0
+    var marginAvailablePct = 400.0
+    var sellCalls = true
+    var sellPuts = true
+}
 struct BrokerSettingsResponse: Codable {
     let broker: BrokerSettings
+    let model: ModelSettings?
     let brokerStatus: BrokerStatus?
     let executionHosts: [ExecutionHost]?
     struct ExecutionHost: Codable, Identifiable { let id: String; let label: String; let lastSeen: String }
@@ -136,7 +152,11 @@ struct BrokerSettingsSection: View {
             TextField("TWS restart time zone", text: $settings.twsRestartTimezone)
             LabeledContent("Restart recovery window (minutes)") { TextField("Minutes", value: $settings.twsRestartGraceMinutes, format: .number) }
             Text("Configure the same auto-restart time inside TWS. PolyTheta reconnects afterward; IB still normally requires weekly authentication.").font(.caption).foregroundStyle(.secondary)
-            LabeledContent("Total allocation (%)") { TextField("Percent", value: $settings.entryCapitalPct, format: .number).multilineTextAlignment(.trailing) }
+            LabeledContent("Percentage of account traded (%)") { TextField("Percent", value: $settings.entryCapitalPct, format: .number).multilineTextAlignment(.trailing) }
+            LabeledContent("Margin available (%)") { TextField("Percent", value: $settings.marginAvailablePct, format: .number).multilineTextAlignment(.trailing) }
+            Toggle("Sell calls", isOn: $settings.sellCalls)
+            Toggle("Sell puts", isOn: $settings.sellPuts)
+            Text("Side toggles decide which legs of the published model basket this account executes; a skipped leg’s share stays unallocated. Margin available scales contracts: 400% backs four dollars of strike or spot per committed dollar. IB’s margin preview must still approve every order.").font(.caption).foregroundStyle(.secondary)
             LabeledContent("Maximum loss per ticker (% of account)") { TextField("0.1–100%", value: $settings.maxAccountLossPct, format: .number).multilineTextAlignment(.trailing) }
             Text("Defaults to 20% of account equity recorded before entry. The worker monitors each ticker and closes only its PolyTheta contracts if triggered; no standing stop order at entry.").font(.caption).foregroundStyle(.secondary)
             LabeledContent("Calls (%)") { TextField("Percent", value: $settings.callAllocationPct, format: .number).multilineTextAlignment(.trailing) }
@@ -187,6 +207,40 @@ struct BrokerSettingsSection: View {
                 hosts = response.executionHosts ?? []
                 message = response.brokerStatus?.stale == false ? response.brokerStatus?.message ?? "IB status unavailable" : "IB connection has not been verified recently."
             } catch { self.error = error.localizedDescription }
+        }
+    }
+}
+
+struct ModelSettingsSection: View {
+    @EnvironmentObject var api: APIClient
+    @State private var settings = ModelSettings()
+    @State private var loaded = false
+    @State private var saving = false
+    @State private var error: String?
+    @State private var saved = false
+    var body: some View {
+        Section {
+            LabeledContent("Model equity ($)") { TextField("Equity", value: $settings.modelEquity, format: .number).multilineTextAlignment(.trailing) }
+            LabeledContent("Percentage of account traded (%)") { TextField("Percent", value: $settings.accountTradedPct, format: .number).multilineTextAlignment(.trailing) }
+            LabeledContent("Margin available (%)") { TextField("Percent", value: $settings.marginAvailablePct, format: .number).multilineTextAlignment(.trailing) }
+            Toggle("Sell calls", isOn: $settings.sellCalls)
+            Toggle("Sell puts", isOn: $settings.sellPuts)
+            Text("The model selects and sizes its weekly basket from these settings, and the Performance tab re-sizes every historical leg from them. 400% margin backs four dollars of notional per committed dollar; 100% reproduces the original cash-backed sizing. With both sides on, the IB call/put split sets the counts. The IB account report always shows real fills.").font(.caption).foregroundStyle(.secondary)
+            if let error { ErrorBanner(message: error) }
+            Button(saving ? "Saving…" : saved ? "Saved — performance recalculated" : "Save model settings") {
+                Task {
+                    saving = true
+                    defer { saving = false }
+                    do { settings = try await api.updateModelSettings(settings); error = nil; saved = true }
+                    catch { self.error = error.localizedDescription }
+                }
+            }.disabled(!loaded || saving)
+        } header: {
+            Text("Model sizing")
+        }.task {
+            guard api.isConfigured else { return }
+            do { settings = try await api.getBrokerSettings().model ?? ModelSettings(); loaded = true }
+            catch { self.error = error.localizedDescription }
         }
     }
 }

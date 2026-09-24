@@ -40,8 +40,12 @@ export function marginReserveStatus(account, settings) {
 }
 export function floorTick(price, contract) { return roundPrice(price, contract, 'floor'); }
 export function ceilTick(price, contract) { return roundPrice(price, contract, 'ceil'); }
+export function sideEnabled(side, settings) {
+  return side === 'call' ? settings.sellCalls !== false : side === 'put' ? settings.sellPuts !== false : false;
+}
 export function planEntry(pick, contract, q, budget, settings, now = new Date()) {
   if (isExcluded(pick, settings) || isExcluded(contract, settings)) throw new Error('Ticker is on the do-not-trade list');
+  if (!sideEnabled(pick.side, settings)) throw new Error(`Selling ${pick.side}s is switched off in Settings`);
   validateQuote(q, contract, settings, now);
   if (pick.doubles_allowed !== false || pick.rule_checks?.earnings_clear !== 'pass' || pick.rule_checks?.thesis_signals?.radar !== 'pass') throw new Error('Entry rules are not confirmed');
   if (!Number.isFinite(q.delta) || Math.abs(q.delta) < 0.15 || Math.abs(q.delta) > 0.20) throw new Error('Live IB delta is outside the entry band');
@@ -57,9 +61,13 @@ export function planEntry(pick, contract, q, budget, settings, now = new Date())
   const minimum = ceilTick(Math.max(0.10, pricing.credit * settings.minimumCreditRatio), contract);
   const limit = floorTick((q.bid + q.ask) / 2, contract);
   if (limit < minimum || limit < q.bid) throw new Error('Available credit is below the configured minimum');
-  // Equally allocated backing capital, rounded down to whole contracts.
-  // A short call still has unbounded upside risk; this is a sizing rule.
-  const quantity = Math.floor(budget.perTrade / (Math.max(spot, pick.K) * contract.multiplier));
+  // Equally allocated backing capital times the margin available (400% = four
+  // dollars of strike/spot backing per committed dollar), rounded down to whole
+  // contracts. IB's margin preview still has to approve the order within the
+  // committed capital. A short call still has unbounded upside risk; this is a
+  // sizing rule.
+  const backing = budget.perTrade * (Number(settings.marginAvailablePct) || 100) / 100;
+  const quantity = Math.floor(backing / (Math.max(spot, pick.K) * contract.multiplier));
   if (quantity < 1) throw new Error('Allocation cannot support one whole contract');
   return { action: 'entry', contract, pick, quantity, limit: +limit.toFixed(4), minimum, budget: budget.perTrade, pricing };
 }

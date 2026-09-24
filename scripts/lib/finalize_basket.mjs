@@ -14,7 +14,7 @@ import { entrySchedule, modelPublicationWindow } from '../../shared/entry-schedu
 import { repriceEntry, pricingReference, optionDelta } from '../../shared/entry-pricing.mjs';
 import { easternTime, sessionClose } from '../../shared/market-calendar.mjs';
 import { minimumOtmFor, otmPercent } from '../../shared/strike-settings.mjs';
-import { basketCounts, isExcluded } from '../../shared/broker-settings.mjs';
+import { basketCounts, isExcluded, sizingBacking } from '../../shared/broker-settings.mjs';
 import { calculateGsrs } from '../../shared/gsrs.mjs';
 import { fetchTvMacros } from './tv_macros.mjs';
 import { refreshWeeklyUniverse, WEEKLYS_SOURCE } from './refresh.mjs';
@@ -133,7 +133,7 @@ export async function finalizeBasket(prepared, settings, { OUT, client = createY
   const counts = basketCounts(settings, prepared.picks.filter(p => p.side === 'call').length, prepared.picks.filter(p => p.side === 'put').length);
   if (counts.total !== prepared.picks.length || score.score >= 5 && counts.puts) throw new Error('Prepared basket no longer satisfies the allocation/GSRS rules; rebuild');
   const scale = (score.score >= 3 && counts.puts ? .5 : 1) * (prepared.picks.some(p => p.frenzy === 'elevated') ? .5 : 1);
-  const capital = prepared.model_equity * settings.entryCapitalPct / 100 * scale / counts.total;
+  const capital = sizingBacking(prepared.model_equity, settings) * scale / counts.total;
   if (!Number.isFinite(capital) || capital <= 0) throw new Error('Equal allocation capital is unavailable');
   const picks = prepared.picks.map((p, index) => {
     if (isExcluded(p, settings) || news[p.ticker]?.error || !Array.isArray(news[p.ticker]?.[p.side]) || news[p.ticker][p.side].length) throw new Error(`${p.ticker}: exclusions/news changed; rebuild basket`);

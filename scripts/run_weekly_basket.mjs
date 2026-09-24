@@ -26,7 +26,7 @@ import { finalizeBasket, preparationPolicy, preparationMatches, freezeFinalPropo
 import { importProposal, findPublishedProposal, publishedBasketForWeek } from './lib/import_proposal.mjs';
 import { sendBasketEmail } from './lib/basket_email.mjs';
 import { buildAlertPlan } from './lib/google_alerts.mjs';
-import { loadBrokerSettings, loadBrokerEquity } from './lib/broker_settings.mjs';
+import { loadBrokerSettings, loadBrokerEquity, loadModelPolicy } from './lib/broker_settings.mjs';
 import { acquireLock } from './lib/file_lock.mjs';
 import { localWorkerIdentity } from './broker/host-runtime.mjs';
 import { assertCurrentDelivery, currentWeek, addDays } from '../shared/market-calendar.mjs';
@@ -34,7 +34,9 @@ import { buildContext, entrySchedule, modelPublicationWindow } from '../shared/e
 const root = path.resolve(import.meta.dirname, '..');
 try { process.loadEnvFile(path.join(root, '.env.local')); } catch { /* environment may supply values */ }
 if (process.argv.includes('--help')) { console.log('Usage: node scripts/run_weekly_basket.mjs [--force] [--date YYYY-MM-DD] [--chain-chunk N]'); process.exit(0); }
-const settings = await loadBrokerSettings();
+// Broker settings shape the basket (split, timing, strikes); the model's own
+// equity, share, margin and side toggles size it.
+const settings = await loadModelPolicy();
 const host = localWorkerIdentity();
 const read = file => fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
 let context = buildContext(settings);
@@ -83,7 +85,7 @@ if (delivery?.published) {
   const proposal = read(finalFile);
   if (!proposal) { console.log(`Week ${week} already published elsewhere; delivery is that computer's job`); process.exit(0); }
   if (proposal?.generated_ts !== delivery.generated_ts || proposal?.basket_date !== week) throw new Error('Published basket/delivery identity mismatch');
-  await requireCurrentModelPolicy(proposal, { loadSettings: loadBrokerSettings, deliveryOnly: true });
+  await requireCurrentModelPolicy(proposal, { loadSettings: loadModelPolicy, deliveryOnly: true });
   const mail = await sendBasketEmail(proposal, { deliveryRetry: true });
   if (!mail.sent) throw new Error(`Delivery incomplete: ${mail.reason ?? mail.status}`);
   write(deliveryFile, { ...delivery, emailed: new Date().toISOString() }); process.exit(0);
@@ -94,7 +96,7 @@ function runSummary(proposal) {
 }
 async function publish(proposal) {
   if (context.deliveryOnly || proposal.phase !== 'final' || proposal.basket_date !== week || proposal.expiry !== expiry || proposal.preparation_policy !== preparationPolicy(settings)) throw new Error('Final basket does not match the current publication policy');
-  await requireCurrentModelPolicy(proposal, { loadSettings: loadBrokerSettings });
+  await requireCurrentModelPolicy(proposal, { loadSettings: loadModelPolicy });
   const window = modelPublicationWindow(week, settings);
   if (!window.open) throw new Error(`Cannot publish now: ${window.reason}`);
   freezeFinalProposal(finalFile, proposal);

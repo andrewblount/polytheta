@@ -65,8 +65,16 @@ export default async function PerformancePage() {
         <CardHeader>
           <CardTitle>Weekly P&L and cumulative curve</CardTitle>
           <p className="text-xs text-muted-foreground">
-            Modeled from recommended entries held to expiry — no doubles, no stops, no early
+            Modeled from recommended entries held to expiry or exited on a radar signal — no doubles, no early
             profit-taking. This measures recommendation quality, not executed trades.
+            {report.basis.sizing === "model" && report.basis.modelEquity != null ? (
+              <>
+                {" "}Every leg is sized from the current model settings: equity {formatCurrency(report.basis.modelEquity)},{" "}
+                {report.basis.accountTradedPct}% traded, {report.basis.marginAvailablePct}% margin available
+                {!report.basis.sellCalls ? ", calls off" : ""}{!report.basis.sellPuts ? ", puts off" : ""}. Change them under{" "}
+                <Link href="/app/settings" className="underline">Settings</Link> and this page recalculates.
+              </>
+            ) : null}
           </p>
         </CardHeader>
         <CardContent>

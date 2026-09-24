@@ -120,6 +120,34 @@ try {
     },
   });
   const mode = profile.mode;
+  // Phone alerts for what the account actually did: every new exit order and
+  // every triggered loss stop is raised once through the site's alert API,
+  // which feeds the Alerts tab, the iMessage bridge, SMS and APNs push.
+  journal.notified ??= {};
+  const raise = async (key, payload) => {
+    if (journal.notified[key]) return;
+    const base = (process.env.POLYTHETA_API_BASE ?? 'https://polytheta.com').replace(/\/$/, '');
+    const token = process.env.MOBILE_API_TOKEN;
+    if (!token) return;
+    try {
+      const response = await fetch(`${base}/api/mobile/alerts`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(8000) });
+      if (response.ok) { journal.notified[key] = new Date().toISOString(); await persistSetting(profile.journalKey, journal); saveJournal(journalPath, journal); }
+    } catch (error) { console.error(`alert not delivered: ${error.message}`); }
+  };
+  for (const intent of Object.values(journal.intents ?? {})) {
+    if (intent.action !== 'exit' || !intent.submittedAt) continue;
+    const c = intent.contract, why = intent.reason ?? {};
+    const cause = why.lossStop ? 'ticker loss limit reached' : why.manual ? 'owner exit request' : why.title ? `news: "${why.title}"` : 'exit signal';
+    await raise(`exit:${intent.ref}`, { kind: 'ib-exit', title: `IB ${mode} exit: ${c.symbol} ${c.side} ${c.strike}`, critical: true,
+      message: `IB ${mode.toUpperCase()} EXIT: buying to close ${intent.quantity} ${c.symbol} ${c.side} ${c.strike} ${c.expiry} (limit ${intent.limit}) — ${cause}.`,
+      meta: { account: mode, ticker: c.symbol, side: c.side, strike: c.strike, expiry: c.expiry, quantity: intent.quantity, limit: intent.limit, ref: intent.ref, cause } });
+  }
+  for (const stop of Object.values(journal.lossStops ?? {})) {
+    if (!stop.triggeredAt) continue;
+    await raise(`loss:${stop.id}`, { kind: 'ib-warning', title: `Loss limit triggered: ${stop.ticker}`, critical: true,
+      message: `IB ${mode.toUpperCase()} LOSS LIMIT: ${stop.ticker} reached its maximum loss (${stop.triggerThresholdAmount != null ? '$' + Math.round(stop.triggerThresholdAmount).toLocaleString('en-US') : 'configured limit'}); closing its PolyTheta contracts at market-following limits.`,
+      meta: { account: mode, ticker: stop.ticker, stopId: stop.id, triggeredAt: stop.triggeredAt } });
+  }
   const status = { ...result, account: undefined, mode, authorizedEntryWeek: profile.authorizedEntryWeek, hostId: host.id, hostLabel: host.label, connection: settings.connection, activated: enabled, checkedAt: new Date().toISOString(), fills: Object.keys(journal.fills).length,
     modelBasket: proposal ? { week: proposal.basket_date, source: proposalSource, late: Boolean(proposal.late), entryTimestamp: proposal.entry_timestamp ?? null, picks: proposal.picks.length } : null };
   // Credentials remain local; only the dedicated worker can read the journal.

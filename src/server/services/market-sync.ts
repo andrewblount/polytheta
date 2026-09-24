@@ -9,21 +9,12 @@ import { defaultMarketDataProvider, YahooMarketDataProvider } from "@/server/mar
 import { normalizePosition } from "@/server/repos/helpers";
 
 import { sendRadarAlert, sendStopBreachAlert } from "./email";
+import { raiseAlert } from "./notify";
 import { scanNewsRadar } from "./news-radar";
 import { generateLiveSnapshot } from "./performance";
-import { getNotificationSettings } from "./settings";
-import { sendTwilioMessage } from "./twilio";
 
-// Fan an urgent alert out to the phone channels the settings enable.
-async function pushUrgent(category: "radar_alerts" | "adverse_move", text: string) {
-  try {
-    const prefs = (await getNotificationSettings())[category] ?? {};
-    if (prefs.sms) await sendTwilioMessage("sms", text);
-    if (prefs.whatsapp) await sendTwilioMessage("whatsapp", text);
-  } catch (err) {
-    console.error("urgent push failed:", err);
-  }
-}
+// Every alert goes through raiseAlert: alert feed (Alerts tab + Mac iMessage
+// bridge), SMS/WhatsApp per settings, and APNs push to the phone.
 
 // Adverse-move heads-up threshold (informational under policy v3 — the
 // position is held to expiry; only a radar signal forces an exit).
@@ -32,6 +23,39 @@ const STOP_LOSS_FRACTION = 0.25;
 export function entrySnapshotIsDue(entryTimestamp: Date | string, now = new Date()) {
   const at = +new Date(entryTimestamp);
   return Number.isFinite(at) && at <= +now;
+}
+
+// Exit a model position now: price it at the current mark, record a
+// manually-closed settlement snapshot and close the position, so the model's
+// performance reflects the exit and no later expiry settlement replaces it.
+export async function exitModelPosition({ row, basketSlug, provider, jobId, reason }: {
+  row: typeof positions.$inferSelect; basketSlug: string; provider: YahooMarketDataProvider | typeof defaultMarketDataProvider; jobId: string | null;
+  reason: { title: string; link: string; publisher?: string; publishedAt?: string };
+}) {
+  if (!db || row.manualCloseDate) return false;
+  const position = normalizePosition({ ...row, latestPerformance: demoBaskets[0].callPositions[0].latestPerformance, performanceHistory: demoBaskets[0].callPositions[0].performanceHistory });
+  const snapshot = await generateLiveSnapshot(position, provider);
+  const exitValue = snapshot.optionMark ?? snapshot.estimatedOptionValue ?? 0;
+  const today = new Date().toISOString().slice(0, 10);
+  const observedAt = new Date(Math.max(+new Date(snapshot.observedAt), Date.now() - 1000));
+  await db.insert(performanceSnapshots).values({
+    basketId: row.basketId, positionId: row.id, observedAt,
+    underlyingPrice: snapshot.underlyingPrice.toString(), optionMark: exitValue.toString(), estimatedOptionValue: exitValue.toString(),
+    impliedVolatility: snapshot.impliedVolatility?.toString(), confidence: snapshot.confidence, state: "manually-closed",
+    underlyingMovePct: snapshot.underlyingMovePct.toString(), distanceToStrike: snapshot.distanceToStrike.toString(), safetyBufferPct: snapshot.safetyBufferPct.toString(),
+    daysToExpiry: snapshot.daysToExpiry, creditCapturePct: snapshot.creditCapturePct.toString(), pnlAmount: snapshot.pnlAmount.toString(), pnlPercent: snapshot.pnlPercent.toString(),
+    sourceLabel: `Model exit on radar signal (${snapshot.sourceLabel})`,
+    sourceMetadata: { reason: "radar", title: reason.title, link: reason.link, publisher: reason.publisher ?? null, publishedAt: reason.publishedAt ?? null },
+  }).onConflictDoNothing();
+  await db.update(positions).set({
+    manualClosePrice: exitValue.toFixed(2), manualCloseDate: today, updatedAt: new Date(),
+    sourceMetadata: { ...((row.sourceMetadata ?? {}) as Record<string, unknown>), model_exit: { at: observedAt.toISOString(), value: exitValue, pnl: Math.round(snapshot.pnlAmount), reason: reason.title, link: reason.link } },
+  }).where(eq(positions.id, row.id));
+  await raiseAlert({ kind: "model-exit", jobId, category: "radar_alerts",
+    title: `Model exit: ${row.ticker} ${row.side} ${Number(row.strike)}`,
+    message: `MODEL EXIT: ${row.ticker} ${row.side} ${Number(row.strike)} closed at ${exitValue.toFixed(2)} (modeled P&L ${Math.round(snapshot.pnlAmount) >= 0 ? "+" : ""}${Math.round(snapshot.pnlAmount)}) on radar: "${reason.title}". The execution service closes the IB contracts on the same signal.`,
+    meta: { ticker: row.ticker, side: row.side, strike: Number(row.strike), exitValue, pnlAmount: Math.round(snapshot.pnlAmount), basket: basketSlug, link: reason.link } });
+  return true;
 }
 
 export async function captureEntrySnapshotsForBasket(basketId: string) {
@@ -198,9 +222,21 @@ export async function runMarketSync(triggeredBy = "manual") {
             inserted += 1;
             basketTouched = true;
 
+            if (expiryPassed) return;
+            // Strike-watch warning: the first time the underlying reaches the
+            // first ATR break level (approaching-strike) or trades through the
+            // strike (breached), warn once per state.
+            const warnedStates = new Set(existingHistory.map((s) => s.state));
+            if ((snapshot.state === "approaching-strike" || snapshot.state === "breached") && !warnedStates.has(snapshot.state)) {
+              try {
+                await raiseAlert({ kind: "trade-warning", jobId: job.id, category: "adverse_move",
+                  title: `Trade warning: ${row.ticker} ${row.side} ${snapshot.state === "breached" ? "through the strike" : "at the break level"}`,
+                  message: `${row.ticker} ${row.side} ${Number(row.strike)}: underlying ${snapshot.underlyingPrice.toFixed(2)} is ${snapshot.state === "breached" ? "through the strike" : "at the first ATR break level"}; modeled P&L ${Math.round(snapshot.pnlAmount)}. Check the news radar; exits happen on a radar signal or the ticker loss limit, not on price.`,
+                  meta: { ticker: row.ticker, side: row.side, strike: Number(row.strike), state: snapshot.state, underlyingPrice: snapshot.underlyingPrice, pnlAmount: Math.round(snapshot.pnlAmount), basket: basketRow.slug } });
+              } catch (err) { console.error("trade warning failed:", err); }
+            }
             // Stop-breach alert: fire once, the first time modeled P&L crosses
             // -25% of the name's allocated margin.
-            if (expiryPassed) return;
             const stopLevel = -STOP_LOSS_FRACTION * row.margin;
             if (snapshot.pnlAmount <= stopLevel) {
               const alreadyBreached = existingHistory.some(
@@ -217,22 +253,10 @@ export async function runMarketSync(triggeredBy = "manual") {
                     underlyingPrice: snapshot.underlyingPrice,
                     basketSlug: basketRow.slug,
                   });
-                  // Feed the iMessage bridge (scripts/alert_bridge.mjs polls these).
-                  const adverseText = `⚠️ ${row.ticker} ${row.side} down ${Math.round((snapshot.pnlAmount / row.margin) * 100)}% of allocation — check news. Policy: hold to expiry.`;
-                  await pushUrgent("adverse_move", adverseText);
-                  await db!.insert(syncLogs).values({
-                    jobId: job.id,
-                    level: "alert",
-                    message: `Heads-up: ${row.ticker} ${row.side} down ${Math.round((snapshot.pnlAmount / row.margin) * 100)}% of allocation — check news. Policy: hold to expiry.`,
-                    metadata: {
-                      kind: "adverse-move",
-                      ticker: row.ticker,
-                      side: row.side,
-                      strike: Number(row.strike),
-                      pnlAmount: Math.round(snapshot.pnlAmount),
-                      margin: row.margin,
-                    },
-                  });
+                  await raiseAlert({ kind: "adverse-move", jobId: job.id, category: "adverse_move",
+                    title: `Trade warning: ${row.ticker} ${row.side}`,
+                    message: `Heads-up: ${row.ticker} ${row.side} down ${Math.round((snapshot.pnlAmount / row.margin) * 100)}% of allocation — check news. Policy: hold to expiry unless the radar fires.`,
+                    meta: { ticker: row.ticker, side: row.side, strike: Number(row.strike), pnlAmount: Math.round(snapshot.pnlAmount), margin: row.margin, basket: basketRow.slug } });
                 } catch (err) {
                   console.error("stop-breach alert failed:", err);
                 }
@@ -257,20 +281,20 @@ export async function runMarketSync(triggeredBy = "manual") {
                   basketSlug: basketRow.slug,
                   hits: fresh,
                 });
-                const radarText = `🚨 ${row.side === "call" ? "ACQUISITION" : "DOWNSIDE-GAP"} RADAR: ${row.ticker} — "${fresh[0].title}" — EXIT SIGNAL, verify now.`;
-                await pushUrgent("radar_alerts", radarText);
-                await db!.insert(syncLogs).values({
-                  jobId: job.id,
-                  level: "alert",
-                  message: `${row.side === "call" ? "ACQUISITION" : "DOWNSIDE-GAP"} RADAR: ${row.ticker} — "${fresh[0].title}" — EXIT SIGNAL, verify now.`,
-                  metadata: {
-                    kind: "radar",
-                    ticker: row.ticker,
-                    side: row.side,
-                    strike: Number(row.strike),
-                    hits: fresh.slice(0, 3),
-                  },
-                });
+                const actionable = fresh.find((h) => h.actionable);
+                await raiseAlert({ kind: "radar", jobId: job.id, category: "radar_alerts",
+                  title: `${row.side === "call" ? "Acquisition" : "Downside-gap"} radar: ${row.ticker}`,
+                  message: `${row.side === "call" ? "ACQUISITION" : "DOWNSIDE-GAP"} RADAR: ${row.ticker} — "${fresh[0].title}" — ${actionable ? "EXIT SIGNAL from a primary source; the model is exiting and the execution service closes its contracts." : "keyword match from a secondary source; verify now."}`,
+                  meta: { ticker: row.ticker, side: row.side, strike: Number(row.strike), actionable: Boolean(actionable), hits: fresh.slice(0, 3), basket: basketRow.slug } });
+                // A credible signal exits the MODEL position at the current mark;
+                // the execution service runs the same classifier against its own
+                // fills and closes the IB contracts independently.
+                if (actionable) {
+                  try {
+                    const exited = await exitModelPosition({ row, basketSlug: basketRow.slug, provider, jobId: job.id, reason: actionable });
+                    if (exited) { inserted += 1; basketTouched = true; }
+                  } catch (err) { console.error("model exit failed:", err); errors += 1; }
+                }
                 await db!
                   .update(positions)
                   .set({

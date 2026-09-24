@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { isMarketOpen, easternTime, sessionClose } from '../../shared/market-calendar.mjs';
-import { entryBudget, planEntry, planExit, validateMargin, validateQuote, exitSignal, floorTick, ceilTick, marginReserveStatus } from '../../shared/execution-policy.mjs';
+import { entryBudget, planEntry, planExit, validateMargin, validateQuote, exitSignal, floorTick, ceilTick, marginReserveStatus, sideEnabled } from '../../shared/execution-policy.mjs';
 import { isExcluded } from '../../shared/broker-settings.mjs';
 import { accountFingerprint, ownedQuantity, portfolioSnapshot } from '../../shared/broker-portfolio.mjs';
 import { tickForPrice } from '../../shared/price-increments.mjs';
@@ -198,7 +198,7 @@ export async function executionCycle({ broker, proposal, settings, journal, save
     if (terminal(intent.status) || ['PendingCancel', 'uncertain'].includes(intent.status) || !intent.orderId || !isMarketOpen(decisionTime())) continue;
     const elapsed = +decisionTime() - Date.parse(intent.submittedAt);
     try {
-    if (intent.action === 'entry' && (settings.pauseEntries || !entryCanWork(intent) || isExcluded(intent.pick, settings) || elapsed > settings.entryTimeoutSeconds * 1000 || journal.signals[intent.contract.conid])) {
+    if (intent.action === 'entry' && (settings.pauseEntries || !entryCanWork(intent) || isExcluded(intent.pick, settings) || !sideEnabled(intent.pick?.side, settings) || elapsed > settings.entryTimeoutSeconds * 1000 || journal.signals[intent.contract.conid])) {
       await beforeWrite(); await broker.cancel(intent.orderId); intent.status = 'PendingCancel'; await save(journal); continue;
     }
     // An already working news/manual exit becomes a risk exit if its ticker
@@ -290,7 +290,8 @@ export async function executionCycle({ broker, proposal, settings, journal, save
     if (!isEntryWindow(proposal.basket_date, settings, decisionTime())) break;
     if (Date.now() >= entryDeadline) break;
     const pick = { ...rawPick, pricing_reference: pricingReference(rawPick, proposal) };
-    if (isExcluded(pick, settings) || tickerEntryBlocked(journal, pick.ticker, proposal.basket_date)) continue;
+    // A side switched off in Settings is skipped; its equal share stays unallocated.
+    if (isExcluded(pick, settings) || !sideEnabled(pick.side, settings) || tickerEntryBlocked(journal, pick.ticker, proposal.basket_date)) continue;
     const contract = await broker.resolve(pick, proposal.expiry);
     const ref = orderRef(broker.account, proposal.basket_date, contract.conid, 'entry');
     if (journal.intents[ref] || journal.signals[contract.conid]) continue;

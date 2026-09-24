@@ -1,8 +1,45 @@
 import SwiftUI
 
+#if os(iOS)
+import UIKit
+import UserNotifications
+
+// Push registration: trade warnings, radar hits and exits (model and IB) are
+// pushed through APNs. The token is sent to the site, which keeps it with the
+// other alert channels. Foreground notifications still show as banners.
+final class PushDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+            guard granted else { return }
+            DispatchQueue.main.async { application.registerForRemoteNotifications() }
+        }
+        return true
+    }
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+        #if DEBUG
+        let sandbox = true
+        #else
+        let sandbox = false
+        #endif
+        Task { try? await APIClient.shared.registerDevice(token: token, sandbox: sandbox, label: UIDevice.current.name) }
+    }
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        print("Push registration failed: \(error.localizedDescription)")
+    }
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        [.banner, .list, .sound]
+    }
+}
+#endif
+
 @main
 struct PolythetaApp: App {
     @StateObject private var api = APIClient.shared
+    #if os(iOS)
+    @UIApplicationDelegateAdaptor(PushDelegate.self) private var pushDelegate
+    #endif
 
     var body: some Scene {
         WindowGroup {

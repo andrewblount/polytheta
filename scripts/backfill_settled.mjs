@@ -87,6 +87,7 @@ const rows = await sql.query(`
   from baskets b
   join positions p on p.basket_id = b.id
   where b.status in ('archived', 'published')
+    and p.manual_close_date is null
     and p.expiry < current_date
   order by b.week_of desc, p.sort_order
 `);

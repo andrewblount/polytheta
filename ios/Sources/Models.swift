@@ -159,6 +159,17 @@ struct PerformanceResponse: Codable {
     let stats: Stats?
     // Account track (IB paper/live fills against the model); absent on older servers.
     let account: AccountPerformance?
+    // How the model legs were sized for this report (from the model settings).
+    let basis: PerformanceBasis?
+}
+
+struct PerformanceBasis: Codable {
+    let sizing: String
+    let modelEquity: Double?
+    let accountTradedPct: Double?
+    let marginAvailablePct: Double?
+    let sellCalls: Bool?
+    let sellPuts: Bool?
 }
 
 struct AccountPerformance: Codable {

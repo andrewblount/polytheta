@@ -30,7 +30,11 @@ struct PerformanceView: View {
                         }
                         .frame(maxWidth: .infinity)
                     } header: {
-                        Text("Modeled — held to expiry, no stops or doubles")
+                        Text("Modeled — held to expiry or exited on a radar signal")
+                    } footer: {
+                        if let b = report?.basis, b.sizing == "model", let equity = b.modelEquity {
+                            Text("Every leg is sized from the model settings: equity \(money(equity)), \(Int(b.accountTradedPct ?? 100))% traded, \(Int(b.marginAvailablePct ?? 100))% margin available\((b.sellCalls ?? true) ? "" : ", calls off")\((b.sellPuts ?? true) ? "" : ", puts off"). Change them in Settings and this tab recalculates.")
+                        }
                     }
                 }
 

@@ -3,6 +3,11 @@ import { clockMinute } from './entry-schedule.mjs';
 export const DEFAULT_BROKER_SETTINGS = Object.freeze({
   connection: 'tws', accountMode: 'live', quoteSource: 'ibkr', pauseEntries: true,
   entryCapitalPct: 100, maxTrades: 8, callAllocationPct: 100, putAllocationPct: 0,
+  // Sizing of the IB account's entries: the share of account equity committed,
+  // the notional backing that share supports under portfolio margin (400% =
+  // four dollars of strike/spot backing per dollar committed), and which sides
+  // the account executes. The model has its own copy (shared/model-settings.mjs).
+  marginAvailablePct: 400, sellCalls: true, sellPuts: true,
   reserveLeverageCeiling: 4, minimumCreditRatio: 0.9, maxEntrySpread: 0.15,
   maxQuoteAgeSeconds: 15, entryTimeoutSeconds: 300, maxExitPremiumMultiple: 1.5,
   maxAccountLossPct: 20,
@@ -19,6 +24,7 @@ export function validateBrokerSettings(input) {
   if (input?.twsPort === undefined && s.accountMode === 'paper') s.twsPort = 4002;
   if (!['tws', 'web-api'].includes(s.connection) || s.quoteSource !== 'ibkr') throw new Error('Select TWS or Web API; execution quotes must use IB');
   if (typeof s.pauseEntries !== 'boolean') throw new Error('Invalid entry pause setting');
+  if (typeof s.sellCalls !== 'boolean' || typeof s.sellPuts !== 'boolean') throw new Error('Sell calls and sell puts must be on or off');
   if (!['monday-morning', 'friday-close'].includes(s.entryTiming) || s.fridayHolidayPolicy !== 'previous-session') throw new Error('Invalid entry timing; Friday holidays use the preceding session');
   if (clockMinute(s.mondayEntryStart) < 570 || clockMinute(s.mondayEntryEnd) > 720 || clockMinute(s.mondayEntryEnd) <= clockMinute(s.mondayEntryStart)) throw new Error('Monday entry must be a morning window between 09:30 and 12:00 ET');
   clockMinute(s.twsRestartTime);
@@ -34,13 +40,13 @@ export function validateBrokerSettings(input) {
     ['entryCapitalPct', 0, 100], ['maxTrades', 1, 20], ['callAllocationPct', 0, 100], ['putAllocationPct', 0, 100],
     ['reserveLeverageCeiling', 1, 4], ['minimumCreditRatio', 0.5, 1], ['maxEntrySpread', 0.01, 0.15],
     ['maxQuoteAgeSeconds', 1, 30], ['entryTimeoutSeconds', 30, 900], ['maxExitPremiumMultiple', 1, 3],
-    ['maxAccountLossPct', 0.1, 100],
+    ['maxAccountLossPct', 0.1, 100], ['marginAvailablePct', 100, 1000],
     ['twsPort', 1, 65535], ['twsClientId', 1, 999999], ['twsRestartGraceMinutes', 1, 60],
     ['preparationLeadMinutes', 30, 240], ['finalizeLeadMinutes', 5, 20], ['vixIvSensitivity', 0, 3], ['modelRiskFreeRatePct', 0, 20],
   ]) if (!Number.isFinite(s[key]) || s[key] < low || s[key] > high) throw new Error(`Invalid ${key}: expected ${low}–${high}`);
   if (Math.abs(s.callAllocationPct + s.putAllocationPct - 100) > 0.001) throw new Error('Call and put allocations must total 100%');
   if (![s.twsPort, s.twsClientId, s.preparationLeadMinutes, s.finalizeLeadMinutes, s.twsRestartGraceMinutes].every(Number.isInteger)) throw new Error('Ports, client IDs and schedule minutes must be whole numbers');
-  if (!Number.isInteger(s.maxTrades) || !basketCounts(s).total) throw new Error('Maximum trades and allocation split must allow whole, equally allocated trades');
+  if (!Number.isInteger(s.maxTrades) || !basketCounts({ ...s, sellCalls: true, sellPuts: true }).total) throw new Error('Maximum trades and allocation split must allow whole, equally allocated trades');
   return Object.fromEntries(Object.keys(DEFAULT_BROKER_SETTINGS).map(key => [key, s[key]]));
 }
 
@@ -59,10 +65,29 @@ export function isExcluded(pick, settings) {
   return excluded.has('SPCX') && (name.includes('SPACEX') || name.includes('SPACEEXPLORATIONTECHNOLOGIES'));
 }
 
+// Which sides a settings object allows. Both on: the configured split applies.
+// One off: the whole basket goes to the other side. Both off: no basket.
+export function sideSplit(settings) {
+  const calls = settings.sellCalls !== false, puts = settings.sellPuts !== false;
+  if (calls && puts) return { callAllocationPct: settings.callAllocationPct, putAllocationPct: settings.putAllocationPct };
+  if (calls) return { callAllocationPct: 100, putAllocationPct: 0 };
+  if (puts) return { callAllocationPct: 0, putAllocationPct: 100 };
+  return null;
+}
+// Notional backing a sizing policy makes available from an equity figure:
+// equity × share committed × margin available. Contracts are then floor(backing
+// per trade / (100 × max(spot, strike))).
+export function sizingBacking(equity, settings) {
+  const traded = Number(settings?.accountTradedPct ?? settings?.entryCapitalPct ?? 100), margin = Number(settings?.marginAvailablePct ?? 100);
+  if (!Number.isFinite(equity) || equity <= 0 || !Number.isFinite(traded) || !Number.isFinite(margin)) return 0;
+  return equity * traded / 100 * margin / 100;
+}
 // The allocation split controls trade counts, not unequal dollar allocations.
 export function basketCounts(settings, availableCalls = Infinity, availablePuts = Infinity) {
+  const split = sideSplit(settings);
+  if (!split) return { calls: 0, puts: 0, total: 0 };
   for (let total = settings.maxTrades; total >= 1; total--) {
-    const call = total * settings.callAllocationPct / 100;
+    const call = total * split.callAllocationPct / 100;
     if (Math.abs(call - Math.round(call)) > 1e-8) continue;
     const calls = Math.round(call), puts = total - calls;
     if (calls <= availableCalls && puts <= availablePuts) return { calls, puts, total };

@@ -37,3 +37,19 @@ export async function GET(request: Request) {
     })),
   });
 }
+
+// The execution service on the Mac raises its own alerts here (exit orders
+// submitted, loss stops triggered, entry warnings) so they reach the same
+// feed, channels and phone push as the model's alerts.
+export async function POST(request: Request) {
+  if (!mobileAuthOk(request)) return unauthorized();
+  let body: { kind?: string; title?: string; message?: string; meta?: Record<string, unknown>; critical?: boolean };
+  try { body = await request.json(); } catch { return Response.json({ error: "invalid JSON" }, { status: 400 }); }
+  const kinds = ["radar", "adverse-move", "trade-warning", "model-exit", "ib-exit", "ib-warning", "briefing", "system"] as const;
+  const kind = kinds.find((k) => k === body.kind) ?? "system";
+  const message = String(body.message ?? "").slice(0, 1000);
+  if (!message) return Response.json({ error: "message required" }, { status: 400 });
+  const { raiseAlert } = await import("@/server/services/notify");
+  const result = await raiseAlert({ kind, title: String(body.title ?? "Polytheta").slice(0, 120), message, meta: body.meta && typeof body.meta === "object" ? body.meta : {}, critical: body.critical });
+  return Response.json({ ok: true, ...result });
+}

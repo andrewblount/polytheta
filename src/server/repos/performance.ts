@@ -1,7 +1,9 @@
 import { inArray } from "drizzle-orm";
 
 import { db } from "@/db";
-import { baskets, performanceSnapshots, positions } from "@/db/schema";
+import { basketMetrics, baskets, performanceSnapshots, positions } from "@/db/schema";
+import { getModelSettings, type ModelSettings } from "@/server/services/model-settings";
+import { sizingBacking } from "../../../shared/broker-settings.mjs";
 import { asNumber, asIsoString } from "./helpers";
 
 const SETTLED_STATES = ["expired-otm", "expired-itm", "manually-closed"] as const;
@@ -53,17 +55,52 @@ export interface PerformanceStats {
   worstLeg: SettledLeg | null;
 }
 
+// How the legs were sized for this report. "model": every historical leg is
+// re-sized from the current model settings (equity × share traded × margin
+// available, split equally, side toggles applied), so changing the settings
+// changes the whole track record. "published": the contracts each basket was
+// published with.
+export interface PerformanceBasis {
+  sizing: "model" | "published";
+  modelEquity: number | null;
+  accountTradedPct: number | null;
+  marginAvailablePct: number | null;
+  sellCalls: boolean;
+  sellPuts: boolean;
+  backing: number | null;
+}
+
 export interface PerformanceReport {
   weeks: WeeklyPerformance[];
   cumulative: { weekOf: string; pnl: number; cumulative: number }[];
   stats: PerformanceStats;
+  basis: PerformanceBasis;
+}
+
+export interface PerformanceOptions {
+  sizing?: "model" | "published";
+  model?: ModelSettings;
+}
+
+// Re-size one leg under a sizing policy. Per-contract economics come from the
+// published leg; the contract count is what the policy would have bought.
+export function resizeLeg(leg: { entryPrice: number; strike: number; contracts: number; margin: number; credit: number; pnl: number | null }, perTradeBacking: number) {
+  const unit = Math.max(leg.entryPrice, leg.strike) * 100;
+  const contracts = unit > 0 && perTradeBacking > 0 ? Math.floor(perTradeBacking / unit) : 0;
+  const ratio = leg.contracts > 0 ? contracts / leg.contracts : 0;
+  return {
+    contracts,
+    margin: Math.round(leg.margin * ratio),
+    credit: Math.round(leg.credit * ratio),
+    pnl: leg.pnl == null ? null : leg.pnl * ratio,
+  };
 }
 
 // Settled-performance report across every basket. "Modeled" throughout:
 // entries at the recommended credit, held to expiry, no doubles, no stops,
 // no early profit-taking — the raw quality of the recommendations, not a
 // record of executed trades.
-export async function getPerformanceReport(): Promise<PerformanceReport | null> {
+export async function getPerformanceReport(options: PerformanceOptions = {}): Promise<PerformanceReport | null> {
   if (!db) {
     return null;
   }
@@ -72,6 +109,14 @@ export async function getPerformanceReport(): Promise<PerformanceReport | null> 
   if (basketRows.length === 0) {
     return null;
   }
+  const sizing = options.sizing ?? "model";
+  const model = sizing === "model" ? options.model ?? (await getModelSettings()) : null;
+  const metricRows = await db.select({ basketId: basketMetrics.basketId, otherMetrics: basketMetrics.otherMetrics }).from(basketMetrics);
+  const scaleByBasket = new Map(metricRows.map((m) => [m.basketId, Number((m.otherMetrics as { allocation_scale?: unknown } | null)?.allocation_scale ?? 1) || 1]));
+  const backing = model ? sizingBacking(model.modelEquity, model) : null;
+  const basis: PerformanceBasis = model
+    ? { sizing: "model", modelEquity: model.modelEquity, accountTradedPct: model.accountTradedPct, marginAvailablePct: model.marginAvailablePct, sellCalls: model.sellCalls, sellPuts: model.sellPuts, backing }
+    : { sizing: "published", modelEquity: null, accountTradedPct: null, marginAvailablePct: null, sellCalls: true, sellPuts: true, backing: null };
   const positionRows = await db.select().from(positions);
   const settledRows = await db
     .select()
@@ -82,9 +127,10 @@ export async function getPerformanceReport(): Promise<PerformanceReport | null> 
   const settledByPosition = new Map<string, (typeof settledRows)[number]>();
   for (const snap of settledRows) {
     const existing = settledByPosition.get(snap.positionId);
-    if (!existing || new Date(snap.observedAt) > new Date(existing.observedAt)) {
-      settledByPosition.set(snap.positionId, snap);
-    }
+    // A model exit (manually-closed) is final; a later expiry settlement never overrides it.
+    const outranks = !existing || (snap.state === "manually-closed" && existing.state !== "manually-closed") ||
+      (existing.state !== "manually-closed" && new Date(snap.observedAt) > new Date(existing.observedAt));
+    if (outranks) settledByPosition.set(snap.positionId, snap);
   }
 
   const positionsByBasket = new Map<string, (typeof positionRows)[number][]>();
@@ -96,8 +142,11 @@ export async function getPerformanceReport(): Promise<PerformanceReport | null> 
 
   const weeks: WeeklyPerformance[] = [];
   for (const basket of basketRows) {
-    const basketPositions = positionsByBasket.get(basket.id) ?? [];
+    const allPositions = positionsByBasket.get(basket.id) ?? [];
+    // Side toggles remove legs from the model entirely; the remaining legs share the backing.
+    const basketPositions = model ? allPositions.filter((p) => (p.side === "call" ? model.sellCalls : model.sellPuts)) : allPositions;
     if (basketPositions.length === 0) continue;
+    const perTrade = backing != null ? (backing * (scaleByBasket.get(basket.id) ?? 1)) / basketPositions.length : null;
 
     let pnl = 0;
     let wins = 0;
@@ -108,12 +157,17 @@ export async function getPerformanceReport(): Promise<PerformanceReport | null> 
     let worstLeg: SettledLeg | null = null;
 
     for (const position of basketPositions) {
-      margin += position.margin;
-      credit += Math.round(asNumber(position.estimatedEntryCredit) * 100 * position.contracts);
       const snap = settledByPosition.get(position.id);
-      if (!snap) continue;
+      const published = {
+        entryPrice: asNumber(position.entryUnderlyingPrice), strike: asNumber(position.strike), contracts: position.contracts, margin: position.margin,
+        credit: Math.round(asNumber(position.estimatedEntryCredit) * 100 * position.contracts), pnl: snap ? asNumber(snap.pnlAmount) : null,
+      };
+      const sized = perTrade != null ? resizeLeg(published, perTrade) : published;
+      margin += sized.margin;
+      credit += sized.credit;
+      if (!snap || sized.pnl == null) continue;
       settled += 1;
-      const legPnl = asNumber(snap.pnlAmount);
+      const legPnl = sized.pnl;
       pnl += legPnl;
       if (legPnl >= 0) wins += 1;
       else losses += 1;
@@ -123,9 +177,9 @@ export async function getPerformanceReport(): Promise<PerformanceReport | null> 
         side: position.side,
         strike: asNumber(position.strike),
         entryCredit: asNumber(position.estimatedEntryCredit),
-        contracts: position.contracts,
-        margin: position.margin,
-        pnl: legPnl,
+        contracts: sized.contracts,
+        margin: sized.margin,
+        pnl: Math.round(legPnl),
         state: snap.state,
         settledAt: asIsoString(snap.observedAt),
       };
@@ -195,5 +249,5 @@ export async function getPerformanceReport(): Promise<PerformanceReport | null> 
     worstLeg: allWorst[0] ?? null,
   };
 
-  return { weeks, cumulative, stats };
+  return { weeks, cumulative, stats, basis };
 }

@@ -20,8 +20,13 @@ test('allocation split controls counts and max count, with equal dollar shares',
   assert.throws(()=>validateBrokerSettings({maxTrades:3,callAllocationPct:75,putAllocationPct:25}),/whole/);
   const b=entryBudget(proposal,account,settings,now);
   assert.equal(b.total,10000);assert.equal(b.perTrade,10000);
-  assert.equal(planEntry(pick,contract,quote,b,settings,now).quantity,4);
+  // $10,000 per trade at the default 400% margin available backs $40,000 of notional: 16 contracts at $25.
+  assert.equal(planEntry(pick,contract,quote,b,settings,now).quantity,16);
+  assert.equal(planEntry(pick,contract,quote,b,{...settings,marginAvailablePct:100},now).quantity,4);
   assert.equal(entryBudget(proposal,account,{...settings,entryCapitalPct:20},now).total,2000);
+  // Side toggles gate execution; the model basket itself is unchanged.
+  assert.throws(()=>planEntry(pick,contract,quote,b,{...settings,sellCalls:false},now),/switched off/);
+  assert.equal(planEntry({...pick,side:'put',K:15,pricing_reference:{...pick.pricing_reference,side:'put',strike:15}},{...contract,side:'put',strike:15},{...quote,delta:-0.18},b,{...settings,sellCalls:false},now).quantity,20);
 });
 test('delayed, stale, crossed and insufficient quotes prevent entries', () => {
   const b=entryBudget(proposal,account,settings,now);

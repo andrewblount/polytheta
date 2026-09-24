@@ -8,7 +8,8 @@ import { BrokerAccountFields } from "./broker-account-fields";
 export async function BrokerSettingsCard() {
   const [s, status, hosts] = await Promise.all([getBrokerSettings(), getBrokerStatus(), getExecutionHosts()]);
   const fields = [
-    ["entryCapitalPct", "Total trade allocation (% of account equity)", 0, 100, 1],
+    ["entryCapitalPct", "Percentage of account traded (% of IB equity)", 0, 100, 1],
+    ["marginAvailablePct", "Margin available (% of committed capital backed as notional)", 100, 1000, 25],
     ["maxAccountLossPct", "Maximum loss per ticker (% of account)", 0.1, 100, 0.1],
     ["maxTrades", "Maximum trades per basket", 1, 20, 1],
     ["callAllocationPct", "Calls (%)", 0, 100, 1],
@@ -50,6 +51,9 @@ export async function BrokerSettingsCard() {
         <textarea name="excludedTickers" rows={3} defaultValue={s.excludedTickers.join(", ")} className="rounded-lg border bg-background p-3" />
         <span className="text-xs text-muted-foreground">Add or remove symbols separated by commas. SPCX is SpaceX. Entering SPACEX is accepted as an alias. Exclusions block new entries and cancel unfilled entries; they do not force an exit from existing trades.</span>
       </label>
+      <label className="flex items-center gap-3 text-sm"><input type="checkbox" name="sellCalls" defaultChecked={s.sellCalls} />Sell calls</label>
+      <label className="flex items-center gap-3 text-sm"><input type="checkbox" name="sellPuts" defaultChecked={s.sellPuts} />Sell puts</label>
+      <p className="text-xs text-muted-foreground sm:col-span-2">Side toggles decide which legs of the published model basket the account executes; a skipped leg’s equal share stays unallocated. Margin available scales contracts per trade: 400% backs four dollars of strike or spot per committed dollar under portfolio margin. IB’s margin preview must still approve every order.</p>
       <label className="flex items-center gap-3 text-sm sm:col-span-2"><input type="checkbox" name="pauseEntries" defaultChecked={s.pauseEntries} />Pause new entries (continue monitoring existing positions)</label>
       <StrikeSettingsEditor initial={s.strikeOverrides} />
       <p className="text-xs text-muted-foreground sm:col-span-2">Calls and puts must total 100%. Whole-contract rounding can leave cash unused. Entry capacity is capped by equity, available cash and IB’s margin preview. The reserve never increases entry size. Exceeding the IB gross-exposure/equity ceiling blocks new entries and flags review; it does not cause a price-based exit. Live execution also requires activation on the trading Mac.</p>

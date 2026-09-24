@@ -7,14 +7,16 @@ import {
   saveNotificationSettings,
 } from "@/server/services/settings";
 
+import { getModelSettings, saveModelSettings } from "@/server/services/model-settings";
+
 import { mobileAuthOk, unauthorized } from "../auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   if (!mobileAuthOk(request)) return unauthorized();
-  const [notifications, broker, brokerStatus, executionHosts] = await Promise.all([getNotificationSettings(), getBrokerSettings(), getBrokerStatus(), getExecutionHosts()]);
-  return Response.json({ notifications, broker, brokerStatus, executionHosts }, { headers: { "Cache-Control": "no-store" } });
+  const [notifications, broker, brokerStatus, executionHosts, model] = await Promise.all([getNotificationSettings(), getBrokerSettings(), getBrokerStatus(), getExecutionHosts(), getModelSettings()]);
+  return Response.json({ notifications, broker, brokerStatus, executionHosts, model }, { headers: { "Cache-Control": "no-store" } });
 }
 
 // Body: { notifications: { briefing_close: { email: false }, ... } } — partial
@@ -22,7 +24,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!mobileAuthOk(request)) return unauthorized();
 
-  let body: { broker?: Record<string, unknown>; notifications?: Record<string, Record<string, unknown>> };
+  let body: { broker?: Record<string, unknown>; model?: Record<string, unknown>; notifications?: Record<string, Record<string, unknown>> };
   try {
     body = await request.json();
     if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("Invalid settings payload");
@@ -35,6 +37,11 @@ export async function POST(request: Request) {
     try { broker = await saveBrokerSettings(mergeBrokerSettingsUpdate(await getBrokerSettings(), body.broker)); }
     catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Invalid trading settings" }, { status: 400 }); }
   }
+  let model;
+  if (body.model !== undefined) {
+    try { model = await saveModelSettings(body.model); }
+    catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Invalid model settings" }, { status: 400 }); }
+  }
   const incoming = body.notifications ?? {};
   const current = await getNotificationSettings();
   const merged = { ...DEFAULT_NOTIFICATIONS, ...current };
@@ -46,5 +53,5 @@ export async function POST(request: Request) {
     }
   }
   await saveNotificationSettings(merged);
-  return Response.json({ notifications: merged, broker: broker ?? await getBrokerSettings() });
+  return Response.json({ notifications: merged, broker: broker ?? await getBrokerSettings(), model: model ?? await getModelSettings() });
 }

@@ -51,11 +51,27 @@ export async function updateBrokerSettingsAction(formData: FormData) {
   await requireAppUser("admin");
   const { getBrokerSettings, saveBrokerSettings } = await import("@/server/services/broker-settings");
   const current = await getBrokerSettings();
-  const updates: Record<string, unknown> = { ...current, connection: String(formData.get("connection")), pauseEntries: formData.get("pauseEntries") === "on" };
+  const updates: Record<string, unknown> = { ...current, connection: String(formData.get("connection")), pauseEntries: formData.get("pauseEntries") === "on",
+    sellCalls: formData.get("sellCalls") === "on", sellPuts: formData.get("sellPuts") === "on" };
   updates.excludedTickers = String(formData.get("excludedTickers") ?? "");
   updates.strikeOverrides = JSON.parse(String(formData.get("strikeOverrides") ?? "[]"));
   for (const key of ["accountMode", "executionHostId", "twsHost", "webApiUrl", "twsRestartTime", "twsRestartTimezone", "entryTiming", "mondayEntryStart", "mondayEntryEnd"]) updates[key] = String(formData.get(key) ?? current[key as keyof typeof current]);
-  for (const key of ["entryCapitalPct", "maxAccountLossPct", "maxTrades", "callAllocationPct", "putAllocationPct", "reserveLeverageCeiling", "minimumCreditRatio", "entryTimeoutSeconds", "maxExitPremiumMultiple", "twsPort", "twsClientId", "twsRestartGraceMinutes", "preparationLeadMinutes", "finalizeLeadMinutes", "vixIvSensitivity", "modelRiskFreeRatePct"]) updates[key] = Number(formData.get(key) ?? current[key as keyof typeof current]);
+  for (const key of ["entryCapitalPct", "marginAvailablePct", "maxAccountLossPct", "maxTrades", "callAllocationPct", "putAllocationPct", "reserveLeverageCeiling", "minimumCreditRatio", "entryTimeoutSeconds", "maxExitPremiumMultiple", "twsPort", "twsClientId", "twsRestartGraceMinutes", "preparationLeadMinutes", "finalizeLeadMinutes", "vixIvSensitivity", "modelRiskFreeRatePct"]) updates[key] = Number(formData.get(key) ?? current[key as keyof typeof current]);
   await saveBrokerSettings(updates);
   revalidatePath("/app/settings");
+}
+
+export async function updateModelSettingsAction(formData: FormData) {
+  await requireAppUser("admin");
+  const { saveModelSettings } = await import("@/server/services/model-settings");
+  await saveModelSettings({
+    modelEquity: Number(formData.get("modelEquity")),
+    accountTradedPct: Number(formData.get("accountTradedPct")),
+    marginAvailablePct: Number(formData.get("marginAvailablePct")),
+    sellCalls: formData.get("sellCalls") === "on",
+    sellPuts: formData.get("sellPuts") === "on",
+  });
+  revalidatePath("/app/settings");
+  revalidatePath("/app/performance");
+  revalidatePath("/app/dashboard");
 }

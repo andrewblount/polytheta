@@ -137,13 +137,21 @@ test('each provider/news run passes its abort deadline to every fetch without a 
 });
 
 test('affordability chooses a smaller complete split and never publishes a single leftover side', () => {
-  const settings = { ...DEFAULT_BROKER_SETTINGS, entryCapitalPct: 1, maxTrades: 4, callAllocationPct: 50, putAllocationPct: 50 };
+  // 1% of equity at 100% margin: $10,000 of backing across four trades, $20,000 across two.
+  const settings = { ...DEFAULT_BROKER_SETTINGS, entryCapitalPct: 1, marginAvailablePct: 100, maxTrades: 4, callAllocationPct: 50, putAllocationPct: 50 };
   const pool = [{ side: 'call', cost: 7500 }, { side: 'call', cost: 3000 }, { side: 'put', cost: 2000 }, { side: 'put', cost: 4000 }];
   const select = (counts, budget) => ({ picks: [...pool.filter(p => p.side === 'call' && p.cost <= budget).slice(0, counts.calls), ...pool.filter(p => p.side === 'put' && p.cost <= budget).slice(0, counts.puts)] });
   const result = selectAffordableBasket({ settings, modelEquity: 1000000, gsrs: 2, select });
   assert.equal(result.picks.length, 2); assert.equal(result.backingPerTrade, 5000); assert.deepEqual(result.picks.map(p => p.side), ['call', 'put']);
   const unaffordable = selectAffordableBasket({ settings: { ...settings, maxTrades: 2 }, modelEquity: 100000, gsrs: 2, select });
   assert.equal(unaffordable.picks.length, 0); assert.equal(unaffordable.backingPerTrade, 0);
+  // Margin available multiplies the backing (400% = four dollars per committed dollar) and the
+  // side toggles route the whole basket to the remaining side.
+  const levered = selectAffordableBasket({ settings: { ...settings, marginAvailablePct: 400 }, modelEquity: 1000000, gsrs: 2, select });
+  assert.equal(levered.backingPerTrade, 10000); assert.equal(levered.picks.length, 4);
+  const callsOnly = selectAffordableBasket({ settings: { ...settings, marginAvailablePct: 400, sellPuts: false }, modelEquity: 1000000, gsrs: 2, select });
+  assert.deepEqual(callsOnly.picks.map(p => p.side), ['call', 'call']); assert.equal(callsOnly.backingPerTrade, 20000);
+  assert.equal(selectAffordableBasket({ settings: { ...settings, sellCalls: false, sellPuts: false }, modelEquity: 1000000, gsrs: 2, select }).picks.length, 0);
 });
 
 test('imports run inside a transaction, roll back failures and permit status-only publication', async t => {

@@ -1,4 +1,5 @@
 import { BrokerSettingsCard } from "@/components/admin/broker-settings-card";
+import { ModelSettingsCard } from "@/components/admin/model-settings-card";
 import { updateMyTrackingAction } from "@/app/(app)/app/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +20,7 @@ export default async function SettingsPage() {
         <p className="eyebrow text-[10px] text-muted-foreground">Settings</p>
         <h1 className="mt-2 text-4xl font-semibold tracking-tight">Account settings</h1>
       </div>
+      {user.role === "admin" ? <ModelSettingsCard /> : null}
       {user.role === "admin" ? <BrokerSettingsCard /> : null}
       <Card>
         <CardHeader>

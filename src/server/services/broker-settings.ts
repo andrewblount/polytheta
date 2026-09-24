@@ -2,7 +2,7 @@ import { eq, like } from "drizzle-orm";
 import { db } from "@/db";
 import { appSettings } from "@/db/schema";
 import { validateBrokerSettings } from "../../../shared/broker-settings.mjs";
-export interface BrokerSettings { strikeOverrides: { ticker: string; side: string; expiry: string; minimumOtmPct: number }[]; excludedTickers: string[]; connection: string; quoteSource: string; pauseEntries: boolean; entryCapitalPct: number; maxTrades: number; callAllocationPct: number; putAllocationPct: number; reserveLeverageCeiling: number; minimumCreditRatio: number; maxEntrySpread: number; maxQuoteAgeSeconds: number; entryTimeoutSeconds: number; maxExitPremiumMultiple: number;
+export interface BrokerSettings { strikeOverrides: { ticker: string; side: string; expiry: string; minimumOtmPct: number }[]; excludedTickers: string[]; connection: string; quoteSource: string; pauseEntries: boolean; entryCapitalPct: number; marginAvailablePct: number; sellCalls: boolean; sellPuts: boolean; maxTrades: number; callAllocationPct: number; putAllocationPct: number; reserveLeverageCeiling: number; minimumCreditRatio: number; maxEntrySpread: number; maxQuoteAgeSeconds: number; entryTimeoutSeconds: number; maxExitPremiumMultiple: number;
  accountMode: 'live' | 'paper'; executionHostId: string; twsHost: string; twsPort: number; twsClientId: number; webApiUrl: string; twsRestartTime: string; twsRestartTimezone: string; twsRestartGraceMinutes: number;
  entryTiming: string; mondayEntryStart: string; mondayEntryEnd: string; fridayHolidayPolicy: string; preparationLeadMinutes: number; finalizeLeadMinutes: number; vixIvSensitivity: number; modelRiskFreeRatePct: number; maxAccountLossPct: number; }
 export async function getExecutionHosts() {

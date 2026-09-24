@@ -18,7 +18,7 @@ import { runFilterAndRefine, autoPick, applyCompliantStrikes, MIN_ATR_BUF_PUT, D
 import { fetchShortInterest, loadOverrides, evaluateSignals } from './thesis_signals.mjs';
 import { scanRadar } from './news_radar.mjs';
 import { calculateGsrs } from '../../shared/gsrs.mjs';
-import { DEFAULT_BROKER_SETTINGS, validateBrokerSettings, basketCounts, isExcluded } from '../../shared/broker-settings.mjs';
+import { DEFAULT_BROKER_SETTINGS, validateBrokerSettings, basketCounts, isExcluded, sizingBacking } from '../../shared/broker-settings.mjs';
 import { minimumOtmFor, otmPercent } from '../../shared/strike-settings.mjs';
 import { firstSessionOfWeek, easternTime } from '../../shared/market-calendar.mjs';
 import { entrySchedule } from '../../shared/entry-schedule.mjs';
@@ -64,7 +64,8 @@ export function selectAffordableBasket({ settings, modelEquity, gsrs, select }) 
     const counts = basketCounts({ ...settings, maxTrades: total });
     if (counts.total !== total) continue;
     const baseScale = gsrs >= 3 && counts.puts ? 0.5 : 1;
-    const allocation = scale => modelEquity * settings.entryCapitalPct / 100 * scale / total;
+    // Notional backing: equity × share traded × margin available, split equally.
+    const allocation = scale => sizingBacking(modelEquity, settings) * scale / total;
     let auto = select(counts, allocation(baseScale));
     if (auto.picks.length !== total) continue;
     if (auto.picks.some(pick => pick.frenzy === 'elevated')) auto = select(counts, allocation(baseScale * 0.5));
@@ -79,6 +80,9 @@ export function selectAffordableBasket({ settings, modelEquity, gsrs, select }) 
 // age checks are evaluated at the snapshot's own time and cached signal files
 // are used as they were, never refetched.
 export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget = 55000, nPerSide = 4, brokerSettings = DEFAULT_BROKER_SETTINGS, brokerEquity = null, outFileName = 'basket_proposal.json', now = new Date(), frozen = false }) {
+  // brokerSettings may carry the model policy overlay (shared/model-settings.mjs
+  // modelPolicy): its modelEquity is read before validation strips it.
+  const equity = resolveModelEquity({ settings: brokerSettings });
   const settings = validateBrokerSettings(brokerSettings);
   const schedule = entrySchedule(BASKET_DATE, settings);
   if (EXPIRY_ISO !== schedule.expiry) throw new Error('Basket expiry does not match the selected exchange week');
@@ -175,7 +179,6 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
 
   // The model sizes against model equity only. The account it will later be
   // compared with is recorded for reference and never affects selection.
-  const equity = resolveModelEquity({ settings });
   const modelEquity = equity.modelEquity;
   const accountReference = accountEquityReference(brokerEquity);
   console.log(`[basket ${BASKET_DATE}] model equity ${modelEquity.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} (${equity.source})${accountReference ? `; account reference ${accountReference.mode ?? ''} ${accountReference.netLiquidation.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} as of ${accountReference.observedAt}` : ''}`);
@@ -290,6 +293,7 @@ export async function runBuildBasket({ BASKET_DATE, EXPIRY_ISO, OUT, nameBudget 
     policy: 'v3-news-only-no-doubling',
     allocation_settings: settings, allocation_scale: allocationScale, model_equity: modelEquity,
     model_equity_source: equity.source, model_equity_observed_at: equity.observedAt,
+    sizing: { accountTradedPct: settings.entryCapitalPct, marginAvailablePct: settings.marginAvailablePct, sellCalls: settings.sellCalls, sellPuts: settings.sellPuts, backing: sizingBacking(modelEquity, settings) },
     account_equity_reference: accountReference,
     data_provenance: 'live-snapshot',
     total_backing_capital: picks.length * backingPerTrade,

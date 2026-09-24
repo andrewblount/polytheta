@@ -26,9 +26,10 @@ import { runBuildBasket } from './lib/build_basket.mjs';
 import { runEarnings } from './lib/earnings.mjs';
 import { preparationPolicy } from './lib/finalize_basket.mjs';
 import { importProposal } from './lib/import_proposal.mjs';
-import { loadBrokerSettings } from './lib/broker_settings.mjs';
+import { loadModelPolicy } from './lib/broker_settings.mjs';
 import { WEEKLYS_SOURCE } from './lib/refresh.mjs';
-import { validateBrokerSettings, basketCounts, isExcluded, normalizeExclusions } from '../shared/broker-settings.mjs';
+import { validateBrokerSettings, basketCounts, isExcluded, normalizeExclusions, sizingBacking } from '../shared/broker-settings.mjs';
+import { modelPolicy } from '../shared/model-settings.mjs';
 import { entrySchedule } from '../shared/entry-schedule.mjs';
 import { repriceEntry, pricingReference, optionDelta } from '../shared/entry-pricing.mjs';
 import { easternTime, sessionClose } from '../shared/market-calendar.mjs';
@@ -68,9 +69,10 @@ const readJson = file => JSON.parse(fs.readFileSync(file, 'utf8'));
 const num = x => { const n = Number(x); return Number.isFinite(n) ? n : null; };
 
 // ---- settings: the current model policy, plus any exclusions in force that week
-const base = flag('--default-settings') ? validateBrokerSettings({}) : await loadBrokerSettings();
+const base = flag('--default-settings') ? modelPolicy(validateBrokerSettings({}), {}) : await loadModelPolicy();
 const excluded = normalizeExclusions([...(base.excludedTickers ?? []), ...(arg('--exclude') ? arg('--exclude').split(',') : [])]);
 const settings = validateBrokerSettings({ ...base, excludedTickers: excluded });
+const modelEquityOverlay = base.modelEquity;
 const schedule = entrySchedule(week, settings);
 const expiry = schedule.expiry;
 if (+entryTime < +schedule.start || easternTime(entryTime).date >= expiry) throw new Error(`--entry-time must be within the week's model window (${schedule.start.toISOString()} .. before ${expiry})`);
@@ -140,7 +142,7 @@ if (arg('--prepared')) {
     fs.writeFileSync(radarFile, JSON.stringify(radar, null, 2));
     notes.push(`News radar: ${repaired} scans were missing or failed that week and are treated as clean for this rebuild (no historical news scan is available)`);
   }
-  const result = await runBuildBasket({ BASKET_DATE: week, EXPIRY_ISO: expiry, OUT, brokerSettings: settings, outFileName: 'prepared_basket.json', now: preparedTime, frozen: true });
+  const result = await runBuildBasket({ BASKET_DATE: week, EXPIRY_ISO: expiry, OUT, brokerSettings: { ...settings, modelEquity: modelEquityOverlay }, outFileName: 'prepared_basket.json', now: preparedTime, frozen: true });
   prepared = readJson(result.outFile);
   if (!prepared.picks.length) throw new Error('The snapshot yields no qualifying basket');
   notes.push(`Selection rebuilt from the ${refresh.synthetic ? 'synthetic' : 'observed'} snapshot at ${snapshotObservedAt}, preparation time ${preparedTime.toISOString()} (signals and news as cached that week)`);
@@ -199,7 +201,7 @@ const counts = basketCounts(settings, prepared.picks.filter(p => p.side === 'cal
 if (counts.total !== prepared.picks.length) { notes.push(`Basket trimmed to the configured split: ${counts.total} of ${prepared.picks.length}`); prepared.picks = [...prepared.picks.filter(p => p.side === 'call').slice(0, counts.calls), ...prepared.picks.filter(p => p.side === 'put').slice(0, counts.puts)]; }
 if (score.score >= 5 && counts.puts) throw new Error('GSRS at entry prohibits puts; the prepared basket does not satisfy the rules');
 const scale = (score.score >= 3 && counts.puts ? .5 : 1) * (prepared.picks.some(p => p.frenzy === 'elevated') ? .5 : 1);
-const capital = prepared.model_equity * settings.entryCapitalPct / 100 * scale / counts.total;
+const capital = sizingBacking(prepared.model_equity, settings) * scale / counts.total;
 const asOf = entryTime;
 const disqualified = [];
 const picks = prepared.picks.map(p => {

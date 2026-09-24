@@ -102,14 +102,17 @@ export async function getAccountPerformanceReport(): Promise<AccountPerformanceR
 type BasketRow = { id: string; slug: string; title: string; weekOf: string | Date };
 type PositionRow = { id: string; basketId: string; ticker: string; side: "call" | "put"; strike: string | number; expiry: string | Date; estimatedEntryCredit: string | number; contracts: number };
 type FillRow = { positionId: string | null; ticker: string; side: "call" | "put"; strike: string | number; expiry: string | Date; action: "sell-to-open" | "buy-to-close"; quantity: number; price: string | number; fees: string | number; broker: string | null; executedAt: string | Date };
-type SettledRow = { positionId: string; observedAt: string | Date; pnlAmount: string | number; optionMark: string | number | null; estimatedOptionValue: string | number | null };
+type SettledRow = { positionId: string; observedAt: string | Date; state?: string; pnlAmount: string | number; optionMark: string | number | null; estimatedOptionValue: string | number | null };
 
 // Pure computation, so it can be unit-tested with synthetic rows.
 export function computeAccountPerformance({ basketRows, positionRows, fillRows, settledRows, now = Date.now() }: { basketRows: BasketRow[]; positionRows: PositionRow[]; fillRows: FillRow[]; settledRows: SettledRow[]; now?: number }): AccountPerformanceReport {
   const settledByPosition = new Map<string, SettledRow>();
   for (const snap of settledRows) {
     const existing = settledByPosition.get(snap.positionId);
-    if (!existing || new Date(snap.observedAt) > new Date(existing.observedAt)) settledByPosition.set(snap.positionId, snap);
+    // A model exit (manually-closed) is final; a later expiry settlement never overrides it.
+    const outranks = !existing || (snap.state === "manually-closed" && existing.state !== "manually-closed") ||
+      (existing.state !== "manually-closed" && new Date(snap.observedAt) > new Date(existing.observedAt));
+    if (outranks) settledByPosition.set(snap.positionId, snap);
   }
   const positionsByBasket = new Map<string, PositionRow[]>();
   for (const row of positionRows) {
