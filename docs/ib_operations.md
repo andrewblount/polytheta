@@ -1,5 +1,11 @@
 # IB connection and operating guide
 
+> **⚠️ ALPHA/UNVERIFIED STATUS**
+> 
+> This IB integration is **IMPLEMENTED BUT UNVERIFIED**. The code has never connected to a live Interactive Brokers account or executed a real order. All adapter code, execution logic, and reconciliation systems remain untested against actual broker responses.
+> 
+> **Do not treat this as production-ready.** Extensive testing with paper trading accounts is required before any consideration of live use.
+
 The website and apps display a database snapshot. The local Node worker owns broker reads and orders. Claude/other language models do not submit trades. Both adapters use the same policy, durable intent journal, matching account fingerprint, exact IB contract ID and order-reference reconciliation.
 
 ## Local configuration

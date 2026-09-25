@@ -8,7 +8,7 @@ Premium members-only options basket platform built with Next.js App Router, Tail
 - Tailwind CSS v4
 - Accessible custom component layer with Radix primitives
 - Netlify Identity for auth
-- Netlify DB / PostgreSQL
+- Neon PostgreSQL (via @netlify/neon)
 - Drizzle ORM + generated SQL migrations
 - Yahoo Finance-compatible provider abstraction on the server
 - Netlify Scheduled Function for recurring refreshes
@@ -33,10 +33,10 @@ npm install
 cp .env.example .env.local
 ```
 
-3. If you want real Netlify auth + database locally, initialize the site with Netlify and use:
+3. If you want real Netlify auth + database locally, provision a Neon database and configure `NETLIFY_DATABASE_URL`:
 
 ```bash
-npx netlify db init
+# Set up Neon database and configure NETLIFY_DATABASE_URL in .env.local
 npm run netlify:dev
 ```
 
@@ -71,7 +71,7 @@ Generated migration output is in [src/db/migrations](./src/db/migrations).
 
 1. Create/connect the Netlify site.
 2. Enable Identity for the site.
-3. Run `npx netlify db init` so Netlify provisions the database and sets `NETLIFY_DATABASE_URL`.
+3. Provision a Neon database and set `NETLIFY_DATABASE_URL` in Netlify environment variables.
 4. Set `INTERNAL_SYNC_TOKEN` in Netlify environment variables.
 5. Set `ACCESS_REQUEST_NOTIFY_EMAIL=ablount@bluecielo.com`.
 6. If you want access-request emails delivered, also configure `SENDGRID_API_KEY` and `SENDGRID_FROM_EMAIL`.
@@ -122,6 +122,8 @@ npm run build
 ```
 
 ## Live IB service and trading rules
+
+> **⚠️ ALPHA/UNVERIFIED:** The IB integration code is implemented but has **never connected to a live account or executed a real order**. Treat as prototype requiring extensive testing before any live use. See [IB operations guide](docs/ib_operations.md) for current status.
 
 - [Entry, exit, allocation and exact GSRS formula](docs/trading_rules.md), also visible at `/trading-rules`.
 - [IB configuration, execution and reconciliation guide](docs/ib_operations.md).
