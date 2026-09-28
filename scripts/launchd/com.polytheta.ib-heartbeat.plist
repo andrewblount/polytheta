@@ -16,10 +16,10 @@
 	<key>ProgramArguments</key>
 	<array>
 		<string>/opt/homebrew/bin/node</string>
-		<string>/Users/andrewblount/Library/CloudStorage/Dropbox-BlueCielo/Andrew Blount/development/polytheta/scripts/ib_heartbeat.mjs</string>
+		<string>/Users/andrewblount/Local/development/polytheta/scripts/ib_heartbeat.mjs</string>
 	</array>
 	<key>WorkingDirectory</key>
-	<string>/Users/andrewblount/Library/CloudStorage/Dropbox-BlueCielo/Andrew Blount/development/polytheta</string>
+	<string>/Users/andrewblount/Local/development/polytheta</string>
 	<key>EnvironmentVariables</key>
 	<dict>
 		<key>PATH</key>

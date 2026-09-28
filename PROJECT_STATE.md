@@ -4,7 +4,7 @@ Last updated: 2026-09-24 (evening)
 
 ## Identity and objective
 
-Authoritative root: `/Users/andrewblount/Library/CloudStorage/Dropbox-BlueCielo/Andrew Blount/development/polytheta` (the `~/Library/CloudStorage/Dropbox/development/polytheta` copy is stale, HEAD 9b1874a; do not work there). GitHub `andrewblount/polytheta`, branch `main`; production `https://polytheta.com`, Netlify site `7c943fa5-689b-484d-abd0-5c506cf8843d`. Next.js website, local Node IB worker, native sources under `ios/`.
+Authoritative root: `/Users/andrewblount/Local/development/polytheta` (launchd agents run there; the Dropbox-BlueCielo and Dropbox CloudStorage copies are gone or stale, do not work there). GitHub `andrewblount/polytheta`, branch `main`; production `https://polytheta.com`, Netlify site `7c943fa5-689b-484d-abd0-5c506cf8843d`. Next.js website, local Node IB worker, native sources under `ios/`.
 
 ## Model first, trading second (2026-09-24, commits a1f88e8, 35a7663, 39fdfce)
 
@@ -38,3 +38,5 @@ The percentage settings (account traded 0–100%, margin available 100–1000%) 
 ## Access moderation, September 17
 
 Unchanged: eight access requests pending; `fblount@biocurrent.com` absent; no account created. Private backup: `/Users/andrewblount/.local/state/polytheta/access-review-2026-09-17/`.
+
+Local-folder migration verified 2026-09-25. Authoritative root: `/Users/andrewblount/Local/development/polytheta`. Path-only maintenance is recorded in `/Users/andrewblount/.codex/audits/local-project-roots-2026-09-25`; product verification dates and remaining product work above are unchanged.

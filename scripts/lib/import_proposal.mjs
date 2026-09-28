@@ -175,6 +175,17 @@ const RULES = [
 export async function importProposal(proposalPath, { publish = false, connectionFactory = () => postgres(requireUrl(), { max: 1 }) } = {}) {
   const proposal = JSON.parse(fs.readFileSync(proposalPath, 'utf8'));
   if (proposal.phase === 'prepared') throw new Error('A preparation basket cannot be imported; finalization is required');
+  // Hard tenor rule: every option sold expires at most one week after the basket date.
+  // This is independent of the exchange-week schedule check below and applies to any
+  // proposal that reaches the database, historical or current.
+  const MAX_TENOR_DAYS = 7;
+  const basketDay = Date.parse(`${proposal.basket_date}T00:00:00Z`);
+  for (const p of proposal.picks ?? []) {
+    const expiryDay = Date.parse(`${p.expiry ?? proposal.expiry}T00:00:00Z`);
+    if (!Number.isFinite(basketDay) || !Number.isFinite(expiryDay)) throw new Error(`${p.ticker ?? 'pick'}: basket or expiry date is unreadable`);
+    const tenorDays = (expiryDay - basketDay) / 86400000;
+    if (tenorDays <= 0 || tenorDays > MAX_TENOR_DAYS) throw new Error(`${p.ticker}: option expiry ${p.expiry ?? proposal.expiry} is ${tenorDays} days from basket date ${proposal.basket_date}; maximum tenor is ${MAX_TENOR_DAYS} days`);
+  }
   if (proposal.phase === 'final') {
     const schedule = entrySchedule(proposal.basket_date, proposal.allocation_settings);
     const entry = Date.parse(proposal.entry_timestamp);
