@@ -130,7 +130,7 @@ try {
     '',
     `What to do: ${fix}`,
     '',
-    `If this is not fixed before ${win}, the weekly basket will NOT publish (the pipeline refuses to publish without a live IB check).`,
+    `If this is not fixed before ${win}, the model basket still publishes on Yahoo Finance quotes, but IB execution will not run for the week.`,
     '',
     `Re-run to confirm: node scripts/ib_heartbeat.mjs`,
   ].join('\n');
