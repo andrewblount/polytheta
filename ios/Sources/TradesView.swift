@@ -12,7 +12,7 @@ struct TradesView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        ScreenNavigation {
             List {
                 if let error { ErrorBanner(message: error) }
 
@@ -37,7 +37,7 @@ struct TradesView: View {
 
                 Section("Fills") {
                     if trades.isEmpty {
-                        Text("No trades logged yet. Tap + to record your first fill.")
+                        Text("No trades logged yet. Use Log trade to record your first fill.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -94,7 +94,8 @@ struct TradesView: View {
                 #endif
             }
             .refreshable { await load() }
-            .task { await load() }
+            .desktopRefresh { await load() }
+            .loadOnAppearance { await load() }
         }
     }
 
@@ -193,6 +194,9 @@ struct TradeFormView: View {
                     Button("Cancel", role: .cancel) { dismiss() }
                 }
             }
+            #if os(macOS)
+            .formStyle(.grouped)
+            #endif
             .navigationTitle("Log Trade")
             .task {
                 if let b = try? await api.summary().basket {

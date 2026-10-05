@@ -109,7 +109,7 @@ struct ArchiveBasketView: View {
             }
         }
         .navigationTitle(weekOf)
-        .task { await load() }
+        .loadOnAppearance { await load() }
         .refreshable { await load() }
     }
 

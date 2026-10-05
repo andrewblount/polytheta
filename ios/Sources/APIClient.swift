@@ -153,17 +153,20 @@ final class APIClient: ObservableObject {
         return try JSONDecoder().decode(Result.self, from: data).model
     }
 
-    // Register this phone's APNs token so trade warnings and exits push here.
-    func registerDevice(token: String, sandbox: Bool, label: String) async throws {
+    // Return delivery readiness separately from successful device registration.
+    @discardableResult
+    func registerDevice(token: String, sandbox: Bool, label: String, platform: String = "ios") async throws -> Bool {
         guard isConfigured, let url = URL(string: baseURL + "/api/mobile/devices") else { throw APIError.notConfigured }
         struct Payload: Encodable { let token: String; let platform: String; let sandbox: Bool; let label: String }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(self.token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(Payload(token: token, platform: "ios", sandbox: sandbox, label: label))
-        let (_, response) = try await URLSession.shared.data(for: request)
+        request.httpBody = try JSONEncoder().encode(Payload(token: token, platform: platform, sandbox: sandbox, label: label))
+        let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { throw APIError.badStatus((response as? HTTPURLResponse)?.statusCode ?? 0) }
+        struct Registration: Decodable { let configured: Bool }
+        return try JSONDecoder().decode(Registration.self, from: data).configured
     }
 
     func getSettings() async throws -> [String: [String: Bool]] {

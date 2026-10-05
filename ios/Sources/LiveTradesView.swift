@@ -9,7 +9,7 @@ struct LiveTradesView: View {
     private var active: [BrokerPosition] { state?.snapshot?.positions.filter { $0.quantity > 0 || $0.workingEntry || $0.status == "Reconciliation required" || $0.lossStop?.triggeredAt != nil } ?? [] }
     private var canAct: Bool { state?.isFresh == true && state?.snapshot?.activated == true && error == nil && !busy }
     var body: some View {
-        NavigationStack {
+        ScreenNavigation {
             List {
                 Section("PolyTheta only · IB live") {
                     Text(state?.isFresh == true && error == nil ? "IB account synchronized" : "IB connection unavailable or stale").foregroundStyle(state?.isFresh == true ? .secondary : .primary)

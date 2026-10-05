@@ -58,7 +58,10 @@ test('native summary accepts the old empty response and the new dated availabili
     latestPublished: { slug: 'weekly-basket-2026-08-31', title: 'August 31 basket', weekOf: '2026-08-31' } };
   const encoded = Buffer.from(JSON.stringify({ basket: null, availability })).toString('base64');
   const source = fs.readFileSync(new URL('../ios/Sources/Models.swift', import.meta.url), 'utf8');
-  const swift = `${source}
+  // The performance response now references the leg-source types. Include
+  // their real declarations so this standalone decoder check matches the app.
+  const performanceSources = fs.readFileSync(new URL('../ios/Sources/ModelSizing.swift', import.meta.url), 'utf8').split('struct ModelPerformance')[0];
+  const swift = `${performanceSources}\n${source}
 let legacy = try JSONDecoder().decode(SummaryResponse.self, from: Data(#"{"basket":null}"#.utf8))
 precondition(legacy.basket == nil && legacy.availability == nil)
 let current = try JSONDecoder().decode(SummaryResponse.self, from: Data(base64Encoded: "${encoded}")!)

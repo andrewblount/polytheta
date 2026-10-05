@@ -11,7 +11,7 @@ struct DashboardView: View {
     @State private var legs: [String: LegPath] = [:]
 
     var body: some View {
-        NavigationStack {
+        ScreenNavigation {
             List {
                 if let error { ErrorBanner(message: error) }
 
@@ -106,7 +106,8 @@ struct DashboardView: View {
             }
             .navigationTitle("Current Basket")
             .refreshable { await load() }
-            .task { await load() }
+            .desktopRefresh { await load() }
+            .loadOnAppearance { await load() }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { Task { await load() } }
             }

@@ -19,7 +19,7 @@ struct PerformanceView: View {
     private var basis: PerformanceBasis? { live?.basis ?? report?.basis }
 
     var body: some View {
-        NavigationStack {
+        ScreenNavigation {
             List {
                 if let error { ErrorBanner(message: error) }
 
@@ -168,7 +168,8 @@ struct PerformanceView: View {
             }
             .navigationTitle("Performance")
             .refreshable { await load() }
-            .task { await load() }
+            .desktopRefresh { await load() }
+            .loadOnAppearance { await load() }
         }
     }
 

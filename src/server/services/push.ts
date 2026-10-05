@@ -1,4 +1,4 @@
-// Apple Push Notification service delivery for the iOS app.
+// Apple Push Notification service delivery for the iOS and Mac apps.
 //
 // Device tokens are registered by the app (POST /api/mobile/devices) and kept
 // in app_settings under 'push_devices'. Sending uses token-based APNs auth
@@ -18,7 +18,7 @@ import { appSettings } from "@/db/schema";
 
 export interface PushDevice {
   token: string;
-  platform: "ios";
+  platform: "ios" | "macos";
   sandbox: boolean;
   label?: string;
   registeredAt: string;
@@ -27,6 +27,16 @@ export interface PushDevice {
 
 const DEVICES_KEY = "push_devices";
 const TOKEN_PATTERN = /^[0-9a-f]{32,200}$/i;
+
+export function normalizePushPlatform(platform?: string): PushDevice["platform"] {
+  if (platform === undefined || platform === "ios") return "ios";
+  if (platform === "macos") return "macos";
+  throw new Error("Unsupported push platform");
+}
+
+export function apnsTopicForDevice(device: Pick<PushDevice, "platform">, iosTopic: string) {
+  return device.platform === "macos" ? "com.andrewblount.polytheta.mac" : iosTopic;
+}
 
 export async function listPushDevices(): Promise<PushDevice[]> {
   if (!db) return [];
@@ -47,7 +57,7 @@ export async function registerPushDevice(input: { token: string; platform?: stri
   const now = new Date().toISOString();
   const devices = await listPushDevices();
   const existing = devices.find((d) => d.token === token);
-  const device: PushDevice = { token, platform: "ios", sandbox: Boolean(input.sandbox), label: input.label?.slice(0, 80), registeredAt: existing?.registeredAt ?? now, lastSeenAt: now };
+  const device: PushDevice = { token, platform: normalizePushPlatform(input.platform), sandbox: Boolean(input.sandbox), label: input.label?.slice(0, 80), registeredAt: existing?.registeredAt ?? now, lastSeenAt: now };
   await savePushDevices([...devices.filter((d) => d.token !== token), device].slice(-20));
   return device;
 }
@@ -127,7 +137,7 @@ export async function sendPush(message: PushMessage) {
     const host = device.sandbox ? "https://api.sandbox.push.apple.com" : "https://api.push.apple.com";
     try {
       const result = await sendOne(host, `/3/device/${device.token}`, {
-        authorization: `bearer ${jwt}`, "apns-topic": config.topic, "apns-push-type": "alert", "apns-priority": "10", "apns-expiration": String(Math.floor(Date.now() / 1000) + 3600),
+        authorization: `bearer ${jwt}`, "apns-topic": apnsTopicForDevice(device, config.topic), "apns-push-type": "alert", "apns-priority": "10", "apns-expiration": String(Math.floor(Date.now() / 1000) + 3600),
       }, payload);
       if (result.status === 200) sent += 1;
       else if (result.status === 410 || /BadDeviceToken|Unregistered|DeviceTokenNotForTopic/.test(result.body)) dead.push(device.token);

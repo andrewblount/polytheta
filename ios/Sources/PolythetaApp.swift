@@ -39,6 +39,8 @@ struct PolythetaApp: App {
     @StateObject private var api = APIClient.shared
     #if os(iOS)
     @UIApplicationDelegateAdaptor(PushDelegate.self) private var pushDelegate
+    #elseif os(macOS)
+    @NSApplicationDelegateAdaptor(MacPushDelegate.self) private var pushDelegate
     #endif
 
     var body: some Scene {
@@ -46,36 +48,39 @@ struct PolythetaApp: App {
             RootView()
                 .environmentObject(api)
                 .preferredColorScheme(.dark)
-                .tint(Color(red: 0.53, green: 0.71, blue: 1.0)) // #88b4ff
+                .tint(polythetaAccent)
+                .accentColor(polythetaAccent)
                 .task {
                     #if os(iOS)
                     PhoneWatchBridge.shared.start()
                     #endif
                 }
         }
+        #if os(macOS)
+        .defaultSize(width: 1180, height: 820)
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings…") {
+                    NotificationCenter.default.post(name: .polythetaShowSettings, object: nil)
+                }.keyboardShortcut(",", modifiers: .command)
+            }
+        }
+        #endif
     }
 }
 
 struct RootView: View {
-    @EnvironmentObject var api: APIClient
-
     var body: some View {
+        #if os(macOS)
+        DesktopRootView()
+        #else
         TabView {
-            LiveTradesView()
-                .tabItem { Label("Live IB", systemImage: "chart.line.uptrend.xyaxis") }
-            DashboardView()
-                .tabItem { Label("Basket", systemImage: "basket") }
-            TradesView()
-                .tabItem { Label("Trades", systemImage: "list.bullet.rectangle.portrait") }
-            AlertsView()
-                .tabItem { Label("Alerts", systemImage: "bell.badge") }
-            PerformanceView()
-                .tabItem { Label("Performance", systemImage: "chart.bar.xaxis") }
-            ArchiveView()
-                .tabItem { Label("Archive", systemImage: "archivebox") }
-            SettingsView()
-                .tabItem { Label("Settings", systemImage: "gearshape") }
+            ForEach(AppDestination.allCases) { destination in
+                destination.content
+                    .tabItem { Label(destination.title, systemImage: destination.symbol) }
+            }
         }
+        #endif
     }
 }
 

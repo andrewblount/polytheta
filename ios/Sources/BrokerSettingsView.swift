@@ -107,106 +107,119 @@ struct BrokerSettingsSection: View {
     @State private var newExcludedTicker = ""
     @State private var hosts: [BrokerSettingsResponse.ExecutionHost] = []
     var body: some View {
-        Section(settings.accountMode == "paper" ? "Interactive Brokers · Paper" : "Interactive Brokers · Live") {
-            Text(message).font(.footnote).foregroundStyle(.secondary)
-            Picker("Account mode", selection: Binding(get: { settings.accountMode }, set: { newMode in
-                guard settings.accountMode != newMode else { return }
-                let ports = newMode == "paper" ? [4001: 4002, 7496: 7497] : [4002: 4001, 7497: 7496]
-                settings.twsPort = ports[settings.twsPort] ?? settings.twsPort
-                settings.accountMode = newMode
-                settings.pauseEntries = true
-                message = "Save the selected account mode, then check its Gateway connection."
-            })) {
-                Text("Paper trading · simulated money").tag("paper")
-                Text("Live trading · real money").tag("live")
-            }
-            Text("Changing mode pauses new entries. Only the selected account is monitored. Saving settings does not activate orders.").font(.caption).foregroundStyle(.secondary)
-            if settings.accountMode == "paper" {
-                Text("On the execution computer, open IB Gateway and select Paper Trading before signing in with your existing IB login. Store your login in Apple Passwords and enter it directly in Gateway. PolyTheta detects a single paper account automatically.").font(.caption).foregroundStyle(.secondary)
-                Text("Paper ports: IB Gateway 4002 / TWS 7497. Keep the API read-only for the first check. Simulated trades stay separate from actual-trade performance.").font(.caption).foregroundStyle(.secondary)
-            }
-            Picker("Execution computer", selection: $settings.executionHostId) {
-                Text("Choose a registered computer").tag("")
-                ForEach(hosts) { host in Text(host.label).tag(host.id) }
-            }
-            Picker("Entry timing", selection: $settings.entryTiming) {
-                Text("Monday morning").tag("monday-morning")
-                Text("Friday: final five minutes").tag("friday-close")
-            }
-            SettingRow("Monday start (HH:MM, New York)") { TextField("Monday start (HH:MM, New York)", text: $settings.mondayEntryStart) }
-            SettingRow("Monday end (HH:MM, New York)") { TextField("Monday end (HH:MM, New York)", text: $settings.mondayEntryEnd) }
-            SettingRow("Screening lead time (minutes)") { TextField("Minutes", value: $settings.preparationLeadMinutes, format: .number) }
-            SettingRow("Final refresh before window (minutes)") { TextField("Minutes", value: $settings.finalizeLeadMinutes, format: .number) }
-            SettingRow("VIX-to-IV sensitivity") { TextField("Sensitivity", value: $settings.vixIvSensitivity, format: .number) }
-            SettingRow("Model annual risk-free rate (%)") { TextField("Rate", value: $settings.modelRiskFreeRatePct, format: .number) }
-            Text("Friday mode prepares before the close and targets next week’s expiry. Friday holidays use the preceding session; early closes are automatic. Monday holidays use the first session. Prices adjust for actual elapsed time, underlying moves and IV; IB fills determine actual results.").font(.caption).foregroundStyle(.secondary)
-            Picker("Connection", selection: $settings.connection) {
-                Text("TWS / IB Gateway").tag("tws")
-                Text("IB Web API").tag("web-api")
-            }
-            SettingRow("TWS / Gateway host or IP") { TextField("TWS / Gateway host or IP", text: $settings.twsHost) }
-            SettingRow("TWS / Gateway port") { TextField("Port", value: $settings.twsPort, format: .number) }
-            SettingRow("Dedicated TWS client ID") { TextField("Client ID", value: $settings.twsClientId, format: .number) }
-            SettingRow("IB Web API HTTPS endpoint") { TextField("IB Web API HTTPS endpoint", text: $settings.webApiUrl) }
-            SettingRow("Expected TWS restart (HH:MM)") { TextField("Expected TWS restart (HH:MM)", text: $settings.twsRestartTime) }
-            SettingRow("TWS restart time zone") { TextField("TWS restart time zone", text: $settings.twsRestartTimezone) }
-            SettingRow("Restart recovery window (minutes)") { TextField("Minutes", value: $settings.twsRestartGraceMinutes, format: .number) }
-            Text("Configure the same auto-restart time inside TWS. PolyTheta reconnects afterward; IB still normally requires weekly authentication.").font(.caption).foregroundStyle(.secondary)
-            PercentSlider(label: "Percentage of account traded", value: $settings.entryCapitalPct, range: ModelSizing.tradedRange, step: ModelSizing.tradedStep)
-            PercentSlider(label: "Margin available", value: $settings.marginAvailablePct, range: ModelSizing.marginRange, step: ModelSizing.marginStep)
-            Toggle("Sell calls", isOn: $settings.sellCalls)
-            Toggle("Sell puts", isOn: $settings.sellPuts)
-            Text("Side toggles decide which legs of the published model basket this account executes; a skipped leg’s share stays unallocated. Margin available scales contracts: 400% backs four dollars of strike or spot per committed dollar. IB’s margin preview must still approve every order.").font(.caption).foregroundStyle(.secondary)
-            SettingRow("Maximum loss per ticker (% of account)") { TextField("0.1–100%", value: $settings.maxAccountLossPct, format: .number) }
-            Text("Defaults to 20% of account equity recorded before entry. The worker monitors each ticker and closes only its PolyTheta contracts if triggered; no standing stop order at entry.").font(.caption).foregroundStyle(.secondary)
-            SettingRow("Calls (%)") { TextField("Percent", value: $settings.callAllocationPct, format: .number) }
-            SettingRow("Puts (%)") { TextField("Percent", value: $settings.putAllocationPct, format: .number) }
-            Stepper("Maximum trades: \(settings.maxTrades)", value: $settings.maxTrades, in: 1...20)
-            SettingRow("Gross exposure / equity ceiling (×)") { TextField("Multiple", value: $settings.reserveLeverageCeiling, format: .number) }
-            SettingRow("Minimum credit / model") { TextField("Ratio", value: $settings.minimumCreditRatio, format: .number) }
-            SettingRow("Cancel unfilled entry after (seconds)") { TextField("Seconds", value: $settings.entryTimeoutSeconds, format: .number) }
-            SettingRow("Exit debit ceiling / initial ask") { TextField("Multiple", value: $settings.maxExitPremiumMultiple, format: .number) }
-            Toggle("Pause new entries", isOn: $settings.pauseEntries)
-            Text("Do not trade").font(.headline)
-            ForEach(settings.excludedTickers, id: \.self) { ticker in
-                HStack { Text(ticker == "SPCX" ? "SPCX · SpaceX" : ticker); Spacer(); Button("Remove") { settings.excludedTickers.removeAll { $0 == ticker } } }
-            }
-            HStack {
-                TextField("Ticker to exclude", text: $newExcludedTicker)
-                Button("Add") { let ticker = newExcludedTicker.trimmingCharacters(in: .whitespacesAndNewlines).uppercased(); if !ticker.isEmpty && !settings.excludedTickers.contains(ticker) { settings.excludedTickers.append(ticker) }; newExcludedTicker = "" }
-            }
-            Text("Exclusions block new entries. Existing trades can still exit.").font(.caption).foregroundStyle(.secondary)
-            Text("Per-trade minimum OTM").font(.headline)
-            ForEach(settings.strikeOverrides.indices, id: \.self) { i in
-                VStack(alignment: .leading) {
-                    SettingRow("Ticker") { TextField("Ticker", text: $settings.strikeOverrides[i].ticker) }
-                    Picker("Side", selection: $settings.strikeOverrides[i].side) { Text("Call").tag("call"); Text("Put").tag("put") }
-                    SettingRow("Expiry (YYYY-MM-DD)") { TextField("Expiry (YYYY-MM-DD)", text: $settings.strikeOverrides[i].expiry) }
-                    SettingRow("At least OTM (%)") { TextField("Minimum", value: $settings.strikeOverrides[i].minimumOtmPct, format: .number) }
-                    Button("Remove trade minimum", role: .destructive) { settings.strikeOverrides.remove(at: i) }
+        Group {
+            Section(settings.accountMode == "paper" ? "Interactive Brokers · Paper" : "Interactive Brokers · Live") {
+                Text(message).font(.footnote).foregroundStyle(.secondary)
+                Picker("Account mode", selection: Binding(get: { settings.accountMode }, set: { newMode in
+                    guard settings.accountMode != newMode else { return }
+                    let ports = newMode == "paper" ? [4001: 4002, 7496: 7497] : [4002: 4001, 7497: 7496]
+                    settings.twsPort = ports[settings.twsPort] ?? settings.twsPort
+                    settings.accountMode = newMode
+                    settings.pauseEntries = true
+                    message = "Save the selected account mode, then check its Gateway connection."
+                })) {
+                    Text("Paper trading · simulated money").tag("paper")
+                    Text("Live trading · real money").tag("live")
+                }
+                .accessibilityIdentifier("broker.accountMode")
+                Text("Changing mode pauses new entries. Only the selected account is monitored. Saving settings does not activate orders.").font(.caption).foregroundStyle(.secondary)
+                if settings.accountMode == "paper" {
+                    Text("On the execution computer, open IB Gateway and select Paper Trading before signing in with your existing IB login. Store your login in Apple Passwords and enter it directly in Gateway. PolyTheta detects a single paper account automatically.").font(.caption).foregroundStyle(.secondary)
+                    Text("Paper ports: IB Gateway 4002 / TWS 7497. Keep the API read-only for the first check. Simulated trades stay separate from actual-trade performance.").font(.caption).foregroundStyle(.secondary)
+                }
+                Picker("Execution computer", selection: $settings.executionHostId) {
+                    Text("Choose a registered computer").tag("")
+                    ForEach(hosts) { host in Text(host.label).tag(host.id) }
                 }
             }
-            Button("Add trade minimum") { settings.strikeOverrides.append(StrikeOverride()) }
-            Text("Set before building the basket. Available strikes must meet this minimum plus delta and ATR rules. Existing positions are unchanged.").font(.caption).foregroundStyle(.secondary)
-            Text("Calls and puts must total 100%. The split determines trade counts; capital is divided equally. IB real-time quotes are required. The margin reserve does not increase entry size.").font(.caption).foregroundStyle(.secondary)
-            if let error { ErrorBanner(message: error) }
-            Button(saving ? "Saving…" : "Save trading settings") {
-                Task {
-                    saving = true
-                    defer { saving = false }
-                    do { settings = try await api.updateBrokerSettings(settings); error = nil; message = "Trading settings saved. Execution requires separate activation for the selected account mode on the trading Mac." }
-                    catch { self.error = error.localizedDescription }
+            Section("Entry schedule") {
+                Picker("Entry timing", selection: $settings.entryTiming) {
+                    Text("Monday morning").tag("monday-morning")
+                    Text("Friday: final five minutes").tag("friday-close")
                 }
-            }.disabled(!loaded || saving)
-            if let url = URL(string: api.baseURL + "/trading-rules") { Link("Entry, exit and GSRS rules", destination: url) }
-        }.task {
-            guard api.isConfigured else { return }
-            do {
-                let response = try await api.getBrokerSettings()
-                settings = response.broker; loaded = true
-                hosts = response.executionHosts ?? []
-                message = response.brokerStatus?.stale == false ? response.brokerStatus?.message ?? "IB status unavailable" : "IB connection has not been verified recently."
-            } catch { self.error = error.localizedDescription }
+                SettingRow("Monday start (HH:MM, New York)") { TextField("Monday start (HH:MM, New York)", text: $settings.mondayEntryStart) }
+                SettingRow("Monday end (HH:MM, New York)") { TextField("Monday end (HH:MM, New York)", text: $settings.mondayEntryEnd) }
+                SettingRow("Screening lead time (minutes)") { TextField("Minutes", value: $settings.preparationLeadMinutes, format: .number) }
+                SettingRow("Final refresh before window (minutes)") { TextField("Minutes", value: $settings.finalizeLeadMinutes, format: .number) }
+                SettingRow("VIX-to-IV sensitivity") { TextField("Sensitivity", value: $settings.vixIvSensitivity, format: .number) }
+                SettingRow("Model annual risk-free rate (%)") { TextField("Rate", value: $settings.modelRiskFreeRatePct, format: .number) }
+                Text("Friday mode prepares before the close and targets next week’s expiry. Friday holidays use the preceding session; early closes are automatic. Monday holidays use the first session. Prices adjust for actual elapsed time, underlying moves and IV; IB fills determine actual results.").font(.caption).foregroundStyle(.secondary)
+            }
+            Section("Connection & recovery") {
+                Picker("Connection", selection: $settings.connection) {
+                    Text("TWS / IB Gateway").tag("tws")
+                    Text("IB Web API").tag("web-api")
+                }
+                SettingRow("TWS / Gateway host or IP") { TextField("TWS / Gateway host or IP", text: $settings.twsHost) }
+                SettingRow("TWS / Gateway port") { TextField("Port", value: $settings.twsPort, format: .number) }
+                SettingRow("Dedicated TWS client ID") { TextField("Client ID", value: $settings.twsClientId, format: .number) }
+                SettingRow("IB Web API HTTPS endpoint") { TextField("IB Web API HTTPS endpoint", text: $settings.webApiUrl) }
+                SettingRow("Expected TWS restart (HH:MM)") { TextField("Expected TWS restart (HH:MM)", text: $settings.twsRestartTime) }
+                SettingRow("TWS restart time zone") { TextField("TWS restart time zone", text: $settings.twsRestartTimezone) }
+                SettingRow("Restart recovery window (minutes)") { TextField("Minutes", value: $settings.twsRestartGraceMinutes, format: .number) }
+                Text("Configure the same auto-restart time inside TWS. PolyTheta reconnects afterward; IB still normally requires weekly authentication.").font(.caption).foregroundStyle(.secondary)
+            }
+            Section("Sizing & risk limits") {
+                PercentSlider(label: "Percentage of account traded", value: $settings.entryCapitalPct, range: ModelSizing.tradedRange, step: ModelSizing.tradedStep)
+                PercentSlider(label: "Margin available", value: $settings.marginAvailablePct, range: ModelSizing.marginRange, step: ModelSizing.marginStep)
+                Toggle("Sell calls", isOn: $settings.sellCalls)
+                Toggle("Sell puts", isOn: $settings.sellPuts)
+                Text("Side toggles decide which legs of the published model basket this account executes; a skipped leg’s share stays unallocated. Margin available scales contracts: 400% backs four dollars of strike or spot per committed dollar. IB’s margin preview must still approve every order.").font(.caption).foregroundStyle(.secondary)
+                SettingRow("Maximum loss per ticker (% of account)") { TextField("0.1–100%", value: $settings.maxAccountLossPct, format: .number) }
+                Text("Defaults to 20% of account equity recorded before entry. The worker monitors each ticker and closes only its PolyTheta contracts if triggered; no standing stop order at entry.").font(.caption).foregroundStyle(.secondary)
+                SettingRow("Calls (%)") { TextField("Percent", value: $settings.callAllocationPct, format: .number) }
+                SettingRow("Puts (%)") { TextField("Percent", value: $settings.putAllocationPct, format: .number) }
+                Stepper("Maximum trades: \(settings.maxTrades)", value: $settings.maxTrades, in: 1...20)
+                SettingRow("Gross exposure / equity ceiling (×)") { TextField("Multiple", value: $settings.reserveLeverageCeiling, format: .number) }
+                SettingRow("Minimum credit / model") { TextField("Ratio", value: $settings.minimumCreditRatio, format: .number) }
+                SettingRow("Cancel unfilled entry after (seconds)") { TextField("Seconds", value: $settings.entryTimeoutSeconds, format: .number) }
+                SettingRow("Exit debit ceiling / initial ask") { TextField("Multiple", value: $settings.maxExitPremiumMultiple, format: .number) }
+                Toggle("Pause new entries", isOn: $settings.pauseEntries)
+            }
+            Section("Do not trade") {
+                ForEach(settings.excludedTickers, id: \.self) { ticker in
+                    HStack { Text(ticker == "SPCX" ? "SPCX · SpaceX" : ticker); Spacer(); Button("Remove") { settings.excludedTickers.removeAll { $0 == ticker } } }
+                }
+                HStack {
+                    TextField("Ticker to exclude", text: $newExcludedTicker)
+                    Button("Add") { let ticker = newExcludedTicker.trimmingCharacters(in: .whitespacesAndNewlines).uppercased(); if !ticker.isEmpty && !settings.excludedTickers.contains(ticker) { settings.excludedTickers.append(ticker) }; newExcludedTicker = "" }
+                }
+                Text("Exclusions block new entries. Existing trades can still exit.").font(.caption).foregroundStyle(.secondary)
+            }
+            Section("Per-trade minimum OTM") {
+                ForEach(settings.strikeOverrides.indices, id: \.self) { i in
+                    VStack(alignment: .leading) {
+                        SettingRow("Ticker") { TextField("Ticker", text: $settings.strikeOverrides[i].ticker) }
+                        Picker("Side", selection: $settings.strikeOverrides[i].side) { Text("Call").tag("call"); Text("Put").tag("put") }
+                        SettingRow("Expiry (YYYY-MM-DD)") { TextField("Expiry (YYYY-MM-DD)", text: $settings.strikeOverrides[i].expiry) }
+                        SettingRow("At least OTM (%)") { TextField("Minimum", value: $settings.strikeOverrides[i].minimumOtmPct, format: .number) }
+                        Button("Remove trade minimum", role: .destructive) { settings.strikeOverrides.remove(at: i) }
+                    }
+                }
+                Button("Add trade minimum") { settings.strikeOverrides.append(StrikeOverride()) }
+                Text("Set before building the basket. Available strikes must meet this minimum plus delta and ATR rules. Existing positions are unchanged.").font(.caption).foregroundStyle(.secondary)
+                Text("Calls and puts must total 100%. The split determines trade counts; capital is divided equally. IB real-time quotes are required. The margin reserve does not increase entry size.").font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
+                if let error { ErrorBanner(message: error) }
+                Button(saving ? "Saving…" : "Save trading settings") {
+                    Task {
+                        saving = true
+                        defer { saving = false }
+                        do { settings = try await api.updateBrokerSettings(settings); error = nil; message = "Trading settings saved. Execution requires separate activation for the selected account mode on the trading Mac." }
+                        catch { self.error = error.localizedDescription }
+                    }
+                }.disabled(!loaded || saving)
+                if let url = URL(string: api.baseURL + "/trading-rules") { Link("Entry, exit and GSRS rules", destination: url) }
+            }.loadOnAppearance {
+                guard api.isConfigured else { return }
+                do {
+                    let response = try await api.getBrokerSettings()
+                    settings = response.broker; loaded = true
+                    hosts = response.executionHosts ?? []
+                    message = response.brokerStatus?.stale == false ? response.brokerStatus?.message ?? "IB status unavailable" : "IB connection has not been verified recently."
+                } catch { self.error = error.localizedDescription }
+            }
         }
     }
 }
@@ -245,7 +258,7 @@ struct ModelSettingsSection: View {
             }.disabled(!loaded || saving)
         } header: {
             Text("Model sizing")
-        }.task {
+        }.loadOnAppearance {
             guard api.isConfigured else { return }
             do { settings = try await api.getBrokerSettings().model ?? ModelSettings(); loaded = true }
             catch { self.error = error.localizedDescription }
@@ -264,6 +277,10 @@ struct SettingRow<Content: View>: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label).font(.caption).foregroundStyle(.secondary)
             content
+                #if os(macOS)
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                #endif
                 #if os(iOS)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
