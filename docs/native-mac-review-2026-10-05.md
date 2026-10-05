@@ -34,3 +34,7 @@ Authenticated live reads returned 200 for summary, settings, performance, IB, an
 **Apple push delivery remains unconfigured on the server** (`configured: false`): its credentials are absent. Mac capability and provisioning are ready, but delivery has not been demonstrated. No test push, trade, exit request, or settings save was submitted during this review. No iOS TestFlight release was uploaded in this task.
 
 Private evidence and the old app backup: `/Users/andrewblount/.local/state/polytheta/mac-ui-2026-10-05/`. Working logs: `/tmp/polytheta-mac-ui-20261005/`. Unrelated pre-existing edits remain outside the commit.
+
+## Delivered release
+
+Source commit `6ec797c` is pushed to main. The final signed Mac **1.7.1 (17)** is installed at `/Applications/Polytheta.app`; its archive-to-Settings transition was verified after installation, and Settings is left open. Netlify production publication completed on October 5. Post-publication authenticated summary, settings, performance, IB, device status, and September 28 leg paths all returned 200. Device status still reports `configured: false`, as recorded above. The private evidence directory contains the deployment receipt, source/install verification, final UI test result, and API check record.
